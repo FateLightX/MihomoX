@@ -1,4 +1,5 @@
 name: stale-issues
+# mihomox-actions-index: force workflow registration
 
 on:
   schedule:
