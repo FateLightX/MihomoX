@@ -119,6 +119,7 @@ const methods = {
 				updating: updating,
 				state: state.state || 'idle',
 				message: state.message || '',
+				updated_at: state.updated_at || '',
 				log: shell_read('tail -20 ' + CORE_LOG_FILE + ' 2>/dev/null')
 			};
 		}

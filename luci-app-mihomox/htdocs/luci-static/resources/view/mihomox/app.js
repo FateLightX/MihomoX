@@ -46,6 +46,20 @@ function updateCoreUpdateStatus(element, status) {
     return element;
 }
 
+function renderCoreUpdateTime(updatedAt) {
+    return updateCoreUpdateTime(E('input', {
+        id: 'core_update_time',
+        style: 'border: unset; font-style: italic;',
+        readonly: ''
+    }), updatedAt);
+}
+
+function updateCoreUpdateTime(element, updatedAt) {
+    if (element)
+        element.value = updatedAt || '-';
+    return element;
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -169,16 +183,22 @@ return view.extend({
             return renderCoreUpdateStatus(coreState);
         };
 
+        o = s.option(form.DummyValue, '_update_time', _('Update At'));
+        o.cfgvalue = function () {
+            return renderCoreUpdateTime(coreState.updated_at);
+        };
+
         poll.add(function () {
             return mihomox.coreStatus().then(function (status) {
                 updateCoreUpdateStatus(document.getElementById('core_update_status'), status);
+                updateCoreUpdateTime(document.getElementById('core_update_time'), status.updated_at);
             });
         });
 
         o = s.option(form.Button, '_update_core', _('Mihomo Core'));
         o.inputstyle = 'positive';
         o.inputtitle = _('Update Core');
-        o.onclick = function (sectionId) {
+        o.onclick = function (_, sectionId) {
             const channel = channelOption.formvalue(sectionId) || 'release';
             const architecture = architectureOption.formvalue(sectionId) || 'auto';
             const mirrorPrefix = mirrorOption.formvalue(sectionId) || '';

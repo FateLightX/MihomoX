@@ -65,6 +65,11 @@ run_update release "file://$TEST_DIR/new-mihomo.gz"
 "$TEST_DIR/core/mihomo" -v | grep -q 'v9.9.9'
 grep -q '^version=v9.9.9$' "$TEST_DIR/core/mihomo.version"
 grep -q '^state=success$' "$TEST_DIR/run/core-update.status"
+grep -Eq '^updated_at=[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$' "$TEST_DIR/run/core-update.status"
+
+run_update Prerelease-Alpha "file://$TEST_DIR/new-mihomo.gz"
+grep -q '^channel=Prerelease-Alpha$' "$TEST_DIR/core/mihomo.version"
+grep -q '^state=success$' "$TEST_DIR/run/core-update.status"
 
 write_core "$TEST_DIR/core/mihomo" "v1.0.0"
 printf 'version=v1.0.0\narchitecture=linux-amd64-v1\n' > "$TEST_DIR/core/mihomo.version"
@@ -91,5 +96,6 @@ if run_update release "file://$TEST_DIR/invalid.gz"; then
 fi
 "$TEST_DIR/core/mihomo" -v | grep -q 'v1.0.0'
 grep -q '^state=failed$' "$TEST_DIR/run/core-update.status"
+grep -Eq '^updated_at=[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$' "$TEST_DIR/run/core-update.status"
 
 echo "runtime core update tests passed"
