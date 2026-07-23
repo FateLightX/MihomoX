@@ -1,0 +1,60 @@
+{
+    "admin/services/mihomox": {
+        "title": "MihomoX",
+        "action": {
+            "type": "firstchild"
+        },
+        "depends": {
+            "acl": [ "luci-app-mihomox" ],
+            "uci": { "mihomox": true }
+        }
+    },
+    "admin/services/mihomox/config": {
+        "title": "App Config",
+        "order": 10,
+        "action": {
+            "type": "view",
+            "path": "mihomox/app"
+        }
+    },
+    "admin/services/mihomox/profile": {
+        "title": "Profile",
+        "order": 20,
+        "action": {
+            "type": "view",
+            "path": "mihomox/profile"
+        }
+    },
+    "admin/services/mihomox/mixin": {
+        "title": "Mixin Config",
+        "order": 30,
+        "action": {
+            "type": "view",
+            "path": "mihomox/mixin"
+        }
+    },
+    "admin/services/mihomox/proxy": {
+        "title": "Proxy Config",
+        "order": 40,
+        "action": {
+            "type": "view",
+            "path": "mihomox/proxy"
+        }
+    },
+    "admin/services/mihomox/editor": {
+        "title": "Editor",
+        "order": 50,
+        "action": {
+            "type": "view",
+            "path": "mihomox/editor"
+        }
+    },
+    "admin/services/mihomox/log": {
+        "title": "Log",
+        "order": 60,
+        "action": {
+            "type": "view",
+            "path": "mihomox/log"
+        }
+    }
+}

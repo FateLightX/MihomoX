@@ -1,0 +1,37 @@
+{
+    "luci-app-mihomox": {
+        "description": "Grant access to mihomox procedures",
+        "read": {
+            "uci": [ "mihomox" ],
+            "ubus": {
+                "rc": [ "*" ],
+                "luci.mihomox": [ "*" ]
+            },
+            "file": {
+                "/etc/mihomox/profiles/*.yaml": ["read"],
+                "/etc/mihomox/profiles/*.yml": ["read"],
+                "/etc/mihomox/subscriptions/*.yaml": ["read"],
+                "/etc/mihomox/subscriptions/*.yml": ["read"],
+                "/etc/mihomox/mixin.yaml": ["read"],
+                "/etc/mihomox/run/config.yaml": ["read"],
+                "/etc/mihomox/run/providers/rule/*": ["read"],
+                "/etc/mihomox/run/providers/proxy/*": ["read"],
+                "/var/log/mihomox/*.log": ["read"]
+            }
+        },
+        "write": {
+            "uci": [ "mihomox" ],
+            "file": {
+                "/etc/mihomox/profiles/*.yaml": ["write"],
+                "/etc/mihomox/profiles/*.yml": ["write"],
+                "/etc/mihomox/subscriptions/*.yaml": ["write"],
+                "/etc/mihomox/subscriptions/*.yml": ["write"],
+                "/etc/mihomox/mixin.yaml": ["write"],
+                "/etc/mihomox/run/config.yaml": ["write"],
+                "/etc/mihomox/run/providers/rule/*": ["write"],
+                "/etc/mihomox/run/providers/proxy/*": ["write"],
+                "/var/log/mihomox/*.log": ["write"]
+            }
+        }
+    }
+}

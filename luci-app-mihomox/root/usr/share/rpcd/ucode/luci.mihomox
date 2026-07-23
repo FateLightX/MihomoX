@@ -1,0 +1,206 @@
+#!/usr/bin/ucode
+
+'use strict';
+
+import { access, popen, readfile, unlink, writefile } from 'fs';
+import { cursor } from 'uci';
+import { get_users, get_groups, get_cgroups, load_profile } from '/etc/mihomox/ucode/include.uc';
+
+const CORE_PATH = '/etc/mihomox/bin/mihomo';
+const CORE_VERSION_FILE = '/etc/mihomox/bin/mihomo.version';
+const CORE_UPDATE_SCRIPT = '/etc/mihomox/scripts/update_core.sh';
+const CORE_STATUS_FILE = '/var/run/mihomox/core-update.status';
+const CORE_LOCK_DIR = '/var/run/mihomox/core-update.lock';
+const CORE_PENDING_FILE = '/var/run/mihomox/core-update.pending';
+const CORE_LOG_FILE = '/var/log/mihomox/core-update.log';
+const CORE_ARCHITECTURES = {
+	'auto': true,
+	'amd64-v1': true,
+	'amd64-v2': true,
+	'amd64-v3': true,
+	'386': true,
+	'arm64': true,
+	'armv7': true,
+	'armv6': true,
+	'armv5': true,
+	'mips': true,
+	'mipsle': true,
+	'mips64': true,
+	'mips64le': true,
+	'riscv64': true,
+	'loong64': true
+};
+
+function shell_read(command) {
+	let process = popen(command);
+	if (!process) return '';
+	let value = trim(process.read('all') || '');
+	process.close();
+	return value;
+}
+
+function read_kv(path) {
+	let result = {};
+	if (!access(path, 'r')) return result;
+	for (let line in split(readfile(path) || '', '\n')) {
+		let position = index(line, '=');
+		if (position <= 0) continue;
+		result[substr(line, 0, position)] = trim(substr(line, position + 1));
+	}
+	return result;
+}
+
+function installed_core_version() {
+	let metadata = read_kv(CORE_VERSION_FILE);
+	if (metadata.version) return metadata.version;
+	return shell_read("" + CORE_PATH + " -v 2>/dev/null | awk '{ for (i=1; i<=NF; i++) if ($i ~ /^v[0-9]+([.][0-9]+)+/) { print $i; exit } }'");
+}
+
+const methods = {
+	version: {
+		call: function() {
+			let app = '';
+			if (system('command -v opkg') == 0) {
+				app = shell_read("opkg status luci-app-mihomox 2>/dev/null | awk -F': ' '/^Version:/{print $2; exit}'");
+			} else if (system('command -v apk') == 0) {
+				app = shell_read("apk list -I luci-app-mihomox 2>/dev/null | awk '{print $1; exit}' | sed 's/^luci-app-mihomox-//'");
+			}
+			return { app: app, core: installed_core_version() };
+		}
+	},
+	profile: {
+		args: { defaults: {} },
+		call: function(req) {
+			let profile = {};
+			const defaults = req.args?.defaults ?? {};
+			const filepath = '/etc/mihomox/run/config.yaml';
+			const tmpFilepath = '/var/run/mihomox/profile.json';
+			if (access(filepath, 'r')) {
+				writefile(tmpFilepath, defaults);
+				const command = `yq -M -p yaml -o json eval-all 'select(fi == 0) *? select(fi == 1)' ${tmpFilepath} ${filepath}`;
+				const process = popen(command);
+				if (process) {
+					profile = json(process);
+					process.close();
+				}
+			}
+			return profile;
+		}
+	},
+	update_subscription: {
+		args: { section_id: 'section_id' },
+		call: function(req) {
+			let success = false;
+			const section_id = req.args?.section_id;
+			if (section_id) {
+				success = system(['service', 'mihomox', 'update_subscription', section_id]) == 0;
+			}
+			return { success: success };
+		}
+	},
+	core_status: {
+		call: function() {
+			let metadata = read_kv(CORE_VERSION_FILE);
+			let state = read_kv(CORE_STATUS_FILE);
+			let configured = shell_read("uci -q get mihomox.core.architecture 2>/dev/null") || 'auto';
+			let detected = shell_read('/etc/mihomox/scripts/update_core.sh --detect-arch 2>/dev/null');
+			let updating = access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r');
+			return {
+				installed: metadata.version || installed_core_version(),
+				latest: state.version || '',
+				architecture: state.architecture || detected,
+				detected_architecture: detected,
+				configured_architecture: configured,
+				updating: updating,
+				state: state.state || 'idle',
+				message: state.message || '',
+				log: shell_read('tail -20 ' + CORE_LOG_FILE + ' 2>/dev/null')
+			};
+		}
+	},
+	update_core: {
+		args: { architecture: 'architecture', mirror_prefix: 'mirror_prefix', download_url: 'download_url' },
+		call: function(req) {
+			let architecture = req.args?.architecture || 'auto';
+			let mirror_prefix = req.args?.mirror_prefix || '';
+			let download_url = req.args?.download_url || '';
+			if (!CORE_ARCHITECTURES[architecture])
+				return { success: false, error: 'invalid_architecture' };
+			if (length(mirror_prefix) > 2048 || length(download_url) > 2048 ||
+				match(mirror_prefix, /[\r\n]/) || match(download_url, /[\r\n]/))
+				return { success: false, error: 'invalid_url' };
+			if ((mirror_prefix && !match(mirror_prefix, /^https?:\/\//)) ||
+				(download_url && !match(download_url, /^https?:\/\//)))
+				return { success: false, error: 'invalid_url' };
+			if (access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r'))
+				return { success: true, started: false, running: true };
+			if (!access(CORE_UPDATE_SCRIPT, 'x'))
+				return { success: false, error: 'missing_script' };
+			if (system('mkdir -p /var/run/mihomox /var/log/mihomox') != 0)
+				return { success: false, error: 'runtime_directory_failed' };
+
+			let uci = cursor();
+			uci.load('mihomox');
+			uci.set('mihomox', 'core', 'architecture', architecture);
+			uci.set('mihomox', 'core', 'mirror_prefix', mirror_prefix);
+			uci.set('mihomox', 'core', 'download_url', download_url);
+			uci.commit('mihomox');
+
+			if (writefile(CORE_PENDING_FILE, 'pending\n') === null)
+				return { success: false, error: 'lock_failed' };
+			let rc = system('nohup /etc/init.d/mihomox update_core >/dev/null 2>&1 </dev/null &');
+			if (rc != 0) {
+				unlink(CORE_PENDING_FILE);
+				return { success: false, error: 'start_failed' };
+			}
+			return { success: true, started: true, running: true };
+		}
+	},
+	api: {
+		args: { method: 'method', path: 'path', query: 'query', body: 'body' },
+		call: function(req) {
+			let result = {};
+
+			const method = req.args?.method;
+			const path = req.args?.path;
+			const query = req.args?.query;
+			const body = req.args?.body;
+
+			const profile = load_profile();
+			const api_listen = profile['external-controller'];
+			const api_tls_listen = profile['external-controller-tls'];
+			const api_secret = profile['secret'];
+			if (!api_listen && !api_tls_listen) {
+				return result;
+			}
+
+			const protocol = api_tls_listen ? 'https' : 'http';
+
+			const url = api_listen + path;
+
+			const process = popen(`curl --proto-default '${protocol}' --insecure --request '${method}' --oauth2-bearer '${api_secret}' --url-query '${query}' --data '${body}' '${url}'`);
+			if (process) {
+				result = json(process);
+				process.close();
+			}
+
+			return result;
+		}
+	},
+	get_identifiers: {
+		call: function() {
+			const users = filter(get_users(), (x) => x != '');
+			const groups = filter(get_groups(), (x) => x != '');
+			const cgroups = filter(get_cgroups(), (x) => x != '' && index(x, 'services/mihomox') < 0);
+			return { users: users, groups: groups, cgroups: cgroups };
+		}
+	},
+	debug: {
+		call: function() {
+			const success = system('/etc/mihomox/scripts/debug.sh > /var/log/mihomox/debug.log') == 0;
+			return { success: success };
+		}
+	}
+};
+
+return { 'luci.mihomox': methods };
