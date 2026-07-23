@@ -1132,6 +1132,9 @@ msgstr "自動"
 msgid "Completed"
 msgstr "已完成"
 
+msgid "Core Channel"
+msgstr "核心通道"
+
 msgid "Core Architecture"
 msgstr "核心架構"
 
@@ -1144,6 +1147,9 @@ msgstr "自訂核心位址"
 msgid "Detected Architecture"
 msgstr "偵測到的架構"
 
+msgid "Installed Core Architecture"
+msgstr "已安裝核心架構"
+
 msgid "Failed"
 msgstr "失敗"
 
@@ -1155,6 +1161,12 @@ msgstr "閒置"
 
 msgid "Mihomo Core"
 msgstr "Mihomo 核心"
+
+msgid "Prerelease Alpha"
+msgstr "預發布 Alpha"
+
+msgid "Release"
+msgstr "正式版"
 
 msgid "Unknown"
 msgstr "未知"

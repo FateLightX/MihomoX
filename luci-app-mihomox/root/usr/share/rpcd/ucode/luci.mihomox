@@ -126,7 +126,8 @@ const methods = {
 	update_core: {
 		args: { channel: 'channel', architecture: 'architecture', mirror_prefix: 'mirror_prefix', download_url: 'download_url' },
 		call: function(req) {
-			let channel = req.args?.channel || 'release';
+			let configured_channel = shell_read("uci -q get mihomox.core.channel 2>/dev/null") || 'release';
+			let channel = req.args?.channel || configured_channel;
 			let architecture = req.args?.architecture || 'auto';
 			let mirror_prefix = req.args?.mirror_prefix || '';
 			let download_url = req.args?.download_url || '';
@@ -140,8 +141,6 @@ const methods = {
 			if ((mirror_prefix && !match(mirror_prefix, /^https?:\/\//)) ||
 				(download_url && !match(download_url, /^https?:\/\//)))
 				return { success: false, error: 'invalid_url' };
-			if (access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r'))
-				return { success: true, started: false, running: true };
 			if (!access(CORE_UPDATE_SCRIPT, 'x'))
 				return { success: false, error: 'missing_script' };
 			if (system('mkdir -p /var/run/mihomox /var/log/mihomox') != 0)
@@ -153,7 +152,12 @@ const methods = {
 			uci.set('mihomox', 'core', 'architecture', architecture);
 			uci.set('mihomox', 'core', 'mirror_prefix', mirror_prefix);
 			uci.set('mihomox', 'core', 'download_url', download_url);
-			uci.commit('mihomox');
+			if (!uci.commit('mihomox'))
+				return { success: false, error: 'save_failed' };
+			if (shell_read("uci -q get mihomox.core.channel 2>/dev/null") != channel)
+				return { success: false, error: 'save_failed' };
+			if (access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r'))
+				return { success: true, started: false, running: true, channel: channel };
 
 			if (writefile(CORE_PENDING_FILE, 'pending\n') === null)
 				return { success: false, error: 'lock_failed' };
@@ -162,7 +166,7 @@ const methods = {
 				unlink(CORE_PENDING_FILE);
 				return { success: false, error: 'start_failed' };
 			}
-			return { success: true, started: true, running: true };
+			return { success: true, started: true, running: true, channel: channel };
 		}
 	},
 	api: {

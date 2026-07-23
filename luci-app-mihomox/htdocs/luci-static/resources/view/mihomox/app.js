@@ -187,6 +187,9 @@ return view.extend({
             return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl).then(function (result) {
                 if (!result || !result.success)
                     return Promise.reject(new Error(result?.error || _('Failed')));
+                const channelElement = channelOption.getUIElement(sectionId);
+                if (channelElement && result.channel)
+                    channelElement.setValue(result.channel);
                 return result;
             });
         };
