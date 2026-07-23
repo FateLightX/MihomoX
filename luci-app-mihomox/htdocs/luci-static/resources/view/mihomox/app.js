@@ -124,6 +124,16 @@ return view.extend({
 
         s = m.section(form.NamedSection, 'core', 'core', _('Core Update'));
 
+        const channelOption = s.option(form.ListValue, 'channel', _('Core Channel'));
+        channelOption.rmempty = false;
+        channelOption.value('release', _('Release'));
+        channelOption.value('Prerelease-Alpha', _('Prerelease Alpha'));
+
+        o = s.option(form.DummyValue, '_installed_architecture', _('Installed Core Architecture'));
+        o.cfgvalue = function () {
+            return coreState.installed_architecture || _('Unknown');
+        };
+
         o = s.option(form.DummyValue, '_detected_architecture', _('Detected Architecture'));
         o.cfgvalue = function () {
             return coreState.detected_architecture || _('Unknown');
@@ -169,11 +179,12 @@ return view.extend({
         o.inputstyle = 'positive';
         o.inputtitle = _('Update Core');
         o.onclick = function (sectionId) {
+            const channel = channelOption.formvalue(sectionId) || 'release';
             const architecture = architectureOption.formvalue(sectionId) || 'auto';
             const mirrorPrefix = mirrorOption.formvalue(sectionId) || '';
             const downloadUrl = downloadUrlOption.formvalue(sectionId) || '';
             updateCoreUpdateStatus(document.getElementById('core_update_status'), { updating: true });
-            return mihomox.updateCore(architecture, mirrorPrefix, downloadUrl).then(function (result) {
+            return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl).then(function (result) {
                 if (!result || !result.success)
                     return Promise.reject(new Error(result?.error || _('Failed')));
                 return result;

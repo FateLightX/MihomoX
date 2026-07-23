@@ -30,4 +30,9 @@ EOF
 [ "$($FETCH_SCRIPT --arch x86_64 --amd64-level v2 --map-only)" = "linux-amd64-v2" ]
 [ "$($FETCH_SCRIPT --arch x86_64 --amd64-level v3 --map-only)" = "linux-amd64-v3" ]
 
+ALPHA_TEST_DIR=$(mktemp -d)
+printf '%s\n' '<a href="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-linux-amd64-v1-alpha-test123.gz">alpha</a>' > "$ALPHA_TEST_DIR/assets.html"
+[ "$($FETCH_SCRIPT --arch x86_64 --channel Prerelease-Alpha --alpha-assets-url "file://$ALPHA_TEST_DIR/assets.html" --resolve-alpha-only)" = "mihomo-linux-amd64-v1-alpha-test123.gz" ]
+rm -rf "$ALPHA_TEST_DIR"
+
 echo "fetch architecture tests passed"

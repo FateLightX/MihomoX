@@ -3,6 +3,7 @@
 set -eu
 
 LATEST_URL="${MIHOMO_LATEST_URL:-https://github.com/MetaCubeX/mihomo/releases/latest}"
+ALPHA_ASSETS_URL="${MIHOMO_ALPHA_ASSETS_URL:-https://github.com/MetaCubeX/mihomo/releases/expanded_assets/Prerelease-Alpha}"
 DOWNLOAD_BASE="${MIHOMO_DOWNLOAD_BASE:-https://github.com/MetaCubeX/mihomo/releases/download}"
 OPENWRT_ARCH=""
 AMD64_LEVEL="v1"
@@ -10,11 +11,13 @@ DL_DIR=""
 OUTPUT=""
 VERSION_FILE=""
 VERSION="${MIHOMO_VERSION:-}"
+CHANNEL="${MIHOMO_CHANNEL:-release}"
 MIRROR_PREFIX="${MIHOMO_MIRROR_PREFIX:-}"
 MAP_ONLY=0
+RESOLVE_ALPHA_ONLY=0
 
 usage() {
-	echo "usage: $0 --arch <openwrt-arch> --dl-dir <dir> --output <file> --version-file <file> [--amd64-level v1|v2|v3]" >&2
+	echo "usage: $0 --arch <openwrt-arch> --dl-dir <dir> --output <file> --version-file <file> [--channel release|Prerelease-Alpha] [--amd64-level v1|v2|v3]" >&2
 	exit 2
 }
 
@@ -26,10 +29,13 @@ while [ "$#" -gt 0 ]; do
 		--output) OUTPUT="$2"; shift 2 ;;
 		--version-file) VERSION_FILE="$2"; shift 2 ;;
 		--version) VERSION="$2"; shift 2 ;;
+		--channel) CHANNEL="$2"; shift 2 ;;
 		--mirror-prefix) MIRROR_PREFIX="$2"; shift 2 ;;
 		--latest-url) LATEST_URL="$2"; shift 2 ;;
+		--alpha-assets-url) ALPHA_ASSETS_URL="$2"; shift 2 ;;
 		--download-base) DOWNLOAD_BASE="$2"; shift 2 ;;
 		--map-only) MAP_ONLY=1; shift ;;
+		--resolve-alpha-only) RESOLVE_ALPHA_ONLY=1; shift ;;
 		*) usage ;;
 	esac
 done
@@ -83,6 +89,23 @@ resolve_latest_version() {
 	esac
 }
 
+resolve_alpha_asset() {
+	assets_tmp="${TMPDIR:-/tmp}/mihomox-alpha-assets.$$"
+	trap 'rm -f "$assets_tmp"' EXIT HUP INT TERM
+	curl -fsSL --retry 2 --connect-timeout 20 --max-time 120 \
+		-A "MihomoX-Build" -o "$assets_tmp" "$ALPHA_ASSETS_URL"
+	asset=$(sed -n 's/.*href="\([^"]*\)".*/\1/p' "$assets_tmp" | awk -v prefix="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-${RELEASE_ARCH}-alpha-" '
+		index($0, prefix) == 1 && $0 ~ /[.]gz$/ { sub(".*/", ""); print; exit }
+	')
+	rm -f "$assets_tmp"
+	trap - EXIT HUP INT TERM
+	[ -n "$asset" ] || {
+		echo "unable to resolve Prerelease-Alpha asset for $RELEASE_ARCH" >&2
+		return 1
+	}
+	printf '%s\n' "$asset"
+}
+
 verify_elf_arch() {
 	file_path="$1"
 	release_arch="$2"
@@ -113,8 +136,23 @@ verify_elf_arch() {
 [ -n "$OPENWRT_ARCH" ] || usage
 RELEASE_ARCH=$(map_release_arch "$OPENWRT_ARCH")
 
+case "$CHANNEL" in
+	release|stable) CHANNEL="release" ;;
+	Prerelease-Alpha|alpha) CHANNEL="Prerelease-Alpha" ;;
+	*) echo "unsupported Mihomo channel: $CHANNEL" >&2; exit 1 ;;
+esac
+
 if [ "$MAP_ONLY" -eq 1 ]; then
 	echo "$RELEASE_ARCH"
+	exit 0
+fi
+
+if [ "$RESOLVE_ALPHA_ONLY" -eq 1 ]; then
+	[ "$CHANNEL" = "Prerelease-Alpha" ] || {
+		echo "--resolve-alpha-only requires the Prerelease-Alpha channel" >&2
+		exit 2
+	}
+	resolve_alpha_asset
 	exit 0
 fi
 
@@ -123,17 +161,25 @@ command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 1; }
 command -v gzip >/dev/null 2>&1 || { echo "gzip is required" >&2; exit 1; }
 command -v file >/dev/null 2>&1 || { echo "file is required" >&2; exit 1; }
 
-if [ -z "$VERSION" ]; then
+if [ -n "$VERSION" ]; then
+	case "$VERSION" in
+		v[0-9]*) ;;
+		*) echo "invalid Mihomo version: $VERSION" >&2; exit 1 ;;
+	esac
+	RELEASE_TAG="$VERSION"
+	ASSET="mihomo-${RELEASE_ARCH}-${VERSION}.gz"
+elif [ "$CHANNEL" = "Prerelease-Alpha" ]; then
+	RELEASE_TAG="Prerelease-Alpha"
+	ASSET=$(resolve_alpha_asset)
+	VERSION=${ASSET%.gz}
+	VERSION="alpha-${VERSION##*-alpha-}"
+else
 	VERSION=$(resolve_latest_version)
+	RELEASE_TAG="$VERSION"
+	ASSET="mihomo-${RELEASE_ARCH}-${VERSION}.gz"
 fi
 
-case "$VERSION" in
-	v[0-9]*) ;;
-	*) echo "invalid Mihomo version: $VERSION" >&2; exit 1 ;;
-esac
-
-ASSET="mihomo-${RELEASE_ARCH}-${VERSION}.gz"
-SOURCE_URL="${DOWNLOAD_BASE%/}/${VERSION}/${ASSET}"
+SOURCE_URL="${DOWNLOAD_BASE%/}/${RELEASE_TAG}/${ASSET}"
 if [ -n "$MIRROR_PREFIX" ]; then
 	SOURCE_URL="${MIRROR_PREFIX%/}/${SOURCE_URL}"
 fi
@@ -169,6 +215,8 @@ verify_elf_arch "$OUTPUT_TMP" "$RELEASE_ARCH"
 SHA256=$(sha256_file "$CACHE_FILE")
 cat > "$VERSION_TMP" <<EOF
 version=$VERSION
+channel=$CHANNEL
+release=$RELEASE_TAG
 architecture=$RELEASE_ARCH
 asset=$ASSET
 source=$SOURCE_URL

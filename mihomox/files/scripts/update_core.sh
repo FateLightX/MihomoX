@@ -13,11 +13,13 @@ STARTED_FLAG="${MIHOMOX_STARTED_FLAG:-$RUN_DIR/started.flag}"
 INIT_SCRIPT="${MIHOMOX_INIT_SCRIPT:-/etc/init.d/mihomox}"
 LATEST_URL="${MIHOMO_LATEST_URL:-https://github.com/MetaCubeX/mihomo/releases/latest}"
 API_URL="${MIHOMO_API_URL:-https://api.github.com/repos/MetaCubeX/mihomo/releases/latest}"
+ALPHA_ASSETS_URL="${MIHOMO_ALPHA_ASSETS_URL:-https://github.com/MetaCubeX/mihomo/releases/expanded_assets/Prerelease-Alpha}"
 DOWNLOAD_BASE="${MIHOMO_DOWNLOAD_BASE:-https://github.com/MetaCubeX/mihomo/releases/download}"
 TMP_DIR=""
 LOCK_HELD=0
 LATEST_VERSION=""
 SELECTED_ARCH=""
+RELEASE_TAG=""
 
 mkdir -p "$CORE_DIR" "$RUN_DIR" "$LOG_DIR"
 
@@ -190,6 +192,19 @@ resolve_latest_version() {
 	return 1
 }
 
+resolve_alpha_asset() {
+	assets_html="$TMP_DIR/alpha-assets.html"
+	for page in "$(apply_mirror "$ALPHA_ASSETS_URL")" "$ALPHA_ASSETS_URL"; do
+		curl -fsSL --retry 1 --connect-timeout 15 --max-time 60 \
+			-A "MihomoX/OpenWrt" -o "$assets_html" "$page" 2>/dev/null || continue
+		asset=$(sed -n 's/.*href="\([^"]*\)".*/\1/p' "$assets_html" | awk -v prefix="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-${SELECTED_ARCH}-alpha-" '
+			index($0, prefix) == 1 && $0 ~ /[.]gz$/ { sub(".*/", ""); print; exit }
+		')
+		[ -n "$asset" ] && { echo "$asset"; return 0; }
+	done
+	return 1
+}
+
 download_url() {
 	url="$1"
 	out="$2"
@@ -215,7 +230,14 @@ sha256_file() {
 }
 
 binary_version() {
-	"$1" -v 2>/dev/null | awk '{ for (i=1; i<=NF; i++) if ($i ~ /^v[0-9]+([.][0-9]+)+/) { gsub(/[^v0-9.].*$/, "", $i); print $i; exit } }'
+	"$1" -v 2>/dev/null | awk '{
+		for (i=1; i<=NF; i++) {
+			if ($i ~ /^v[0-9]+([.][0-9]+)+/) {
+				gsub(/[^v0-9.].*$/, "", $i); print $i; exit
+			}
+			if ($i ~ /^alpha-[0-9a-f]+$/) { print $i; exit }
+		}
+	}'
 }
 
 verify_binary() {
@@ -254,8 +276,12 @@ write_status "running" "正在检查最新版本"
 log_line "开始更新 Mihomo 内核"
 
 CHANNEL="${MIHOMOX_CHANNEL:-$(uci -q get mihomox.core.channel 2>/dev/null)}"
-[ -n "$CHANNEL" ] || CHANNEL="stable"
-[ "$CHANNEL" = "stable" ] || fail "不支持的内核通道：$CHANNEL"
+[ -n "$CHANNEL" ] || CHANNEL="release"
+case "$CHANNEL" in
+	release|stable) CHANNEL="release" ;;
+	Prerelease-Alpha|alpha) CHANNEL="Prerelease-Alpha" ;;
+	*) fail "不支持的内核通道：$CHANNEL" ;;
+esac
 
 ARCH_SETTING="${MIHOMOX_ARCHITECTURE:-$(uci -q get mihomox.core.architecture 2>/dev/null)}"
 [ -n "$ARCH_SETTING" ] || ARCH_SETTING="auto"
@@ -271,13 +297,22 @@ DOWNLOADED_URL=""
 
 if [ -n "$CUSTOM_URL" ]; then
 	LATEST_VERSION="custom"
+	RELEASE_TAG="custom"
 	ASSET=${CUSTOM_URL##*/}
 	write_status "running" "正在下载自定义内核" "$LATEST_VERSION" "$SELECTED_ARCH"
 	download_url "$CUSTOM_URL" "$ARCHIVE" || fail "自定义内核下载失败"
 else
-	LATEST_VERSION=$(resolve_latest_version) || fail "无法获取最新稳定版版本"
-	ASSET="mihomo-${SELECTED_ARCH}-${LATEST_VERSION}.gz"
-	SOURCE_URL="${DOWNLOAD_BASE%/}/${LATEST_VERSION}/${ASSET}"
+	if [ "$CHANNEL" = "Prerelease-Alpha" ]; then
+		RELEASE_TAG="Prerelease-Alpha"
+		ASSET=$(resolve_alpha_asset) || fail "无法获取 Prerelease-Alpha 内核资产"
+		LATEST_VERSION=${ASSET%.gz}
+		LATEST_VERSION="alpha-${LATEST_VERSION##*-alpha-}"
+	else
+		LATEST_VERSION=$(resolve_latest_version) || fail "无法获取最新正式版版本"
+		RELEASE_TAG="$LATEST_VERSION"
+		ASSET="mihomo-${SELECTED_ARCH}-${LATEST_VERSION}.gz"
+	fi
+	SOURCE_URL="${DOWNLOAD_BASE%/}/${RELEASE_TAG}/${ASSET}"
 
 	installed_version=$(metadata_value version "$VERSION_FILE" 2>/dev/null)
 	installed_arch=$(metadata_value architecture "$VERSION_FILE" 2>/dev/null)
@@ -289,9 +324,9 @@ else
 
 	write_status "running" "正在下载 $LATEST_VERSION" "$LATEST_VERSION" "$SELECTED_ARCH"
 	if ! download_url "$SOURCE_URL" "$ARCHIVE"; then
-		if [ "$SELECTED_ARCH" = "linux-amd64-v1" ]; then
+		if [ "$CHANNEL" = "release" ] && [ "$SELECTED_ARCH" = "linux-amd64-v1" ]; then
 			ASSET="mihomo-linux-amd64-compatible-${LATEST_VERSION}.gz"
-			SOURCE_URL="${DOWNLOAD_BASE%/}/${LATEST_VERSION}/${ASSET}"
+			SOURCE_URL="${DOWNLOAD_BASE%/}/${RELEASE_TAG}/${ASSET}"
 			download_url "$SOURCE_URL" "$ARCHIVE" || fail "内核下载失败：$LATEST_VERSION ($SELECTED_ARCH)"
 		else
 			fail "内核下载失败：$LATEST_VERSION ($SELECTED_ARCH)"
@@ -325,7 +360,8 @@ verify_binary "$CORE_TMP" || fail "安装前内核校验失败"
 
 if ! cat > "$VERSION_TMP" <<EOF
 version=$NEW_VERSION
-release=$LATEST_VERSION
+channel=$CHANNEL
+release=$RELEASE_TAG
 architecture=$SELECTED_ARCH
 asset=$ASSET
 source=$DOWNLOADED_URL

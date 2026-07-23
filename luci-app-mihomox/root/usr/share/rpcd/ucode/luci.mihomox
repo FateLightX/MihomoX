@@ -30,6 +30,10 @@ const CORE_ARCHITECTURES = {
 	'riscv64': true,
 	'loong64': true
 };
+const CORE_CHANNELS = {
+	'release': true,
+	'Prerelease-Alpha': true
+};
 
 function shell_read(command) {
 	let process = popen(command);
@@ -107,6 +111,7 @@ const methods = {
 			let updating = access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r');
 			return {
 				installed: metadata.version || installed_core_version(),
+				installed_architecture: metadata.architecture || '',
 				latest: state.version || '',
 				architecture: state.architecture || detected,
 				detected_architecture: detected,
@@ -119,11 +124,14 @@ const methods = {
 		}
 	},
 	update_core: {
-		args: { architecture: 'architecture', mirror_prefix: 'mirror_prefix', download_url: 'download_url' },
+		args: { channel: 'channel', architecture: 'architecture', mirror_prefix: 'mirror_prefix', download_url: 'download_url' },
 		call: function(req) {
+			let channel = req.args?.channel || 'release';
 			let architecture = req.args?.architecture || 'auto';
 			let mirror_prefix = req.args?.mirror_prefix || '';
 			let download_url = req.args?.download_url || '';
+			if (!CORE_CHANNELS[channel])
+				return { success: false, error: 'invalid_channel' };
 			if (!CORE_ARCHITECTURES[architecture])
 				return { success: false, error: 'invalid_architecture' };
 			if (length(mirror_prefix) > 2048 || length(download_url) > 2048 ||
@@ -141,6 +149,7 @@ const methods = {
 
 			let uci = cursor();
 			uci.load('mihomox');
+			uci.set('mihomox', 'core', 'channel', channel);
 			uci.set('mihomox', 'core', 'architecture', architecture);
 			uci.set('mihomox', 'core', 'mirror_prefix', mirror_prefix);
 			uci.set('mihomox', 'core', 'download_url', download_url);

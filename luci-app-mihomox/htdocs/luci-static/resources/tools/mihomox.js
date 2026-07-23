@@ -73,7 +73,7 @@ const callMihomoXCoreStatus = rpc.declare({
 const callMihomoXUpdateCore = rpc.declare({
     object: 'luci.mihomox',
     method: 'update_core',
-    params: ['architecture', 'mirror_prefix', 'download_url'],
+    params: ['channel', 'architecture', 'mirror_prefix', 'download_url'],
     expect: { '': {} }
 });
 
@@ -242,7 +242,7 @@ return baseclass.extend({
         return L.resolveDefault(callMihomoXCoreStatus(), {});
     },
 
-    updateCore: function (architecture, mirrorPrefix, downloadUrl) {
-        return callMihomoXUpdateCore(architecture, mirrorPrefix, downloadUrl);
+    updateCore: function (channel, architecture, mirrorPrefix, downloadUrl) {
+        return callMihomoXUpdateCore(channel, architecture, mirrorPrefix, downloadUrl);
     },
 })

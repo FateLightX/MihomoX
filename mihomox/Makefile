@@ -9,7 +9,12 @@ PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 MIHOMO_TARGET_ARCH:=$(if $(ARCH_PACKAGES),$(ARCH_PACKAGES),$(ARCH))
 MIHOMO_AMD64_LEVEL?=v1
 MIHOMO_VERSION?=
+MIHOMO_CHANNEL?=release
 MIHOMO_MIRROR_PREFIX?=
+GEOSITE_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geosite.dat
+GEOIP_MMDB_URL?=https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country.mmdb
+GEOIP_DAT_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geoip.dat
+GEOIP_ASN_URL?=https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb
 
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=MihomoX contributors
@@ -47,6 +52,10 @@ define Package/mihomox/install
 	$(INSTALL_DATA) $(CURDIR)/files/mixin.yaml $(1)/etc/mihomox/mixin.yaml
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mihomo $(1)/etc/mihomox/bin/mihomo
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/mihomo.version $(1)/etc/mihomox/bin/mihomo.version
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoSite.dat $(1)/etc/mihomox/run/GeoSite.dat
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/Country.mmdb $(1)/etc/mihomox/run/Country.mmdb
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoIP.dat $(1)/etc/mihomox/run/GeoIP.dat
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/ASN.mmdb $(1)/etc/mihomox/run/ASN.mmdb
 
 	$(INSTALL_BIN) $(CURDIR)/files/ucode/include.uc $(1)/etc/mihomox/ucode/include.uc
 	$(INSTALL_BIN) $(CURDIR)/files/ucode/mixin.uc $(1)/etc/mihomox/ucode/mixin.uc
@@ -96,11 +105,19 @@ define Build/Prepare
 	$(CURDIR)/scripts/fetch_mihomo.sh \
 		--arch "$(MIHOMO_TARGET_ARCH)" \
 		--amd64-level "$(MIHOMO_AMD64_LEVEL)" \
+		--channel "$(MIHOMO_CHANNEL)" \
 		--version "$(MIHOMO_VERSION)" \
 		--mirror-prefix "$(MIHOMO_MIRROR_PREFIX)" \
 		--dl-dir "$(DL_DIR)" \
 		--output "$(PKG_BUILD_DIR)/mihomo" \
 		--version-file "$(PKG_BUILD_DIR)/mihomo.version"
+	$(CURDIR)/scripts/fetch_geodata.sh \
+		--dl-dir "$(DL_DIR)" \
+		--output-dir "$(PKG_BUILD_DIR)" \
+		--geosite-url "$(GEOSITE_URL)" \
+		--geoip-mmdb-url "$(GEOIP_MMDB_URL)" \
+		--geoip-dat-url "$(GEOIP_DAT_URL)" \
+		--geoip-asn-url "$(GEOIP_ASN_URL)"
 endef
 
 $(eval $(call BuildPackage,mihomox))

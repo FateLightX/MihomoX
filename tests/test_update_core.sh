@@ -30,14 +30,16 @@ EOF
 }
 
 run_update() {
+	channel="$1"
+	url="$2"
 	PATH="$TEST_DIR/bin:$PATH" \
 	MIHOMOX_CORE_DIR="$TEST_DIR/core" \
 	MIHOMOX_RUN_DIR="$TEST_DIR/run" \
 	MIHOMOX_LOG_DIR="$TEST_DIR/log" \
 	MIHOMOX_INIT_SCRIPT="$TEST_DIR/init" \
-	MIHOMOX_CHANNEL=stable \
+	MIHOMOX_CHANNEL="$channel" \
 	MIHOMOX_ARCHITECTURE=amd64-v1 \
-	MIHOMO_CUSTOM_URL="$1" \
+	MIHOMO_CUSTOM_URL="$url" \
 	sh "$UPDATE_SCRIPT"
 }
 
@@ -59,7 +61,7 @@ write_core "$TEST_DIR/core/mihomo" "v1.0.0"
 write_core "$TEST_DIR/new-mihomo" "v9.9.9"
 gzip -c "$TEST_DIR/new-mihomo" > "$TEST_DIR/new-mihomo.gz"
 
-run_update "file://$TEST_DIR/new-mihomo.gz"
+run_update release "file://$TEST_DIR/new-mihomo.gz"
 "$TEST_DIR/core/mihomo" -v | grep -q 'v9.9.9'
 grep -q '^version=v9.9.9$' "$TEST_DIR/core/mihomo.version"
 grep -q '^state=success$' "$TEST_DIR/run/core-update.status"
@@ -74,7 +76,7 @@ esac
 exec /bin/mv "\$@"
 EOF
 chmod 0755 "$TEST_DIR/bin/mv"
-if run_update "file://$TEST_DIR/new-mihomo.gz"; then
+if run_update Prerelease-Alpha "file://$TEST_DIR/new-mihomo.gz"; then
 	echo "failed metadata install unexpectedly succeeded" >&2
 	exit 1
 fi
@@ -83,7 +85,7 @@ grep -q '^version=v1.0.0$' "$TEST_DIR/core/mihomo.version"
 
 write_core "$TEST_DIR/core/mihomo" "v1.0.0"
 printf 'not gzip\n' > "$TEST_DIR/invalid.gz"
-if run_update "file://$TEST_DIR/invalid.gz"; then
+if run_update release "file://$TEST_DIR/invalid.gz"; then
 	echo "invalid archive unexpectedly succeeded" >&2
 	exit 1
 fi
