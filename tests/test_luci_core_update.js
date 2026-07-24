@@ -107,8 +107,19 @@ const translate = (value) => value;
 const L = { resolveDefault: (value) => value };
 const document = {
     getElementById: (id) => {
-        nodes[id] ||= { style: {}, value: '' };
+        nodes[id] ||= { style: {}, value: '', textContent: nodes[id]?.textContent || '', parentNode: { appendChild: () => {} } };
         return nodes[id];
+    },
+    querySelectorAll: () => {
+        const btn = {
+            value: 'Update Core',
+            parentNode: {
+                appendChild: (span) => {
+                    nodes[span.id] = span;
+                }
+            }
+        };
+        return [btn];
     }
 };
 
@@ -121,8 +132,10 @@ const appView = loadView(form, view, uci, poll, mihomox, E, translate, L, docume
 appView.render([null, {}, false, [], coreStatus]);
 
 assert.strictEqual(renderedMap.options.channel.default, 'Prerelease-Alpha');
+assert.strictEqual(renderedMap.options._update_status, undefined);
 const updateTime = renderedMap.options._update_time.cfgvalue();
 assert.strictEqual(updateTime.value, coreStatus.updated_at);
+assert.strictEqual(nodes.core_update_span, undefined);
 
 Promise.resolve(renderedMap.options._update_core.onclick({ type: 'click' }, 'core'))
     .then(() => {
@@ -134,6 +147,9 @@ Promise.resolve(renderedMap.options._update_core.onclick({ type: 'click' }, 'cor
             '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
         ]);
         assert.strictEqual(renderedMap.options.channel.uiValue, 'Prerelease-Alpha');
+        assert.ok(nodes.core_update_span);
+        assert.strictEqual(nodes.core_update_span.textContent, 'Updating');
+        assert.strictEqual(nodes.core_update_span.style.display, 'inline');
         console.log('LuCI core update tests passed');
     })
     .catch((error) => {

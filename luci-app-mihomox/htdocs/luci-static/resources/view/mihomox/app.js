@@ -17,34 +17,7 @@ function updateStatus(element, running) {
     return element;
 }
 
-function renderCoreUpdateStatus(status) {
-    return updateCoreUpdateStatus(E('input', {
-        id: 'core_update_status',
-        style: 'border: unset; font-style: italic; font-weight: bold;',
-        readonly: ''
-    }), status);
-}
-
-function updateCoreUpdateStatus(element, status) {
-    if (!element)
-        return element;
-
-    status = status || {};
-    if (status.updating) {
-        element.style.color = '#b36b00';
-        element.value = _('Updating');
-    } else if (status.state === 'failed') {
-        element.style.color = 'red';
-        element.value = status.message || _('Failed');
-    } else if (status.state === 'success') {
-        element.style.color = 'green';
-        element.value = status.message || _('Completed');
-    } else {
-        element.style.color = '';
-        element.value = _('Idle');
-    }
-    return element;
-}
+var coreUpdateSessionActive = false;
 
 function renderCoreUpdateTime(updatedAt) {
     return updateCoreUpdateTime(E('input', {
@@ -58,6 +31,63 @@ function updateCoreUpdateTime(element, updatedAt) {
     if (element)
         element.value = updatedAt || '-';
     return element;
+}
+
+function getOrCreateCoreUpdateSpan() {
+    var span = document.getElementById('core_update_span');
+    if (span)
+        return span;
+
+    var btn = null;
+    var buttons = document.querySelectorAll('input[type="button"]');
+    var title = _('Update Core');
+    for (var i = 0; i < buttons.length; i++) {
+        if ((buttons[i].value || '') === title) {
+            btn = buttons[i];
+            break;
+        }
+    }
+    if (!btn || !btn.parentNode)
+        return null;
+
+    span = E('span', {
+        id: 'core_update_span',
+        style: 'margin-left: 8px; font-style: italic; font-weight: bold; display: none;'
+    });
+    btn.parentNode.appendChild(span);
+    return span;
+}
+
+function updateCoreUpdateSpan(status) {
+    if (!coreUpdateSessionActive)
+        return;
+
+    var span = getOrCreateCoreUpdateSpan();
+    if (!span)
+        return;
+
+    status = status || {};
+    if (status.updating) {
+        span.style.color = '#b36b00';
+        span.textContent = _('Updating');
+        span.style.display = 'inline';
+    } else if (status.state === 'failed') {
+        span.style.color = 'red';
+        span.textContent = status.message || _('Failed');
+        span.style.display = 'inline';
+    } else if (status.state === 'success') {
+        span.style.color = 'green';
+        span.textContent = status.message || _('Completed');
+        span.style.display = 'inline';
+    } else if (status.state === 'running') {
+        span.style.color = '#b36b00';
+        span.textContent = status.message || _('Updating');
+        span.style.display = 'inline';
+    } else {
+        // Idle after a session still keeps last terminal text if any; hide only when empty.
+        if (!span.textContent)
+            span.style.display = 'none';
+    }
 }
 
 function validateCron(value) {
@@ -196,11 +226,6 @@ return view.extend({
             return /^[0-9a-fA-F]{64}$/.test(value) ? true : _('Invalid SHA256');
         };
 
-        o = s.option(form.DummyValue, '_update_status', _('Update Status'));
-        o.cfgvalue = function () {
-            return renderCoreUpdateStatus(coreState);
-        };
-
         o = s.option(form.DummyValue, '_update_time', _('Update At'));
         o.cfgvalue = function () {
             return renderCoreUpdateTime(coreState.updated_at);
@@ -208,8 +233,13 @@ return view.extend({
 
         poll.add(function () {
             return mihomox.coreStatus().then(function (status) {
-                updateCoreUpdateStatus(document.getElementById('core_update_status'), status);
                 updateCoreUpdateTime(document.getElementById('core_update_time'), status.updated_at);
+                if (!coreUpdateSessionActive)
+                    return;
+                if (status.updating || status.state === 'running')
+                    updateCoreUpdateSpan({ updating: true, message: status.message });
+                else
+                    updateCoreUpdateSpan(status);
             });
         });
 
@@ -224,14 +254,22 @@ return view.extend({
             const downloadSha256 = downloadSha256Option.formvalue(sectionId) || '';
             if (downloadUrl && !downloadSha256)
                 return Promise.reject(new Error(_('Custom Core SHA256 is required')));
-            updateCoreUpdateStatus(document.getElementById('core_update_status'), { updating: true });
+            coreUpdateSessionActive = true;
+            updateCoreUpdateSpan({ updating: true });
             return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl, downloadSha256).then(function (result) {
-                if (!result || !result.success)
+                if (!result || !result.success) {
+                    updateCoreUpdateSpan({ state: 'failed', message: result?.error || _('Failed') });
                     return Promise.reject(new Error(result?.error || _('Failed')));
+                }
                 const channelElement = channelOption.getUIElement(sectionId);
                 if (channelElement && result.channel)
                     channelElement.setValue(result.channel);
+                updateCoreUpdateSpan({ updating: true });
                 return result;
+            }).catch(function (error) {
+                const message = error && error.message ? error.message : _('Failed');
+                updateCoreUpdateSpan({ state: 'failed', message: message });
+                return Promise.reject(error instanceof Error ? error : new Error(message));
             });
         };
 
