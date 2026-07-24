@@ -7,18 +7,19 @@
 'require ui';
 'require tools.mihomox as mihomox';
 
-/* Load ACE from the browser so the package does not need to ship editor assets. */
-var ACE_VERSION = '1.43.3';
-var ACE_CDN_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/ace/' + ACE_VERSION + '/';
+/* Load the bundled editor assets without requiring internet access. */
+var ACE_BASE = L.resource('mihomox/ace');
+var aceLoadPromise;
+
+function filterEditableFiles(files) {
+    return files.filter(function (file) {
+        return !/\.mrs$/i.test(file.name);
+    });
+}
 
 function loadScript(url) {
     return new Promise(function (resolve, reject) {
-        if (document.querySelector('script[src="' + url + '"]')) {
-            resolve();
-            return;
-        }
-
-        var script = E('script', { src: url, type: 'text/javascript', crossorigin: 'anonymous' });
+        var script = E('script', { src: url, type: 'text/javascript' });
         script.onload = function () { resolve(); };
         script.onerror = function () { reject(new Error('Failed to load ' + url)); };
         document.head.appendChild(script);
@@ -29,17 +30,24 @@ function loadAce() {
     if (window.ace)
         return Promise.resolve(true);
 
-    return loadScript(ACE_CDN_BASE + 'ace.min.js').then(function () {
+    if (aceLoadPromise)
+        return aceLoadPromise;
+
+    aceLoadPromise = loadScript(ACE_BASE + '/ace.min.js').then(function () {
         return Promise.all([
-            loadScript(ACE_CDN_BASE + 'mode-yaml.js'),
-            loadScript(ACE_CDN_BASE + 'theme-tomorrow_night.js')
+            loadScript(ACE_BASE + '/mode-yaml.min.js'),
+            loadScript(ACE_BASE + '/theme-tomorrow_night.min.js')
         ]);
     }).then(function () {
+        if (!window.ace || typeof window.ace.edit !== 'function')
+            throw new Error('ACE global is unavailable');
         return true;
     }).catch(function (error) {
         console.warn('[mihomox] ACE editor unavailable, falling back to plain textarea:', error);
         return false;
     });
+
+    return aceLoadPromise;
 }
 
 var CBIAceValue = form.TextValue.extend({
@@ -58,28 +66,36 @@ var CBIAceValue = form.TextValue.extend({
         var height = (this.rows ? this.rows * 20 : 500) + 'px';
         var editorContainer = E('div', {
             id: (textarea.id || this.cbid(section_id)) + '-ace',
-            style: 'width:100%; height:' + height + ';'
+            style: 'display:none; width:100%; height:' + height + ';'
         });
 
-        textarea.style.display = 'none';
         var wrapper = E('div', { class: 'cbi-ace-wrapper' }, [node, editorContainer]);
         var self = this;
 
         loadAce().then(function (available) {
             if (!available) {
-                textarea.style.display = '';
                 editorContainer.remove();
                 return;
             }
 
-            var editor = window.ace.edit(editorContainer, {
-                value: textarea.value || '',
-                mode: self.mode,
-                theme: self.theme,
-                fontSize: '13px',
-                useWorker: false,
-                wrap: false
-            });
+            var editor;
+            try {
+                editorContainer.style.display = '';
+                editor = window.ace.edit(editorContainer, {
+                    value: textarea.value || '',
+                    mode: self.mode,
+                    theme: self.theme,
+                    fontSize: '13px',
+                    useWorker: false,
+                    wrap: false
+                });
+                textarea.style.display = 'none';
+            } catch (error) {
+                console.warn('[mihomox] Failed to initialize ACE editor, using plain textarea:', error);
+                editorContainer.remove();
+                textarea.style.display = '';
+                return;
+            }
 
             editor.session.on('change', function () {
                 if (textarea.value === editor.getValue())
@@ -110,10 +126,9 @@ return view.extend({
     load: function () {
         return Promise.all([
             uci.load('mihomox'),
-            mihomox.listProfiles(),
-            mihomox.listRuleProviders(),
-            mihomox.listProxyProviders(),
-            loadAce()
+            mihomox.listProfiles().then(filterEditableFiles),
+            mihomox.listRuleProviders().then(filterEditableFiles),
+            mihomox.listProxyProviders().then(filterEditableFiles)
         ]);
     },
     render: function (data) {

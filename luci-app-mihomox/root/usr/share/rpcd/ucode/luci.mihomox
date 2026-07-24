@@ -127,7 +127,7 @@ const methods = {
 	update_core: {
 		args: { channel: 'channel', architecture: 'architecture', mirror_prefix: 'mirror_prefix', download_url: 'download_url' },
 		call: function(req) {
-			let configured_channel = shell_read("uci -q get mihomox.core.channel 2>/dev/null") || 'release';
+			let configured_channel = shell_read("uci -q get mihomox.core.channel 2>/dev/null") || 'Prerelease-Alpha';
 			let channel = req.args?.channel || configured_channel;
 			let architecture = req.args?.architecture || 'auto';
 			let mirror_prefix = req.args?.mirror_prefix || '';

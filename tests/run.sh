@@ -10,7 +10,9 @@ done
 
 "$ROOT_DIR/tests/test_fetch_arch.sh"
 "$ROOT_DIR/tests/test_fetch_geodata.sh"
+"$ROOT_DIR/tests/test_fetch_zashboard.sh"
 "$ROOT_DIR/tests/test_update_core.sh"
 node "$ROOT_DIR/tests/test_luci_core_update.js"
+node "$ROOT_DIR/tests/test_luci_editor.js"
 
 echo "all tests passed"

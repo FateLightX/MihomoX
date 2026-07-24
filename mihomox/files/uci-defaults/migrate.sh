@@ -211,7 +211,7 @@ routing_dummy_device=$(uci -q get mihomox.routing.dummy_device); [ -z "$routing_
 
 section_core=$(uci -q get mihomox.core); [ -z "$section_core" ] && {
 	uci set mihomox.core=core
-	uci set mihomox.core.channel=release
+	uci set mihomox.core.channel=Prerelease-Alpha
 	uci set mihomox.core.architecture=auto
 	uci set mihomox.core.mirror_prefix=
 	uci set mihomox.core.download_url=
@@ -222,7 +222,7 @@ section_core=$(uci -q get mihomox.core); [ -z "$section_core" ] && {
 
 # since v1.26.0
 
-[ -z "$(uci -q get mihomox.core.channel)" ] && uci set mihomox.core.channel=release
+[ -z "$(uci -q get mihomox.core.channel)" ] && uci set mihomox.core.channel=Prerelease-Alpha
 [ "$(uci -q get mihomox.core.channel)" = "stable" ] && uci set mihomox.core.channel=release
 [ "$(uci -q get mihomox.core.channel)" = "alpha" ] && uci set mihomox.core.channel=Prerelease-Alpha
 [ -z "$(uci -q get mihomox.core.architecture)" ] && uci set mihomox.core.architecture=auto

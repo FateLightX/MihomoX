@@ -33,6 +33,10 @@ EOF
 ALPHA_TEST_DIR=$(mktemp -d)
 printf '%s\n' '<a href="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-linux-amd64-v1-alpha-test123.gz">alpha</a>' > "$ALPHA_TEST_DIR/assets.html"
 [ "$($FETCH_SCRIPT --arch x86_64 --channel Prerelease-Alpha --alpha-assets-url "file://$ALPHA_TEST_DIR/assets.html" --resolve-alpha-only)" = "mihomo-linux-amd64-v1-alpha-test123.gz" ]
+[ "$($FETCH_SCRIPT --arch x86_64 --alpha-assets-url "file://$ALPHA_TEST_DIR/assets.html" --resolve-alpha-only)" = "mihomo-linux-amd64-v1-alpha-test123.gz" ]
 rm -rf "$ALPHA_TEST_DIR"
+
+grep -q '^MIHOMO_CHANNEL?=Prerelease-Alpha$' "$ROOT_DIR/mihomox/Makefile"
+grep -q "option 'channel' 'Prerelease-Alpha'" "$ROOT_DIR/mihomox/files/mihomox.conf"
 
 echo "fetch architecture tests passed"

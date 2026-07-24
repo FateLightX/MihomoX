@@ -119,6 +119,7 @@ const appView = loadView(form, view, uci, poll, mihomox, E, translate, L, docume
 
 appView.render([null, {}, false, [], coreStatus]);
 
+assert.strictEqual(renderedMap.options.channel.default, 'Prerelease-Alpha');
 const updateTime = renderedMap.options._update_time.cfgvalue();
 assert.strictEqual(updateTime.value, coreStatus.updated_at);
 

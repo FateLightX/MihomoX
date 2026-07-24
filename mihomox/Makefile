@@ -2,19 +2,20 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.07.24
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 MIHOMO_TARGET_ARCH:=$(if $(ARCH_PACKAGES),$(ARCH_PACKAGES),$(ARCH))
 MIHOMO_AMD64_LEVEL?=v1
 MIHOMO_VERSION?=
-MIHOMO_CHANNEL?=release
+MIHOMO_CHANNEL?=Prerelease-Alpha
 MIHOMO_MIRROR_PREFIX?=
 GEOSITE_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geosite.dat
 GEOIP_MMDB_URL?=https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country.mmdb
 GEOIP_DAT_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geoip.dat
 GEOIP_ASN_URL?=https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb
+ZASHBOARD_URL?=https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip
 
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=MihomoX contributors
@@ -48,6 +49,7 @@ define Package/mihomox/install
 	$(INSTALL_DIR) $(1)/etc/mihomox/run/providers
 	$(INSTALL_DIR) $(1)/etc/mihomox/run/providers/rule
 	$(INSTALL_DIR) $(1)/etc/mihomox/run/providers/proxy
+	$(INSTALL_DIR) $(1)/etc/mihomox/run/ui
 
 	$(INSTALL_DATA) $(CURDIR)/files/mixin.yaml $(1)/etc/mihomox/mixin.yaml
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mihomo $(1)/etc/mihomox/bin/mihomo
@@ -56,6 +58,7 @@ define Package/mihomox/install
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/Country.mmdb $(1)/etc/mihomox/run/Country.mmdb
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoIP.dat $(1)/etc/mihomox/run/GeoIP.dat
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/ASN.mmdb $(1)/etc/mihomox/run/ASN.mmdb
+	$(CP) $(PKG_BUILD_DIR)/zashboard/. $(1)/etc/mihomox/run/ui/
 
 	$(INSTALL_BIN) $(CURDIR)/files/ucode/include.uc $(1)/etc/mihomox/ucode/include.uc
 	$(INSTALL_BIN) $(CURDIR)/files/ucode/mixin.uc $(1)/etc/mihomox/ucode/mixin.uc
@@ -118,6 +121,10 @@ define Build/Prepare
 		--geoip-mmdb-url "$(GEOIP_MMDB_URL)" \
 		--geoip-dat-url "$(GEOIP_DAT_URL)" \
 		--geoip-asn-url "$(GEOIP_ASN_URL)"
+	$(CURDIR)/scripts/fetch_zashboard.sh \
+		--dl-dir "$(DL_DIR)" \
+		--output-dir "$(PKG_BUILD_DIR)/zashboard" \
+		--url "$(ZASHBOARD_URL)"
 endef
 
 $(eval $(call BuildPackage,mihomox))

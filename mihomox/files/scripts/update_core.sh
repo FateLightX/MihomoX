@@ -276,7 +276,7 @@ write_status "running" "正在检查最新版本"
 log_line "开始更新 Mihomo 内核"
 
 CHANNEL="${MIHOMOX_CHANNEL:-$(uci -q get mihomox.core.channel 2>/dev/null)}"
-[ -n "$CHANNEL" ] || CHANNEL="release"
+[ -n "$CHANNEL" ] || CHANNEL="Prerelease-Alpha"
 case "$CHANNEL" in
 	release|stable) CHANNEL="release" ;;
 	Prerelease-Alpha|alpha) CHANNEL="Prerelease-Alpha" ;;

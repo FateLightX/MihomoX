@@ -140,6 +140,7 @@ return view.extend({
 
         const channelOption = s.option(form.ListValue, 'channel', _('Core Channel'));
         channelOption.rmempty = false;
+        channelOption.default = 'Prerelease-Alpha';
         channelOption.value('release', _('Release'));
         channelOption.value('Prerelease-Alpha', _('Prerelease Alpha'));
 
@@ -199,7 +200,7 @@ return view.extend({
         o.inputstyle = 'positive';
         o.inputtitle = _('Update Core');
         o.onclick = function (_, sectionId) {
-            const channel = channelOption.formvalue(sectionId) || 'release';
+            const channel = channelOption.formvalue(sectionId) || 'Prerelease-Alpha';
             const architecture = architectureOption.formvalue(sectionId) || 'auto';
             const mirrorPrefix = mirrorOption.formvalue(sectionId) || '';
             const downloadUrl = downloadUrlOption.formvalue(sectionId) || '';

@@ -1,0 +1,8 @@
+Ace 1.44.0
+Source: https://registry.npmjs.org/ace-builds/-/ace-builds-1.44.0.tgz
+Files: package/src-min
+
+SHA256:
+116962fc63b120f6f6973e7e82ec8faa02c3bf1ceb59a3effaafb57ea09bee88  ace.min.js
+25afd0b54386dae0f9389c14c25c149d14ff86a6ec23e94391469f7a83bd302b  mode-yaml.min.js
+8ba3064c7eff1c7384a6d8a4a30ad0ea2c09f270b6097f7b4ab415bf97aa449e  theme-tomorrow_night.min.js
