@@ -14,5 +14,6 @@ done
 "$ROOT_DIR/tests/test_update_core.sh"
 node "$ROOT_DIR/tests/test_luci_core_update.js"
 node "$ROOT_DIR/tests/test_luci_editor.js"
+node "$ROOT_DIR/tests/test_luci_profile_upload.js"
 
 echo "all tests passed"

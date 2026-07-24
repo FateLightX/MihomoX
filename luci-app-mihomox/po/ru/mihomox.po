@@ -1094,6 +1094,10 @@ msgstr "Интервал обновления"
 msgid "Upload Profile"
 msgstr "Загрузить профиль"
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/profile.js:28
+msgid "Upload Rule File"
+msgstr "Загрузить файл правил"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:487
 msgid "Url"
 msgstr "URL"

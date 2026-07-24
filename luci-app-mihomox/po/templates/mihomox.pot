@@ -1087,6 +1087,10 @@ msgstr ""
 msgid "Upload Profile"
 msgstr ""
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/profile.js:28
+msgid "Upload Rule File"
+msgstr ""
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:487
 msgid "Url"
 msgstr ""

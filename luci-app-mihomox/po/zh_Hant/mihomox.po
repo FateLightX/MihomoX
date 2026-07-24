@@ -1094,6 +1094,10 @@ msgstr "更新間隔"
 msgid "Upload Profile"
 msgstr "上傳設定檔"
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/profile.js:28
+msgid "Upload Rule File"
+msgstr "上傳規則檔案"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:487
 msgid "Url"
 msgstr "下載網址"
