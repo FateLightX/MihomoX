@@ -15,39 +15,14 @@ const aceDir = path.join(
 );
 const source = fs.readFileSync(editorPath, 'utf8');
 const aceAssets = {
-    'ace.min.js': '116962fc63b120f6f6973e7e82ec8faa02c3bf1ceb59a3effaafb57ea09bee88',
-    'mode-yaml.min.js': '25afd0b54386dae0f9389c14c25c149d14ff86a6ec23e94391469f7a83bd302b',
-    'theme-tomorrow_night.min.js': '8ba3064c7eff1c7384a6d8a4a30ad0ea2c09f270b6097f7b4ab415bf97aa449e'
+    'ace.min.js': '072d13e53d11e2ceccfffe1a0fa7f15cf69c5435d897df53d98c71be1c4a2e7f',
+    'mode-yaml.min.js': '24faa242ac5085656ff0b9fe283edc8d8565c2ad84f5a824b5868eb5a7ca5cb3',
+    'theme-tomorrow_night.min.js': '757fb017f0ff7a6f2b47f30a3ff7bd6211529deceebf07909d4647ae1175a38a'
 };
 
-const scripts = [];
-let aceDefinition;
-
-const form = {
-    TextValue: {
-        extend: (definition) => {
-            aceDefinition = definition;
-            return definition;
-        }
-    }
-};
 const view = { extend: (definition) => definition };
 const uci = { load: () => Promise.resolve(), sections: () => [] };
-const profiles = [];
-const ruleProviders = [];
-const proxyProviders = [];
-const mihomox = {
-    listProfiles: () => Promise.resolve(profiles),
-    listRuleProviders: () => Promise.resolve(ruleProviders),
-    listProxyProviders: () => Promise.resolve(proxyProviders)
-};
-const window = {};
 const L = { resource: (name) => '/luci-static/resources/' + name };
-const document = {
-    head: {
-        appendChild: (script) => scripts.push(script)
-    }
-};
 const E = (tag, attributes, children) => {
     const style = {};
     if (attributes?.style?.includes('display:none'))
@@ -62,15 +37,78 @@ const E = (tag, attributes, children) => {
 };
 const quietConsole = { warn: () => { } };
 
-const loadView = new Function(
-    'form', 'view', 'uci', 'fs', 'dom', 'ui', 'mihomox',
-    'E', 'window', 'document', 'console', 'L',
-    source
-);
-const editorView = loadView(
-    form, view, uci, {}, {}, {}, mihomox,
-    E, window, document, quietConsole, L
-);
+function createEnvironment(options = {}) {
+    const scripts = [];
+    let aceDefinition;
+    const renderedOptions = [];
+    const profiles = [];
+    const ruleProviders = [];
+    const proxyProviders = [];
+    function MockMap() {}
+    MockMap.prototype.section = function () {
+        return {
+            option: function (type, name) {
+                const option = {
+                    name: name,
+                    values: [],
+                    value: function (value, label) {
+                        this.values.push({ value, label });
+                    }
+                };
+                renderedOptions.push(option);
+                return option;
+            }
+        };
+    };
+    MockMap.prototype.render = function () {
+        return renderedOptions;
+    };
+    const form = {
+        ListValue: function () {},
+        Map: MockMap,
+        NamedSection: function () {},
+        TextValue: {
+            extend: (definition) => {
+                aceDefinition = definition;
+                return definition;
+            }
+        }
+    };
+    const mihomox = {
+        profilesDir: '/etc/mihomox/profiles',
+        subscriptionsDir: '/etc/mihomox/subscriptions',
+        ruleProvidersDir: '/etc/mihomox/run/providers/rule',
+        proxyProvidersDir: '/etc/mihomox/run/providers/proxy',
+        mixinFilePath: '/etc/mihomox/mixin.yaml',
+        runProfilePath: '/etc/mihomox/run/config.yaml',
+        listProfiles: () => Promise.resolve(profiles),
+        listRuleProviders: () => Promise.resolve(ruleProviders),
+        listProxyProviders: () => Promise.resolve(proxyProviders)
+    };
+    const document = {
+        head: {
+            appendChild: (script) => scripts.push(script)
+        }
+    };
+    const loadView = new Function(
+        'form', 'view', 'uci', 'fs', 'dom', 'ui', 'mihomox',
+        'E', 'window', 'document', 'console', 'L', '_',
+        source
+    );
+    const editorView = loadView(
+        form, view, uci, {}, options.dom || {}, {}, mihomox,
+        E, options.window || {}, document, quietConsole, L, (text) => text
+    );
+    return {
+        aceDefinition,
+        editorView,
+        profiles,
+        renderedOptions,
+        ruleProviders,
+        proxyProviders,
+        scripts
+    };
+}
 
 async function main() {
     for (const [name, expectedHash] of Object.entries(aceAssets)) {
@@ -79,14 +117,37 @@ async function main() {
         assert.strictEqual(actualHash, expectedHash, name + ' checksum mismatch');
     }
 
-    profiles.push({ name: 'config.yaml' }, { name: 'country.mrs' });
-    ruleProviders.push({ name: 'rules.MRS' }, { name: 'rules.yaml' });
-    proxyProviders.push({ name: 'proxy.mrs' }, { name: 'proxy.yml' });
-    const loaded = await editorView.load();
+    const fallbackEnv = createEnvironment();
+
+    fallbackEnv.profiles.push({ name: 'config.yaml' }, { name: 'country.mrs' });
+    fallbackEnv.ruleProviders.push({ name: 'rules.MRS' }, { name: 'rules.yaml' });
+    fallbackEnv.proxyProviders.push({ name: 'proxy.mrs' }, { name: 'proxy.yml' });
+    const loaded = await fallbackEnv.editorView.load();
     assert.deepStrictEqual(loaded[1].map((file) => file.name), ['config.yaml']);
     assert.deepStrictEqual(loaded[2].map((file) => file.name), ['rules.yaml']);
     assert.deepStrictEqual(loaded[3].map((file) => file.name), ['proxy.yml']);
-    assert.strictEqual(scripts.length, 0, 'page load must not wait for ACE');
+    assert.strictEqual(fallbackEnv.scripts.length, 0, 'page load must not wait for ACE');
+
+    const renderEnv = createEnvironment();
+    renderEnv.editorView.render([
+        null,
+        [{ name: 'config.yaml' }, { name: 'country.mrs' }],
+        [{ name: 'rules.yaml' }, { name: 'rules.MRS' }],
+        [{ name: 'proxy.yml' }, { name: 'proxy.mrs' }]
+    ]);
+    const fileOption = renderEnv.renderedOptions.find((option) => option.name === '_file');
+    assert.ok(fileOption);
+    assert.deepStrictEqual(
+        fileOption.values
+            .filter((entry) => /^\/etc\/mihomox\/(profiles|run\/providers)\//.test(entry.value))
+            .map((entry) => entry.value),
+        [
+            '/etc/mihomox/profiles/config.yaml',
+            '/etc/mihomox/run/providers/rule/rules.yaml',
+            '/etc/mihomox/run/providers/proxy/proxy.yml'
+        ]
+    );
+    assert.ok(fileOption.values.every((entry) => !/\.mrs$/i.test(entry.value)));
 
     const textarea = {
         tagName: 'TEXTAREA',
@@ -94,7 +155,7 @@ async function main() {
         style: {},
         value: 'mode: rule'
     };
-    const widget = aceDefinition.renderWidget.call({
+    const widget = fallbackEnv.aceDefinition.renderWidget.call({
         rows: 25,
         cbid: () => 'editor-textarea',
         super: () => textarea
@@ -103,19 +164,65 @@ async function main() {
 
     assert.notStrictEqual(textarea.style.display, 'none');
     assert.strictEqual(editorContainer.style.display, 'none');
-    assert.strictEqual(scripts.length, 1);
+    assert.strictEqual(fallbackEnv.scripts.length, 1);
     assert.strictEqual(
-        scripts[0].attributes.src,
+        fallbackEnv.scripts[0].attributes.src,
         '/luci-static/resources/mihomox/ace/ace.min.js'
     );
-    assert.ok(!/^https?:/.test(scripts[0].attributes.src));
+    assert.ok(!/^https?:/.test(fallbackEnv.scripts[0].attributes.src));
 
-    scripts[0].onerror();
+    fallbackEnv.scripts[0].onerror();
     await new Promise((resolve) => setImmediate(resolve));
 
     assert.notStrictEqual(textarea.style.display, 'none');
     assert.strictEqual(editorContainer.removed, true);
-    console.log('LuCI editor fallback tests passed');
+
+    const editors = [];
+    const successEnv = createEnvironment({
+        dom: { findClassInstance: () => null },
+        window: {
+            ace: {
+                edit: (container, options) => {
+                    const editor = {
+                        container,
+                        options,
+                        resizeCalls: [],
+                        setValueCalls: [],
+                        value: '',
+                        session: { on: (event, handler) => { editor.changeHandler = handler; } },
+                        getValue: function () { return this.value; },
+                        setValue: function (value, cursorPosition) {
+                            this.value = value;
+                            this.setValueCalls.push([value, cursorPosition]);
+                        },
+                        resize: function (force) { this.resizeCalls.push(force); }
+                    };
+                    editors.push(editor);
+                    return editor;
+                }
+            }
+        }
+    });
+    const successTextarea = {
+        tagName: 'TEXTAREA',
+        id: 'editor-success-textarea',
+        style: {},
+        value: 'mode: global'
+    };
+    const successWidget = successEnv.aceDefinition.renderWidget.call({
+        rows: 25,
+        cbid: () => 'editor-success-textarea',
+        super: () => successTextarea
+    }, 'editor', 0, successTextarea.value);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.strictEqual(successEnv.scripts.length, 0);
+    assert.strictEqual(successTextarea.style.display, 'none');
+    assert.strictEqual(successWidget.children[1].style.display, '');
+    assert.strictEqual(successWidget.children[1]._aceInstance, editors[0]);
+    assert.deepStrictEqual(editors[0].setValueCalls, [['mode: global', -1]]);
+    assert.deepStrictEqual(editors[0].resizeCalls, [true]);
+    console.log('LuCI editor ACE tests passed');
 }
 
 main().catch((error) => {

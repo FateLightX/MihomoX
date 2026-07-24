@@ -12,9 +12,18 @@ var ACE_BASE = L.resource('mihomox/ace');
 var aceLoadPromise;
 
 function filterEditableFiles(files) {
-    return files.filter(function (file) {
-        return !/\.mrs$/i.test(file.name);
+    return (files || []).filter(function (file) {
+        return isEditablePath(file ? file.name : '');
     });
+}
+
+function isEditablePath(path) {
+    return !/\.mrs$/i.test(String(path || ''));
+}
+
+function addEditableFileOption(option, path, label, name) {
+    if (isEditablePath(name || path))
+        option.value(path, label);
 }
 
 function loadScript(url) {
@@ -89,6 +98,8 @@ var CBIAceValue = form.TextValue.extend({
                     useWorker: false,
                     wrap: false
                 });
+                editor.setValue(textarea.value || '', -1);
+                editor.resize(true);
                 textarea.style.display = 'none';
             } catch (error) {
                 console.warn('[mihomox] Failed to initialize ACE editor, using plain textarea:', error);
@@ -146,21 +157,23 @@ return view.extend({
         o.optional = true;
 
         for (const profile of profiles)
-            o.value(mihomox.profilesDir + '/' + profile.name, _('File:') + profile.name);
+            addEditableFileOption(o, mihomox.profilesDir + '/' + profile.name, _('File:') + profile.name, profile.name);
 
         for (const subscription of subscriptions)
             o.value(mihomox.subscriptionsDir + '/' + subscription['.name'] + '.yaml', _('Subscription:') + subscription.name);
 
         for (const ruleProvider of ruleProviders)
-            o.value(mihomox.ruleProvidersDir + '/' + ruleProvider.name, _('Rule Provider:') + ruleProvider.name);
+            addEditableFileOption(o, mihomox.ruleProvidersDir + '/' + ruleProvider.name, _('Rule Provider:') + ruleProvider.name, ruleProvider.name);
 
         for (const proxyProvider of proxyProviders)
-            o.value(mihomox.proxyProvidersDir + '/' + proxyProvider.name, _('Proxy Provider:') + proxyProvider.name);
+            addEditableFileOption(o, mihomox.proxyProvidersDir + '/' + proxyProvider.name, _('Proxy Provider:') + proxyProvider.name, proxyProvider.name);
 
         o.value(mihomox.mixinFilePath, _('File for Mixin'));
         o.value(mihomox.runProfilePath, _('Profile for Startup'));
         o.write = function () { return true; };
         o.onchange = function (event, section_id, value) {
+            if (!isEditablePath(value))
+                return;
             return L.resolveDefault(fs.read_direct(value), '').then(function (content) {
                 var uiElement = m.lookupOption('_file_content', section_id)[0].getUIElement(section_id);
                 if (uiElement)
@@ -173,10 +186,14 @@ return view.extend({
         o.wrap = false;
         o.write = function (section_id, formvalue) {
             const path = m.lookupOption('_file', section_id)[0].formvalue(section_id);
+            if (!isEditablePath(path))
+                return;
             return mihomox.writefile(path, formvalue);
         };
         o.remove = function (section_id) {
             const path = m.lookupOption('_file', section_id)[0].formvalue(section_id);
+            if (!isEditablePath(path))
+                return;
             return mihomox.writefile(path);
         };
 
