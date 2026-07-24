@@ -96,10 +96,33 @@ const coreStatus = {
     detected_architecture: 'linux-amd64-v3',
     updated_at: '2026-07-24 12:34:56'
 };
+let updateCallCount = 0;
+let resolveUpdate;
 const mihomox = {
+    version: () => Promise.resolve({ app: '1.0', core: 'v1' }),
+    status: () => Promise.resolve(false),
+    coreStatus: () => Promise.resolve(coreStatus),
+    listProfiles: () => Promise.resolve([]),
     updateCore: (...args) => {
         updateArgs = args;
-        return Promise.resolve({ success: true, channel: args[0] });
+        updateCallCount += 1;
+        if (updateCallCount === 1) {
+            return new Promise((resolve) => {
+                resolveUpdate = () => resolve({
+                    success: true,
+                    started: true,
+                    running: true,
+                    channel: args[0]
+                });
+            });
+        }
+        return Promise.resolve({
+            success: true,
+            started: false,
+            running: true,
+            channel: args[0],
+            message: 'update_already_running'
+        });
     }
 };
 const E = (_, attributes) => Object.assign({ style: {}, value: '' }, attributes);
@@ -129,15 +152,30 @@ const loadView = new Function(
 );
 const appView = loadView(form, view, uci, poll, mihomox, E, translate, L, document);
 
-appView.render([null, {}, false, [], coreStatus]);
+appView.render([null, []]);
 
 assert.strictEqual(renderedMap.options.channel.default, 'Prerelease-Alpha');
 assert.strictEqual(renderedMap.options._update_status, undefined);
 const updateTime = renderedMap.options._update_time.cfgvalue();
-assert.strictEqual(updateTime.value, coreStatus.updated_at);
+assert.strictEqual(updateTime.value, '-');
 assert.strictEqual(nodes.core_update_span, undefined);
 
-Promise.resolve(renderedMap.options._update_core.onclick({ type: 'click' }, 'core'))
+const firstClick = renderedMap.options._update_core.onclick({ type: 'click' }, 'core');
+
+Promise.resolve()
+    .then(() => {
+        assert.strictEqual(updateCallCount, 1);
+        assert.ok(nodes.core_update_span);
+        assert.strictEqual(nodes.core_update_span.textContent, 'Updating');
+        // Concurrent second click while RPC in-flight.
+        return renderedMap.options._update_core.onclick({ type: 'click' }, 'core');
+    })
+    .then(() => {
+        assert.strictEqual(updateCallCount, 1);
+        assert.strictEqual(nodes.core_update_span.textContent, 'Update request in progress');
+        resolveUpdate();
+        return firstClick;
+    })
     .then(() => {
         assert.deepStrictEqual(updateArgs, [
             'Prerelease-Alpha',
@@ -147,9 +185,13 @@ Promise.resolve(renderedMap.options._update_core.onclick({ type: 'click' }, 'cor
             '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
         ]);
         assert.strictEqual(renderedMap.options.channel.uiValue, 'Prerelease-Alpha');
-        assert.ok(nodes.core_update_span);
         assert.strictEqual(nodes.core_update_span.textContent, 'Updating');
-        assert.strictEqual(nodes.core_update_span.style.display, 'inline');
+        // After in-flight clears, another click should call backend again.
+        return renderedMap.options._update_core.onclick({ type: 'click' }, 'core');
+    })
+    .then(() => {
+        assert.strictEqual(updateCallCount, 2);
+        assert.strictEqual(nodes.core_update_span.textContent, 'Update already running');
         console.log('LuCI core update tests passed');
     })
     .catch((error) => {

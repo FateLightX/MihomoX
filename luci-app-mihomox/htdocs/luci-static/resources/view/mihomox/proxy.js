@@ -8,11 +8,20 @@
 
 return view.extend({
     load: function () {
+        // getIdentifiers can be slow; load it with a soft timeout so the page still opens.
+        const identifiers = Promise.race([
+            L.resolveDefault(mihomox.getIdentifiers(), { users: [], groups: [], cgroups: [] }),
+            new Promise(function (resolve) {
+                setTimeout(function () {
+                    resolve({ users: [], groups: [], cgroups: [] });
+                }, 1500);
+            })
+        ]);
         return Promise.all([
             uci.load('mihomox'),
             network.getHostHints(),
             network.getNetworks(),
-            mihomox.getIdentifiers(),
+            identifiers
         ]);
     },
     render: function (data) {

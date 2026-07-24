@@ -15,12 +15,67 @@ function validateCron(value) {
     return true;
 }
 
+function getOptionUI(option, sectionId) {
+    if (!option || typeof option.getUIElement !== 'function')
+        return null;
+    try {
+        return option.getUIElement(sectionId) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function getTextareaNode(uiElement) {
+    if (!uiElement)
+        return null;
+    if (uiElement.node) {
+        if (uiElement.node.tagName === 'TEXTAREA')
+            return uiElement.node;
+        if (uiElement.node.firstChild && uiElement.node.firstChild.tagName === 'TEXTAREA')
+            return uiElement.node.firstChild;
+        return uiElement.node;
+    }
+    if (uiElement.tagName === 'TEXTAREA')
+        return uiElement;
+    return null;
+}
+
+function isVisibleNode(node) {
+    return !!(node && node.offsetParent !== null && !document.hidden);
+}
+
+function setLogValue(option, sectionId, value) {
+    const uiElement = getOptionUI(option, sectionId);
+    if (!uiElement || typeof uiElement.setValue !== 'function')
+        return false;
+    const node = getTextareaNode(uiElement);
+    if (node && !isVisibleNode(node) && !(uiElement.node && isVisibleNode(uiElement.node)))
+        return false;
+    try {
+        uiElement.setValue(value);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function scrollLogToBottom(map, optionName, sectionId) {
+    const option = map.lookupOption(optionName, sectionId);
+    if (!option || !option[0])
+        return;
+    const uiElement = getOptionUI(option[0], sectionId);
+    const node = getTextareaNode(uiElement);
+    if (!node)
+        return;
+    node.scrollTop = node.scrollHeight;
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
             uci.load('mihomox'),
-            mihomox.getAppLog(),
-            mihomox.getCoreLog()
+            L.resolveDefault(mihomox.getAppLog(), ''),
+            L.resolveDefault(mihomox.getCoreLog(), '')
         ]);
     },
     render: function (data) {
@@ -28,6 +83,8 @@ return view.extend({
         const coreLog = data[2];
 
         let m, s, o;
+        let appLogOption;
+        let coreLogOption;
 
         m = new form.Map('mihomox');
 
@@ -68,35 +125,26 @@ return view.extend({
         o = s.taboption('app_log', form.Button, 'clear_app_log');
         o.inputstyle = 'negative';
         o.inputtitle = _('Clear Log');
-        o.onclick = function (_, section_id) {
-            m.lookupOption('_app_log', section_id)[0].getUIElement(section_id).setValue('');
+        o.onclick = function (ev, section_id) {
+            setLogValue(appLogOption, section_id, '');
             return mihomox.clearAppLog();
         };
 
-        o = s.taboption('app_log', form.TextValue, '_app_log');
-        o.rows = 25;
-        o.wrap = false;
-        o.load = function (section_id) {
+        appLogOption = s.taboption('app_log', form.TextValue, '_app_log');
+        appLogOption.rows = 25;
+        appLogOption.wrap = false;
+        appLogOption.readonly = true;
+        appLogOption.load = function () {
             return appLog;
         };
-        o.write = function (section_id, formvalue) {
+        appLogOption.write = function () {
             return true;
         };
-        poll.add(L.bind(function () {
-            const option = this;
-            const uiElement = option.getUIElement('log');
-            if (document.hidden || !uiElement?.node || uiElement.node.offsetParent === null)
-                return Promise.resolve();
-            return L.resolveDefault(mihomox.getAppLog()).then(function (log) {
-                uiElement.setValue(log);
-            });
-        }, o));
 
         o = s.taboption('app_log', form.Button, 'scroll_app_log_to_bottom');
         o.inputtitle = _('Scroll To Bottom');
-        o.onclick = function (_, section_id) {
-            const element = m.lookupOption('_app_log', section_id)[0].getUIElement(section_id).node.firstChild;
-            element.scrollTop = element.scrollHeight;
+        o.onclick = function (ev, section_id) {
+            scrollLogToBottom(m, '_app_log', section_id);
         };
 
         s.tab('core_log', _('Core Log'));
@@ -104,35 +152,26 @@ return view.extend({
         o = s.taboption('core_log', form.Button, 'clear_core_log');
         o.inputstyle = 'negative';
         o.inputtitle = _('Clear Log');
-        o.onclick = function (_, section_id) {
-            m.lookupOption('_core_log', section_id)[0].getUIElement(section_id).setValue('');
+        o.onclick = function (ev, section_id) {
+            setLogValue(coreLogOption, section_id, '');
             return mihomox.clearCoreLog();
         };
 
-        o = s.taboption('core_log', form.TextValue, '_core_log');
-        o.rows = 25;
-        o.wrap = false;
-        o.load = function (section_id) {
+        coreLogOption = s.taboption('core_log', form.TextValue, '_core_log');
+        coreLogOption.rows = 25;
+        coreLogOption.wrap = false;
+        coreLogOption.readonly = true;
+        coreLogOption.load = function () {
             return coreLog;
         };
-        o.write = function (section_id, formvalue) {
+        coreLogOption.write = function () {
             return true;
         };
-        poll.add(L.bind(function () {
-            const option = this;
-            const uiElement = option.getUIElement('log');
-            if (document.hidden || !uiElement?.node || uiElement.node.offsetParent === null)
-                return Promise.resolve();
-            return L.resolveDefault(mihomox.getCoreLog()).then(function (log) {
-                uiElement.setValue(log);
-            });
-        }, o));
 
         o = s.taboption('core_log', form.Button, 'scroll_core_log_to_bottom');
         o.inputtitle = _('Scroll To Bottom');
-        o.onclick = function (_, section_id) {
-            const element = m.lookupOption('_core_log', section_id)[0].getUIElement(section_id).node.firstChild;
-            element.scrollTop = element.scrollHeight;
+        o.onclick = function (ev, section_id) {
+            scrollLogToBottom(m, '_core_log', section_id);
         };
 
         s.tab('debug_log', _('Debug Log'));
@@ -142,25 +181,37 @@ return view.extend({
         o.inputtitle = _('Generate & Download');
         o.onclick = function () {
             return mihomox.debug().then(function () {
-                fs.read_direct(mihomox.debugLogPath, 'blob').then(function (data) {
-                    // create url
+                return fs.read_direct(mihomox.debugLogPath, 'blob').then(function (data) {
                     const url = window.URL.createObjectURL(data, { type: 'text/markdown' });
-                    // create link
                     const link = document.createElement('a');
                     link.href = url;
                     link.download = 'debug.log';
-                    // append to body
                     document.body.appendChild(link);
-                    // download
                     link.click();
-                    // remove from body
                     document.body.removeChild(link);
-                    // revoke url
                     window.URL.revokeObjectURL(url);
                 });
             });
         };
 
-        return m.render();
+        return m.render().then(function (viewNode) {
+            // Register poll only after map DOM root exists to avoid
+            // getUIElement -> root.querySelectorAll on undefined.
+            poll.add(function () {
+                if (document.hidden)
+                    return Promise.resolve();
+                return L.resolveDefault(mihomox.getAppLog(), '').then(function (log) {
+                    setLogValue(appLogOption, 'log', log);
+                });
+            });
+            poll.add(function () {
+                if (document.hidden)
+                    return Promise.resolve();
+                return L.resolveDefault(mihomox.getCoreLog(), '').then(function (log) {
+                    setLogValue(coreLogOption, 'log', log);
+                });
+            });
+            return viewNode;
+        });
     }
 });

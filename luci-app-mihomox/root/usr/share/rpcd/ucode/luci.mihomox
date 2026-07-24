@@ -49,6 +49,8 @@ const CORE_CHANNELS = {
 	'Prerelease-Alpha': true
 };
 let detected_core_architecture = '';
+let cached_app_version = null;
+const DETECTED_ARCH_CACHE = '/var/run/mihomox/detected-arch';
 
 function shell_read(command) {
 	let process = popen(command);
@@ -56,6 +58,40 @@ function shell_read(command) {
 	let value = trim(process.read('all') || '');
 	process.close();
 	return value;
+}
+
+function lock_pid_alive() {
+	if (!access(CORE_LOCK_DIR + '/pid', 'r'))
+		return false;
+	let pid = trim(readfile(CORE_LOCK_DIR + '/pid') || '');
+	if (!match(pid, /^[0-9]+$/))
+		return false;
+	return system('kill -0 ' + pid + ' 2>/dev/null') == 0;
+}
+
+function now_ts() {
+	return int(shell_read('date +%s 2>/dev/null') || 0);
+}
+
+function clear_stale_core_update_markers() {
+	if (access(CORE_LOCK_DIR, 'r') && !lock_pid_alive())
+		system('rm -rf ' + CORE_LOCK_DIR);
+	if (access(CORE_PENDING_FILE, 'r') && !lock_pid_alive()) {
+		let pending = stat(CORE_PENDING_FILE);
+		let age = pending?.mtime != null ? (now_ts() - int(pending.mtime)) : 9999;
+		if (age > 120)
+			unlink(CORE_PENDING_FILE);
+	}
+}
+
+function core_update_running() {
+	clear_stale_core_update_markers();
+	if (lock_pid_alive())
+		return true;
+	if (access(CORE_PENDING_FILE, 'r'))
+		return true;
+	let state = read_kv(CORE_STATUS_FILE);
+	return state.state == 'running';
 }
 
 function read_kv(path) {
@@ -105,13 +141,14 @@ function writable_path(path) {
 const methods = {
 	version: {
 		call: function() {
-			let app = '';
-			if (system('command -v opkg') == 0) {
-				app = shell_read("opkg status luci-app-mihomox 2>/dev/null | awk -F': ' '/^Version:/{print $2; exit}'");
-			} else if (system('command -v apk') == 0) {
-				app = shell_read("apk list -I luci-app-mihomox 2>/dev/null | awk '{print $1; exit}' | sed 's/^luci-app-mihomox-//'");
+			if (cached_app_version == null) {
+				// Prefer opkg status once; fall back to apk. Cache for process lifetime.
+				let app = shell_read("opkg status luci-app-mihomox 2>/dev/null | awk -F': ' '/^Version:/{print $2; exit}'");
+				if (!app)
+					app = shell_read("apk list -I luci-app-mihomox 2>/dev/null | awk '{print $1; exit}' | sed 's/^luci-app-mihomox-//'");
+				cached_app_version = app || '';
 			}
-			return { app: app, core: installed_core_version() };
+			return { app: cached_app_version, core: installed_core_version() };
 		}
 	},
 	profile: {
@@ -153,13 +190,24 @@ const methods = {
 		call: function() {
 			let metadata = read_kv(CORE_VERSION_FILE);
 			let state = read_kv(CORE_STATUS_FILE);
-			let configured = shell_read("uci -q get mihomox.core.architecture 2>/dev/null") || 'auto';
-			if (!detected_core_architecture)
-				detected_core_architecture = shell_read('/etc/mihomox/scripts/update_core.sh --detect-arch 2>/dev/null');
+			let uci = cursor();
+			uci.load('mihomox');
+			let configured = uci.get('mihomox', 'core', 'architecture') || 'auto';
+			if (!detected_core_architecture) {
+				if (access(DETECTED_ARCH_CACHE, 'r'))
+					detected_core_architecture = trim(readfile(DETECTED_ARCH_CACHE) || '');
+				if (!detected_core_architecture) {
+					detected_core_architecture = shell_read('/etc/mihomox/scripts/update_core.sh --detect-arch 2>/dev/null');
+					if (detected_core_architecture) {
+						system('mkdir -p /var/run/mihomox');
+						writefile(DETECTED_ARCH_CACHE, detected_core_architecture + '\n');
+					}
+				}
+			}
 			let detected = detected_core_architecture;
-			let updating = access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r');
+			let updating = core_update_running();
 			return {
-				installed: metadata.version || installed_core_version(),
+				installed: metadata.version || '',
 				installed_architecture: metadata.architecture || '',
 				latest: state.version || '',
 				architecture: state.architecture || detected,
@@ -269,13 +317,31 @@ const methods = {
 				return { success: false, error: 'save_failed' };
 			if (shell_read("uci -q get mihomox.core.channel 2>/dev/null") != channel)
 				return { success: false, error: 'save_failed' };
-			if (access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r'))
-				return { success: true, started: false, running: true, channel: channel };
+			if (core_update_running())
+				return {
+					success: true,
+					started: false,
+					running: true,
+					channel: channel,
+					message: 'update_already_running'
+				};
 
 			if (writefile(CORE_PENDING_FILE, 'pending\n') === null)
 				return { success: false, error: 'lock_failed' };
-			let rc = system('nohup /etc/init.d/mihomox update_core >/dev/null 2>&1 </dev/null &');
-			if (rc != 0) {
+
+			let start_cmds = [
+				'setsid ' + CORE_UPDATE_SCRIPT + ' >>/var/log/mihomox/core-update.log 2>&1 </dev/null &',
+				'nohup ' + CORE_UPDATE_SCRIPT + ' >>/var/log/mihomox/core-update.log 2>&1 </dev/null &',
+				'nohup /etc/init.d/mihomox update_core >>/var/log/mihomox/core-update.log 2>&1 </dev/null &'
+			];
+			let started = false;
+			for (let cmd in start_cmds) {
+				if (system(cmd) == 0) {
+					started = true;
+					break;
+				}
+			}
+			if (!started) {
 				unlink(CORE_PENDING_FILE);
 				return { success: false, error: 'start_failed' };
 			}

@@ -17,7 +17,22 @@ function updateStatus(element, running) {
     return element;
 }
 
+function renderReadonlyText(id, value) {
+    return updateReadonlyText(E('input', {
+        id: id,
+        style: 'border: unset; font-style: italic;',
+        readonly: ''
+    }), value);
+}
+
+function updateReadonlyText(element, value) {
+    if (element)
+        element.value = value || '-';
+    return element;
+}
+
 var coreUpdateSessionActive = false;
+var coreUpdateInFlight = false;
 
 function renderCoreUpdateTime(updatedAt) {
     return updateCoreUpdateTime(E('input', {
@@ -69,7 +84,7 @@ function updateCoreUpdateSpan(status) {
     status = status || {};
     if (status.updating) {
         span.style.color = '#b36b00';
-        span.textContent = _('Updating');
+        span.textContent = status.message || _('Updating');
         span.style.display = 'inline';
     } else if (status.state === 'failed') {
         span.style.color = 'red';
@@ -101,21 +116,19 @@ function validateCron(value) {
 
 return view.extend({
     load: function () {
+        // Keep initial view load light; version/status/coreStatus can be slow on OpenWrt.
         return Promise.all([
             uci.load('mihomox'),
-            mihomox.version(),
-            mihomox.status(),
-            mihomox.listProfiles(),
-            mihomox.coreStatus()
+            L.resolveDefault(mihomox.listProfiles(), [])
         ]);
     },
     render: function (data) {
         const subscriptions = uci.sections('mihomox', 'subscription');
-        const appVersion = data[1].app ?? '';
-        const coreVersion = data[1].core ?? '';
-        const running = data[2];
-        const profiles = data[3];
-        const coreState = data[4] || {};
+        const profiles = data[1] || [];
+        let appVersion = '';
+        let coreVersion = '';
+        let running = false;
+        let coreState = {};
 
         let m, s, o;
 
@@ -124,26 +137,42 @@ return view.extend({
         s = m.section(form.TableSection, 'status', _('Status'));
         s.anonymous = true;
 
-        o = s.option(form.Value, '_app_version', _('App Version'));
-        o.readonly = true;
-        o.load = function () {
-            return appVersion;
+        o = s.option(form.DummyValue, '_app_version', _('App Version'));
+        o.cfgvalue = function () {
+            return renderReadonlyText('app_version', appVersion || '-');
         };
-        o.write = function () { };
 
-        o = s.option(form.Value, '_core_version', _('Core Version'));
-        o.readonly = true;
-        o.load = function () {
-            return coreVersion;
+        o = s.option(form.DummyValue, '_core_version', _('Core Version'));
+        o.cfgvalue = function () {
+            return renderReadonlyText('core_version', coreVersion || '-');
         };
-        o.write = function () { };
 
         o = s.option(form.DummyValue, '_core_status', _('Core Status'));
         o.cfgvalue = function () {
             return renderStatus(running);
         };
+
+        // Populate slow fields after first paint so "Loading view" stays short.
+        L.resolveDefault(mihomox.version(), {}).then(function (version) {
+            appVersion = version.app || '';
+            coreVersion = version.core || '';
+            updateReadonlyText(document.getElementById('app_version'), appVersion || '-');
+            updateReadonlyText(document.getElementById('core_version'), coreVersion || '-');
+        });
+        L.resolveDefault(mihomox.status()).then(function (isRunning) {
+            running = !!isRunning;
+            updateStatus(document.getElementById('core_status'), running);
+        });
+        L.resolveDefault(mihomox.coreStatus(), {}).then(function (status) {
+            coreState = status || {};
+            updateReadonlyText(document.getElementById('installed_architecture'), coreState.installed_architecture || _('Unknown'));
+            updateReadonlyText(document.getElementById('detected_architecture'), coreState.detected_architecture || _('Unknown'));
+            updateCoreUpdateTime(document.getElementById('core_update_time'), coreState.updated_at);
+        });
+
         poll.add(function () {
-            return L.resolveDefault(mihomox.status()).then(function (running) {
+            return L.resolveDefault(mihomox.status()).then(function (isRunning) {
+                running = !!isRunning;
                 updateStatus(document.getElementById('core_status'), running);
             });
         });
@@ -185,12 +214,12 @@ return view.extend({
 
         o = s.option(form.DummyValue, '_installed_architecture', _('Installed Core Architecture'));
         o.cfgvalue = function () {
-            return coreState.installed_architecture || _('Unknown');
+            return renderReadonlyText('installed_architecture', coreState.installed_architecture || _('Unknown'));
         };
 
         o = s.option(form.DummyValue, '_detected_architecture', _('Detected Architecture'));
         o.cfgvalue = function () {
-            return coreState.detected_architecture || _('Unknown');
+            return renderReadonlyText('detected_architecture', coreState.detected_architecture || _('Unknown'));
         };
 
         const architectureOption = s.option(form.ListValue, 'architecture', _('Core Architecture'));
@@ -246,30 +275,53 @@ return view.extend({
         o = s.option(form.Button, '_update_core', _('Mihomo Core'));
         o.inputstyle = 'positive';
         o.inputtitle = _('Update Core');
-        o.onclick = function (_, sectionId) {
+        o.onclick = function (ev, sectionId) {
+            if (coreUpdateInFlight) {
+                coreUpdateSessionActive = true;
+                updateCoreUpdateSpan({ updating: true, message: _('Update request in progress') });
+                return Promise.resolve();
+            }
+
             const channel = channelOption.formvalue(sectionId) || 'Prerelease-Alpha';
             const architecture = architectureOption.formvalue(sectionId) || 'auto';
-            const mirrorPrefix = mirrorOption.formvalue(sectionId) || '';
-            const downloadUrl = downloadUrlOption.formvalue(sectionId) || '';
-            const downloadSha256 = downloadSha256Option.formvalue(sectionId) || '';
-            if (downloadUrl && !downloadSha256)
-                return Promise.reject(new Error(_('Custom Core SHA256 is required')));
+            const mirrorPrefix = (mirrorOption.formvalue(sectionId) || '').trim();
+            const downloadUrl = (downloadUrlOption.formvalue(sectionId) || '').trim();
+            const downloadSha256 = (downloadSha256Option.formvalue(sectionId) || '').trim();
+            if (downloadUrl && !downloadSha256) {
+                coreUpdateSessionActive = true;
+                const message = _('Custom Core SHA256 is required');
+                updateCoreUpdateSpan({ state: 'failed', message: message });
+                // Resolve so LuCI re-enables the button.
+                return Promise.resolve();
+            }
+
             coreUpdateSessionActive = true;
+            coreUpdateInFlight = true;
             updateCoreUpdateSpan({ updating: true });
+
             return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl, downloadSha256).then(function (result) {
                 if (!result || !result.success) {
                     updateCoreUpdateSpan({ state: 'failed', message: result?.error || _('Failed') });
-                    return Promise.reject(new Error(result?.error || _('Failed')));
+                    return;
                 }
                 const channelElement = channelOption.getUIElement(sectionId);
                 if (channelElement && result.channel)
                     channelElement.setValue(result.channel);
-                updateCoreUpdateSpan({ updating: true });
-                return result;
+                if (result.running && result.started === false) {
+                    updateCoreUpdateSpan({
+                        updating: true,
+                        message: result.message === 'update_already_running'
+                            ? _('Update already running')
+                            : _('Updating')
+                    });
+                } else {
+                    updateCoreUpdateSpan({ updating: true });
+                }
             }).catch(function (error) {
                 const message = error && error.message ? error.message : _('Failed');
                 updateCoreUpdateSpan({ state: 'failed', message: message });
-                return Promise.reject(error instanceof Error ? error : new Error(message));
+            }).then(function () {
+                coreUpdateInFlight = false;
             });
         };
 
