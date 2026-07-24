@@ -2,7 +2,7 @@
 
 'use strict';
 
-import { access, popen, readfile, unlink, writefile } from 'fs';
+import { access, chmod, open, popen, readfile, rename, stat, unlink, writefile } from 'fs';
 import { cursor } from 'uci';
 import { get_users, get_groups, get_cgroups, load_profile } from '/etc/mihomox/ucode/include.uc';
 
@@ -12,7 +12,21 @@ const CORE_UPDATE_SCRIPT = '/etc/mihomox/scripts/update_core.sh';
 const CORE_STATUS_FILE = '/var/run/mihomox/core-update.status';
 const CORE_LOCK_DIR = '/var/run/mihomox/core-update.lock';
 const CORE_PENDING_FILE = '/var/run/mihomox/core-update.pending';
-const CORE_LOG_FILE = '/var/log/mihomox/core-update.log';
+const APP_LOG_FILE = '/var/log/mihomox/app.log';
+const CORE_LOG_FILE = '/var/log/mihomox/core.log';
+const MAX_EDIT_FILE_SIZE = 16 * 1024 * 1024;
+const WRITABLE_PATHS = [
+	'/etc/mihomox/mixin.yaml',
+	'/etc/mihomox/run/config.yaml',
+	APP_LOG_FILE,
+	CORE_LOG_FILE
+];
+const WRITABLE_PREFIXES = [
+	'/etc/mihomox/profiles/',
+	'/etc/mihomox/subscriptions/',
+	'/etc/mihomox/run/providers/rule/',
+	'/etc/mihomox/run/providers/proxy/'
+];
 const CORE_ARCHITECTURES = {
 	'auto': true,
 	'amd64-v1': true,
@@ -34,6 +48,7 @@ const CORE_CHANNELS = {
 	'release': true,
 	'Prerelease-Alpha': true
 };
+let detected_core_architecture = '';
 
 function shell_read(command) {
 	let process = popen(command);
@@ -58,6 +73,33 @@ function installed_core_version() {
 	let metadata = read_kv(CORE_VERSION_FILE);
 	if (metadata.version) return metadata.version;
 	return shell_read("" + CORE_PATH + " -v 2>/dev/null | awk '{ for (i=1; i<=NF; i++) if ($i ~ /^v[0-9]+([.][0-9]+)+/) { print $i; exit } }'");
+}
+
+function valid_api_value(value, maximum) {
+	return value != null && length(value) <= maximum && !match(value, /[\x00-\x1f\x7f]/);
+}
+
+function controller_url(listen, protocol, path) {
+	let base = listen;
+	if (!match(base, /^https?:\/\//))
+		base = protocol + '://' + base;
+	if (length(base) > 0 && substr(base, length(base) - 1, 1) == '/' && substr(path, 0, 1) == '/')
+		base = substr(base, 0, length(base) - 1);
+	return base + path;
+}
+
+function writable_path(path) {
+	if (!valid_api_value(path, 4096) || match(path, /(^|\/)\.\.(\/|$)/))
+		return false;
+	if (index(WRITABLE_PATHS, path) >= 0)
+		return true;
+	for (let prefix in WRITABLE_PREFIXES)
+		if (substr(path, 0, length(prefix)) == prefix && length(path) > length(prefix)) {
+			if (match(prefix, /profiles|subscriptions/) && !match(path, /\.(yaml|yml)$/))
+				return false;
+			return true;
+		}
+	return false;
 }
 
 const methods = {
@@ -96,7 +138,12 @@ const methods = {
 		call: function(req) {
 			let success = false;
 			const section_id = req.args?.section_id;
-			if (section_id) {
+			if (section_id && match(section_id, /^[A-Za-z0-9_-]{1,64}$/)) {
+				let uci = cursor();
+				uci.load('mihomox');
+				const section = uci.get_all('mihomox', section_id);
+				if (section?.['.type'] != 'subscription')
+					return { success: false };
 				success = system(['service', 'mihomox', 'update_subscription', section_id]) == 0;
 			}
 			return { success: success };
@@ -107,7 +154,9 @@ const methods = {
 			let metadata = read_kv(CORE_VERSION_FILE);
 			let state = read_kv(CORE_STATUS_FILE);
 			let configured = shell_read("uci -q get mihomox.core.architecture 2>/dev/null") || 'auto';
-			let detected = shell_read('/etc/mihomox/scripts/update_core.sh --detect-arch 2>/dev/null');
+			if (!detected_core_architecture)
+				detected_core_architecture = shell_read('/etc/mihomox/scripts/update_core.sh --detect-arch 2>/dev/null');
+			let detected = detected_core_architecture;
 			let updating = access(CORE_LOCK_DIR, 'r') || access(CORE_PENDING_FILE, 'r');
 			return {
 				installed: metadata.version || installed_core_version(),
@@ -119,19 +168,77 @@ const methods = {
 				updating: updating,
 				state: state.state || 'idle',
 				message: state.message || '',
-				updated_at: state.updated_at || '',
-				log: shell_read('tail -20 ' + CORE_LOG_FILE + ' 2>/dev/null')
+				updated_at: state.updated_at || ''
 			};
 		}
 	},
+	log: {
+		args: { name: 'name' },
+		call: function(req) {
+			const paths = {
+				'app': APP_LOG_FILE,
+				'core': CORE_LOG_FILE
+			};
+			const path = paths[req.args?.name];
+			if (!path)
+				return { log: '' };
+			const process = popen(['tail', '-c', '65536', path], 'r');
+			if (!process)
+				return { log: '' };
+			const result = process.read('all') || '';
+			process.close();
+			return { log: result };
+		}
+	},
+	write_file: {
+		args: { path: 'path', data: 'data', append: 'append', mode: 'mode', token: 'token', commit: 'commit', abort: 'abort' },
+		call: function(req) {
+			const path = req.args?.path;
+			const data = req.args?.data ?? '';
+			const append = req.args?.append == true;
+			const commit = req.args?.commit == true;
+			const token = req.args?.token || '';
+			let mode = req.args?.mode;
+			if (!writable_path(path) || !match(token, /^[A-Za-z0-9_-]{16,80}$/))
+				return { success: false, error: 'invalid_path' };
+			if (mode != 384 && mode != 420)
+				mode = 420;
+
+			const temporary = path + '.mihomox-' + token + '.tmp';
+			if (req.args?.abort == true) {
+				unlink(temporary);
+				return { success: true };
+			}
+			if (!append)
+				unlink(temporary);
+			const handle = open(temporary, append ? 'a' : 'w', 384);
+			if (!handle)
+				return { success: false, error: 'open_failed' };
+			const written = handle.write(data);
+			handle.close();
+			const file_stat = stat(temporary);
+			if (written === null || !file_stat || file_stat.size > MAX_EDIT_FILE_SIZE) {
+				unlink(temporary);
+				return { success: false, error: file_stat?.size > MAX_EDIT_FILE_SIZE ? 'file_too_large' : 'write_failed' };
+			}
+			if (commit) {
+				if (!chmod(temporary, mode) || !rename(temporary, path)) {
+					unlink(temporary);
+					return { success: false, error: 'commit_failed' };
+				}
+			}
+			return { success: true, size: file_stat.size };
+		}
+	},
 	update_core: {
-		args: { channel: 'channel', architecture: 'architecture', mirror_prefix: 'mirror_prefix', download_url: 'download_url' },
+		args: { channel: 'channel', architecture: 'architecture', mirror_prefix: 'mirror_prefix', download_url: 'download_url', download_sha256: 'download_sha256' },
 		call: function(req) {
 			let configured_channel = shell_read("uci -q get mihomox.core.channel 2>/dev/null") || 'Prerelease-Alpha';
 			let channel = req.args?.channel || configured_channel;
 			let architecture = req.args?.architecture || 'auto';
 			let mirror_prefix = req.args?.mirror_prefix || '';
 			let download_url = req.args?.download_url || '';
+			let download_sha256 = req.args?.download_sha256 || '';
 			if (!CORE_CHANNELS[channel])
 				return { success: false, error: 'invalid_channel' };
 			if (!CORE_ARCHITECTURES[architecture])
@@ -142,6 +249,10 @@ const methods = {
 			if ((mirror_prefix && !match(mirror_prefix, /^https?:\/\//)) ||
 				(download_url && !match(download_url, /^https?:\/\//)))
 				return { success: false, error: 'invalid_url' };
+			if (length(download_sha256) > 128 || (download_sha256 && !match(download_sha256, /^[0-9a-fA-F]{64}$/)))
+				return { success: false, error: 'invalid_sha256' };
+			if (download_url && !download_sha256)
+				return { success: false, error: 'custom_sha256_required' };
 			if (!access(CORE_UPDATE_SCRIPT, 'x'))
 				return { success: false, error: 'missing_script' };
 			if (system('mkdir -p /var/run/mihomox /var/log/mihomox') != 0)
@@ -153,6 +264,7 @@ const methods = {
 			uci.set('mihomox', 'core', 'architecture', architecture);
 			uci.set('mihomox', 'core', 'mirror_prefix', mirror_prefix);
 			uci.set('mihomox', 'core', 'download_url', download_url);
+			uci.set('mihomox', 'core', 'download_sha256', download_sha256);
 			if (!uci.commit('mihomox'))
 				return { success: false, error: 'save_failed' };
 			if (shell_read("uci -q get mihomox.core.channel 2>/dev/null") != channel)
@@ -175,10 +287,16 @@ const methods = {
 		call: function(req) {
 			let result = {};
 
-			const method = req.args?.method;
-			const path = req.args?.path;
-			const query = req.args?.query;
-			const body = req.args?.body;
+			const method = req.args?.method || 'GET';
+			const path = req.args?.path || '/';
+			const query = req.args?.query || '';
+			const body = req.args?.body || '';
+			if (!match(method, /^(GET|POST|PUT|PATCH|DELETE|OPTIONS)$/) ||
+				!match(path, /^\/[^\r\n]*$/) ||
+				!valid_api_value(path, 4096) ||
+				!valid_api_value(query, 8192) ||
+				!valid_api_value(body, 1048576))
+				return result;
 
 			const profile = load_profile();
 			const api_listen = profile['external-controller'];
@@ -189,13 +307,26 @@ const methods = {
 			}
 
 			const protocol = api_tls_listen ? 'https' : 'http';
+			const listen = api_tls_listen || api_listen;
+			const url = controller_url(listen, protocol, path);
+			const curl_args = [
+				'curl', '--silent', '--show-error', '--max-time', '30',
+				'--connect-timeout', '10', '--proto-default', protocol,
+				'--insecure', '--request', method
+			];
+			if (api_secret)
+				push(curl_args, '--oauth2-bearer', api_secret);
+			push(curl_args, '--url-query', query, '--data', body, '--url', url);
 
-			const url = api_listen + path;
-
-			const process = popen(`curl --proto-default '${protocol}' --insecure --request '${method}' --oauth2-bearer '${api_secret}' --url-query '${query}' --data '${body}' '${url}'`);
+			const process = popen(curl_args, 'r');
 			if (process) {
-				result = json(process);
+				const output = process.read('all') || '';
 				process.close();
+				try {
+					result = json(output) || {};
+				} catch (e) {
+					result = {};
+				}
 			}
 
 			return result;

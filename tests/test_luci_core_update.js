@@ -13,7 +13,8 @@ const formValues = {
     channel: 'Prerelease-Alpha',
     architecture: 'amd64-v3',
     mirror_prefix: 'https://mirror.example/',
-    download_url: 'https://example.com/mihomo.gz'
+    download_url: 'https://example.com/mihomo.gz',
+    download_sha256: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 };
 const nodes = {};
 const pollCallbacks = [];
@@ -129,7 +130,8 @@ Promise.resolve(renderedMap.options._update_core.onclick({ type: 'click' }, 'cor
             'Prerelease-Alpha',
             'amd64-v3',
             'https://mirror.example/',
-            'https://example.com/mihomo.gz'
+            'https://example.com/mihomo.gz',
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
         ]);
         assert.strictEqual(renderedMap.options.channel.uiValue, 'Prerelease-Alpha');
         console.log('LuCI core update tests passed');

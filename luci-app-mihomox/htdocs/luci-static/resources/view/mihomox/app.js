@@ -60,6 +60,15 @@ function updateCoreUpdateTime(element, updatedAt) {
     return element;
 }
 
+function validateCron(value) {
+    const fields = String(value || '').trim().split(/\s+/);
+    if (fields.length !== 5 || fields.some(function (field) {
+        return !/^[0-9*/,-]+$/.test(field);
+    }))
+        return _('Invalid cron expression');
+    return true;
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -179,6 +188,14 @@ return view.extend({
         downloadUrlOption.datatype = 'url';
         downloadUrlOption.placeholder = 'https://example.com/mihomo.gz';
 
+        const downloadSha256Option = s.option(form.Value, 'download_sha256', _('Custom Core SHA256'));
+        downloadSha256Option.placeholder = _('Required when using Custom Core URL');
+        downloadSha256Option.validate = function (_, value) {
+            if (!value)
+                return true;
+            return /^[0-9a-fA-F]{64}$/.test(value) ? true : _('Invalid SHA256');
+        };
+
         o = s.option(form.DummyValue, '_update_status', _('Update Status'));
         o.cfgvalue = function () {
             return renderCoreUpdateStatus(coreState);
@@ -204,8 +221,11 @@ return view.extend({
             const architecture = architectureOption.formvalue(sectionId) || 'auto';
             const mirrorPrefix = mirrorOption.formvalue(sectionId) || '';
             const downloadUrl = downloadUrlOption.formvalue(sectionId) || '';
+            const downloadSha256 = downloadSha256Option.formvalue(sectionId) || '';
+            if (downloadUrl && !downloadSha256)
+                return Promise.reject(new Error(_('Custom Core SHA256 is required')));
             updateCoreUpdateStatus(document.getElementById('core_update_status'), { updating: true });
-            return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl).then(function (result) {
+            return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl, downloadSha256).then(function (result) {
                 if (!result || !result.success)
                     return Promise.reject(new Error(result?.error || _('Failed')));
                 const channelElement = channelOption.getUIElement(sectionId);
@@ -241,6 +261,9 @@ return view.extend({
         o = s.option(form.Value, 'scheduled_restart_cron', _('Scheduled Restart Cron'));
         o.retain = true;
         o.rmempty = false;
+        o.validate = function (_, value) {
+            return validateCron(value);
+        };
         o.depends('scheduled_restart', '1');
 
         o = s.option(form.Flag, 'test_profile', _('Test Profile'));

@@ -15,11 +15,17 @@ printf '<!doctype html><title>Zashboard</title>\n' > "$SOURCE_DIR/dist/index.htm
 printf 'fixture\n' > "$SOURCE_DIR/dist/assets/app.js"
 
 (cd "$SOURCE_DIR" && zip -qr "$ARCHIVE" dist)
+if command -v sha256sum >/dev/null 2>&1; then
+	ARCHIVE_SHA256=$(sha256sum "$ARCHIVE" | awk '{print $1}')
+else
+	ARCHIVE_SHA256=$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')
+fi
 
 "$FETCH_SCRIPT" \
 	--dl-dir "$TEST_DIR/dl" \
 	--output-dir "$OUTPUT_DIR" \
-	--url "file://$ARCHIVE"
+	--url "file://$ARCHIVE" \
+	--sha256 "$ARCHIVE_SHA256"
 
 cmp "$SOURCE_DIR/dist/index.html" "$OUTPUT_DIR/index.html"
 cmp "$SOURCE_DIR/dist/assets/app.js" "$OUTPUT_DIR/assets/app.js"
@@ -30,9 +36,19 @@ rm -rf "$SOURCE_DIR" "$ARCHIVE" "$OUTPUT_DIR"
 "$FETCH_SCRIPT" \
 	--dl-dir "$TEST_DIR/dl" \
 	--output-dir "$OUTPUT_DIR" \
-	--url "file:///unavailable"
+	--url "file://$ARCHIVE" \
+	--sha256 "$ARCHIVE_SHA256"
 
 [ -s "$OUTPUT_DIR/index.html" ]
 [ -s "$OUTPUT_DIR/assets/app.js" ]
+
+if "$FETCH_SCRIPT" \
+	--dl-dir "$TEST_DIR/dl" \
+	--output-dir "$OUTPUT_DIR" \
+	--url "file:///unavailable" \
+	--sha256 "$ARCHIVE_SHA256"; then
+	echo "changed unavailable URL unexpectedly reused cached Zashboard" >&2
+	exit 1
+fi
 
 echo "fetch Zashboard tests passed"

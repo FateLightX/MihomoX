@@ -1183,3 +1183,18 @@ msgstr "更新状态"
 
 msgid "Updating"
 msgstr "更新中"
+
+msgid "Custom Core SHA256"
+msgstr "自定义内核 SHA256"
+
+msgid "Required when using Custom Core URL"
+msgstr "使用自定义内核 URL 时必须填写"
+
+msgid "Invalid SHA256"
+msgstr "SHA256 无效"
+
+msgid "Custom Core SHA256 is required"
+msgstr "必须填写自定义内核 SHA256"
+
+msgid "Invalid cron expression"
+msgstr "Cron 表达式无效"

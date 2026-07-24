@@ -5,9 +5,26 @@
 
 	import { cursor } from 'uci';
 	import { connect } from 'ubus';
-	import { uci_bool, uci_array, get_cgroups_version, get_users, get_groups, get_cgroups, load_profile } from '/etc/mihomox/ucode/include.uc';
+	import { uci_bool, uci_int, uci_array, get_cgroups_version, get_users, get_groups, get_cgroups, load_profile } from '/etc/mihomox/ucode/include.uc';
 
 	const fw4 = require('fw4');
+
+	function valid_port(value) {
+		const port = uci_int(value);
+		return port > 0 && port <= 65535 ? port : null;
+	}
+
+	function safe_mark(value, fallback) {
+		return value != null && match(value, /^(0[xX][0-9A-Fa-f]+|[0-9]+)$/) ? value : fallback;
+	}
+
+	function safe_identifier(value, fallback) {
+		return value != null && match(value, /^[A-Za-z0-9_.-]{1,64}$/) ? value : fallback;
+	}
+
+	function safe_list(values, pattern) {
+		return filter(uci_array(values), (value) => value != null && match(value, pattern));
+	}
 
 	const cgroups_version = get_cgroups_version();
 
@@ -32,19 +49,19 @@
 	const tun_listener_name = uci.get('mihomox', 'core', 'tun_listener_name');
 
 	if (profile['redir-port']) {
-		redir_port = profile['redir-port']
+		redir_port = valid_port(profile['redir-port']);
 	} else {
 		const profile_listeners = filter(profile['listeners'], (x) => x['name'] == redirect_listener_name && x['type'] === 'redir');
 		if (length(profile_listeners) > 0) {
-			redir_port = profile_listeners[0]['port'];
+			redir_port = valid_port(profile_listeners[0]['port']);
 		}
 	}
 	if (profile['tproxy-port']) {
-		tproxy_port = profile['tproxy-port']
+		tproxy_port = valid_port(profile['tproxy-port']);
 	} else {
 		const profile_listeners = filter(profile['listeners'], (x) => x['name'] == tproxy_listener_name && x['type'] === 'tproxy');
 		if (length(profile_listeners) > 0) {
-			tproxy_port = profile_listeners[0]['port'];
+			tproxy_port = valid_port(profile_listeners[0]['port']);
 		}
 	}
 	if (profile['tun'] && profile['tun']['enable'] && profile['tun']['device']) {
@@ -60,10 +77,12 @@
 		const dns_listen = profile['dns']['listen'];
 		const dns_listen_rindex = rindex(dns_listen, ':');
 		if (dns_listen_rindex >= 0 && dns_listen_rindex + 1 < length(dns_listen)) {
-			dns_port = substr(dns_listen, dns_listen_rindex + 1);
+			dns_port = valid_port(substr(dns_listen, dns_listen_rindex + 1));
 		}
-		fake_ip_range = profile['dns']['fake-ip-range'];
-		fake_ip6_range = profile['dns']['fake-ip-range6'];
+		const profile_fake_ip_range = profile['dns']['fake-ip-range'];
+		const profile_fake_ip6_range = profile['dns']['fake-ip-range6'];
+		fake_ip_range = profile_fake_ip_range != null && match(profile_fake_ip_range, /^[0-9A-Fa-f:.\/-]+$/) ? profile_fake_ip_range : null;
+		fake_ip6_range = profile_fake_ip6_range != null && match(profile_fake_ip6_range, /^[0-9A-Fa-f:.\/-]+$/) ? profile_fake_ip6_range : null;
 	}
 
 	uci.load('mihomox');
@@ -103,9 +122,9 @@
 	const lan_access_control = [];
 	uci.foreach('mihomox', 'lan_access_control', (access_control) => {
 		access_control['enabled'] = uci_bool(access_control['enabled']);
-		access_control['ip'] = uci_array(access_control['ip']);
-		access_control['ip6'] = uci_array(access_control['ip6']);
-		access_control['mac'] = uci_array(access_control['mac']);
+		access_control['ip'] = safe_list(access_control['ip'], /^[0-9A-Fa-f:.\/-]+$/);
+		access_control['ip6'] = safe_list(access_control['ip6'], /^[0-9A-Fa-f:.\/-]+$/);
+		access_control['mac'] = safe_list(access_control['mac'], /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/);
 		access_control['proxy'] = uci_bool(access_control['proxy']);
 		access_control['dns'] = uci_bool(access_control['dns']);
 		if (access_control['enabled']) {
@@ -113,11 +132,13 @@
 		}
 	});
 
-	const reserved_ip = uci_array(uci.get('mihomox', 'proxy', 'reserved_ip'));
-	const reserved_ip6 = uci_array(uci.get('mihomox', 'proxy', 'reserved_ip6'));
-	const bypass_dscp = uci_array(uci.get('mihomox', 'proxy', 'bypass_dscp'));
+	const reserved_ip = safe_list(uci.get('mihomox', 'proxy', 'reserved_ip'), /^[0-9A-Fa-f:.\/-]+$/);
+	const reserved_ip6 = safe_list(uci.get('mihomox', 'proxy', 'reserved_ip6'), /^[0-9A-Fa-f:.\/-]+$/);
+	const bypass_dscp = safe_list(uci.get('mihomox', 'proxy', 'bypass_dscp'), /^[0-9A-Za-z]+$/);
 	const bypass_fwmark = [];
 	for (let fwmark in uci_array(uci.get('mihomox', 'proxy', 'bypass_fwmark'))) {
+		if (!match(fwmark, /^(0[xX][0-9A-Fa-f]+|[0-9]+)(\/(0[xX][0-9A-Fa-f]+|[0-9]+))?$/))
+			continue;
 		let mark;
 		let mask = '0xFFFFFFFF';
 		if (index(fwmark, '/') >= 0) {
@@ -131,16 +152,16 @@
 	}
 	const bypass_china_mainland_ip = uci_bool(uci.get('mihomox', 'proxy', 'bypass_china_mainland_ip'));
 	const bypass_china_mainland_ip6 = uci_bool(uci.get('mihomox', 'proxy', 'bypass_china_mainland_ip6'));
-	const proxy_tcp_dport = split((uci.get('mihomox', 'proxy', 'proxy_tcp_dport') ?? '0-65535'), ' ');
-	const proxy_udp_dport = split((uci.get('mihomox', 'proxy', 'proxy_udp_dport') ?? '0-65535'), ' ');
+	const proxy_tcp_dport = filter(split((uci.get('mihomox', 'proxy', 'proxy_tcp_dport') ?? '0-65535'), ' '), (port) => match(port, /^[0-9]{1,5}(-[0-9]{1,5})?$/));
+	const proxy_udp_dport = filter(split((uci.get('mihomox', 'proxy', 'proxy_udp_dport') ?? '0-65535'), ' '), (port) => match(port, /^[0-9]{1,5}(-[0-9]{1,5})?$/));
 
-	const cgroup_id = uci.get('mihomox', 'routing', 'cgroup_id') ?? '0x12061206';
-	const cgroup_name = uci.get('mihomox', 'routing', 'cgroup_name') ?? 'mihomox';
-	const tproxy_fw_mark = uci.get('mihomox', 'routing', 'tproxy_fw_mark') ?? '0x80';
-	const tproxy_fw_mask = uci.get('mihomox', 'routing', 'tproxy_fw_mask') ?? '0xFF';
+	const cgroup_id = safe_mark(uci.get('mihomox', 'routing', 'cgroup_id'), '0x12061206');
+	const cgroup_name = safe_identifier(uci.get('mihomox', 'routing', 'cgroup_name'), 'mihomox');
+	const tproxy_fw_mark = safe_mark(uci.get('mihomox', 'routing', 'tproxy_fw_mark'), '0x80');
+	const tproxy_fw_mask = safe_mark(uci.get('mihomox', 'routing', 'tproxy_fw_mask'), '0xFF');
 	const tproxy_fw_umask = fw4.hex(~tproxy_fw_mask & 0xFFFFFFFF);
-	const tun_fw_mark = uci.get('mihomox', 'routing', 'tun_fw_mark') ?? '0x81';
-	const tun_fw_mask = uci.get('mihomox', 'routing', 'tun_fw_mask') ?? '0xFF';
+	const tun_fw_mark = safe_mark(uci.get('mihomox', 'routing', 'tun_fw_mark'), '0x81');
+	const tun_fw_mask = safe_mark(uci.get('mihomox', 'routing', 'tun_fw_mask'), '0xFF');
 	const tun_fw_umask = fw4.hex(~tun_fw_mask & 0xFFFFFFFF);
 
 	const dns_hijack_nfproto = [];
@@ -217,7 +238,7 @@ table inet mihomox {
 		auto-merge
 		{% if (length(lan_inbound_device) > 0): %}
 		elements = {
-			{{ join(', ', map(lan_inbound_device, (x) => `"${x}"`)) }}
+			{{ join(', ', map(lan_inbound_device, (x) => fw4.quote(x, true))) }}
 		}
 		{% endif %}
 	}

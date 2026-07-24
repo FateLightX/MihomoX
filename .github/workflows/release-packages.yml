@@ -7,11 +7,15 @@ on:
     tags:
       - v*
 
+permissions:
+  contents: read
+
 jobs:
   release:
     name: ${{ matrix.arch }}-${{ matrix.branch }} release
     runs-on: ubuntu-latest
-    continue-on-error: true
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -58,10 +62,10 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: build
-        uses: openwrt/gh-action-sdk@main
+        uses: openwrt/gh-action-sdk@797d0e3d0eb13b355c3447f60d0179d4b43089e2 # main
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
           FEEDNAME: mihomox
@@ -80,13 +84,13 @@ jobs:
 
       - if: github.event_name == 'push' && startsWith(github.ref_name, 'v')
         name: release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           files: |
             mihomox_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
 
       - name: upload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: feed_mihomox_${{ matrix.arch }}-${{ matrix.branch }}
           path: feed_mihomox_${{ matrix.arch }}-${{ matrix.branch }}.tar.gz
@@ -98,7 +102,7 @@ jobs:
 
     steps:
       - name: download
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: feed_mihomox_*
           merge-multiple: true
@@ -115,7 +119,7 @@ jobs:
           sed -i '/<p class="VERSION">/,/<\/p>/d' public/index.html
 
       - name: feed
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

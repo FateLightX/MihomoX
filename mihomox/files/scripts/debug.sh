@@ -4,10 +4,23 @@
 
 enabled=`uci get mihomox.config.enabled`
 
-if [ "$enabled" == "0" ]; then
+restore_enabled=0
+cleanup() {
+	if [ "$restore_enabled" = 1 ]; then
+		restore_enabled=0
+		uci set mihomox.config.enabled=0
+		uci commit mihomox
+		/etc/init.d/mihomox restart >/dev/null 2>&1 || true
+	fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+if [ "$enabled" = "0" ]; then
 	uci set mihomox.config.enabled=1
 	uci commit mihomox
-	/etc/init.d/mihomox restart
+	restore_enabled=1
+	/etc/init.d/mihomox restart >/dev/null 2>&1
 fi
 
 echo \
@@ -82,6 +95,17 @@ if (exists(result, "subscription")) {
 	for (let x in result["subscription"]) {
 		if (exists(x, "url")) {
 			x["url"] = "*";
+		}
+		if (exists(x, "info_url")) {
+			x["info_url"] = "*";
+		}
+	}
+}
+for (let section_type in result) {
+	for (let x in result[section_type]) {
+		for (let key in x) {
+			if (match(key, /(^|_)(url|info_url|api_secret|download_url|mirror_prefix|ui_url|geosite_url|geoip_.*_url|password|token)$/))
+				x[key] = "*";
 		}
 	}
 }
@@ -179,6 +203,15 @@ function desensitize_profile() {
 				}
 			}
 		}
+		if (exists(profile, "rule-providers")) {
+			for (let x in profile["rule-providers"])
+				if (exists(profile["rule-providers"][x], "url"))
+					profile["rule-providers"][x]["url"] = "*";
+		}
+		if (exists(profile, "external-ui-url"))
+			profile["external-ui-url"] = "*";
+		if (exists(profile, "geox-url"))
+			profile["geox-url"] = {};
 		if (exists(profile, "proxies")) {
 			desensitize_proxies(profile["proxies"]);
 		}
@@ -240,9 +273,3 @@ nft list table inet mihomox
 `
 \`\`\`
 "
-
-if [ "$enabled" == "0" ]; then
-	uci set mihomox.config.enabled=0
-	uci commit mihomox
-	/etc/init.d/mihomox restart
-fi

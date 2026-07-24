@@ -13,11 +13,12 @@ VERSION_FILE=""
 VERSION="${MIHOMO_VERSION:-}"
 CHANNEL="${MIHOMO_CHANNEL:-Prerelease-Alpha}"
 MIRROR_PREFIX="${MIHOMO_MIRROR_PREFIX:-}"
+EXPECTED_SHA256="${MIHOMO_SHA256:-}"
 MAP_ONLY=0
 RESOLVE_ALPHA_ONLY=0
 
 usage() {
-	echo "usage: $0 --arch <openwrt-arch> --dl-dir <dir> --output <file> --version-file <file> [--channel release|Prerelease-Alpha] [--amd64-level v1|v2|v3]" >&2
+	echo "usage: $0 --arch <openwrt-arch> --dl-dir <dir> --output <file> --version-file <file> [--channel release|Prerelease-Alpha] [--amd64-level v1|v2|v3] [--sha256 <hex>]" >&2
 	exit 2
 }
 
@@ -31,6 +32,7 @@ while [ "$#" -gt 0 ]; do
 		--version) VERSION="$2"; shift 2 ;;
 		--channel) CHANNEL="$2"; shift 2 ;;
 		--mirror-prefix) MIRROR_PREFIX="$2"; shift 2 ;;
+		--sha256) EXPECTED_SHA256="$2"; shift 2 ;;
 		--latest-url) LATEST_URL="$2"; shift 2 ;;
 		--alpha-assets-url) ALPHA_ASSETS_URL="$2"; shift 2 ;;
 		--download-base) DOWNLOAD_BASE="$2"; shift 2 ;;
@@ -75,6 +77,60 @@ sha256_file() {
 		echo "sha256sum or shasum is required" >&2
 		return 1
 	fi
+}
+
+valid_sha256() {
+	[ -n "$1" ] || return 1
+	printf '%s\n' "$1" | awk 'length($0) == 64 && $0 !~ /[^0-9a-fA-F]/ { exit 0 } { exit 1 }'
+}
+
+normalize_sha256() {
+	printf '%s' "$1" | tr 'A-F' 'a-f'
+}
+
+resolve_expected_sha256() {
+	checksum_tmp="${TMPDIR:-/tmp}/mihomox-checksums.$$"
+	assets_tmp="${TMPDIR:-/tmp}/mihomox-release-assets.$$"
+	trap 'rm -f "$checksum_tmp" "$assets_tmp"' EXIT HUP INT TERM
+	checksum_url="https://github.com/MetaCubeX/mihomo/releases/download/${RELEASE_TAG}/checksums.txt"
+	if curl -fsSL --retry 2 --connect-timeout 20 --max-time 120 \
+		-A "MihomoX-Build" -o "$checksum_tmp" "$checksum_url" 2>/dev/null; then
+		expected=$(awk -v asset="$ASSET" '
+			{
+				name=$NF
+				sub(/^\.\//, "", name)
+				if (name == asset) { print $1; exit }
+			}' "$checksum_tmp")
+		if valid_sha256 "$expected"; then
+			rm -f "$checksum_tmp" "$assets_tmp"
+			trap - EXIT HUP INT TERM
+			normalize_sha256 "$expected"
+			return 0
+		fi
+	fi
+
+	assets_url="https://github.com/MetaCubeX/mihomo/releases/expanded_assets/$RELEASE_TAG"
+	if curl -fsSL --retry 2 --connect-timeout 20 --max-time 120 \
+		-A "MihomoX-Build" -o "$assets_tmp" "$assets_url" 2>/dev/null; then
+		expected=$(awk -v asset="$ASSET" '
+			index($0, ">" asset "<") { found=1; next }
+			found && index($0, "sha256:") {
+				value=$0
+				sub(/^.*sha256:/, "", value)
+				sub(/[^0-9a-fA-F].*$/, "", value)
+				print value
+				exit
+			}' "$assets_tmp")
+		if valid_sha256 "$expected"; then
+			rm -f "$checksum_tmp" "$assets_tmp"
+			trap - EXIT HUP INT TERM
+			normalize_sha256 "$expected"
+			return 0
+		fi
+	fi
+	rm -f "$checksum_tmp" "$assets_tmp"
+	trap - EXIT HUP INT TERM
+	return 1
 }
 
 resolve_latest_version() {
@@ -188,8 +244,21 @@ CACHE_DIR="${DL_DIR%/}/mihomox"
 CACHE_FILE="$CACHE_DIR/$ASSET"
 mkdir -p "$CACHE_DIR" "$(dirname "$OUTPUT")" "$(dirname "$VERSION_FILE")"
 
-if [ -f "$CACHE_FILE" ] && ! gzip -t "$CACHE_FILE" >/dev/null 2>&1; then
-	rm -f "$CACHE_FILE"
+if [ -n "$EXPECTED_SHA256" ]; then
+	valid_sha256 "$EXPECTED_SHA256" || { echo "invalid Mihomo SHA256" >&2; exit 1; }
+	EXPECTED_SHA256=$(normalize_sha256 "$EXPECTED_SHA256")
+else
+	EXPECTED_SHA256=$(resolve_expected_sha256) || {
+		echo "unable to resolve trusted SHA256 for $ASSET" >&2
+		exit 1
+	}
+fi
+
+if [ -f "$CACHE_FILE" ]; then
+	CACHED_SHA256=$(sha256_file "$CACHE_FILE" 2>/dev/null || true)
+	if ! gzip -t "$CACHE_FILE" >/dev/null 2>&1 || [ "$(normalize_sha256 "$CACHED_SHA256")" != "$EXPECTED_SHA256" ]; then
+		rm -f "$CACHE_FILE"
+	fi
 fi
 
 if [ ! -f "$CACHE_FILE" ]; then
@@ -198,6 +267,11 @@ if [ ! -f "$CACHE_FILE" ]; then
 	echo "Downloading Mihomo $VERSION ($RELEASE_ARCH)"
 	curl -fsSL --retry 2 --connect-timeout 20 --max-time 600 \
 		-A "MihomoX-Build" -o "$CACHE_TMP" "$SOURCE_URL"
+	DOWNLOADED_SHA256=$(sha256_file "$CACHE_TMP")
+	[ "$(normalize_sha256 "$DOWNLOADED_SHA256")" = "$EXPECTED_SHA256" ] || {
+		echo "Mihomo SHA256 verification failed" >&2
+		exit 1
+	}
 	gzip -t "$CACHE_TMP"
 	mv -f "$CACHE_TMP" "$CACHE_FILE"
 	trap - EXIT HUP INT TERM

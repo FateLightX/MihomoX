@@ -228,6 +228,7 @@ section_core=$(uci -q get mihomox.core); [ -z "$section_core" ] && {
 [ -z "$(uci -q get mihomox.core.architecture)" ] && uci set mihomox.core.architecture=auto
 [ -z "$(uci -q get mihomox.core.mirror_prefix)" ] && uci set mihomox.core.mirror_prefix=
 [ -z "$(uci -q get mihomox.core.download_url)" ] && uci set mihomox.core.download_url=
+[ -z "$(uci -q get mihomox.core.download_sha256)" ] && uci set mihomox.core.download_sha256=
 
 # since v1.25.3
 
@@ -241,6 +242,26 @@ log_scheduled_clear_size_limit_unit=$(uci -q get mihomox.log.scheduled_clear_siz
 # since v1.25.4
 
 config_clear_at_stop=$(uci -q get mihomox.log.clear_at_stop); [ -z "$config_clear_at_stop" ] && uci set mihomox.log.clear_at_stop=1
+
+legacy_proxy_dns_policy=$(uci -q get mihomox.mixin.proxy_server_nameserver_policy)
+if [ -n "$legacy_proxy_dns_policy" ]; then
+	[ -z "$(uci -q get mihomox.mixin.dns_proxy_server_nameserver_policy)" ] && uci set mihomox.mixin.dns_proxy_server_nameserver_policy="$legacy_proxy_dns_policy"
+	uci -q delete mihomox.mixin.proxy_server_nameserver_policy
+fi
+
+# replace missing legacy credentials before the service is started
+if [ -z "$(uci -q get mihomox.mixin.api_secret)" ]; then
+	api_secret=$(generate_secret) || exit 1
+	uci set mihomox.mixin.api_secret="$api_secret"
+fi
+for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@authentication\[[0-9][0-9]*\]\)=authentication$/\1/p'); do
+	auth_enabled=$(uci -q get "$auth_section.enabled")
+	auth_password=$(uci -q get "$auth_section.password")
+	if [ "$auth_enabled" = 1 ] && [ -z "$auth_password" ]; then
+		auth_password=$(generate_secret) || exit 1
+		uci set "$auth_section.password=$auth_password"
+	fi
+done
 
 # commit
 uci commit mihomox

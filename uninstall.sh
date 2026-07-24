@@ -25,9 +25,12 @@ if [ -x "/bin/opkg" ]; then
 	if grep -q mihomox /etc/opkg/customfeeds.conf; then
 		sed -i '/mihomox/d' /etc/opkg/customfeeds.conf
 	fi
-	wget -O "mihomox.pub" "${MIHOMOX_FEED_URL:-https://mihomox.pages.dev}/key-build.pub"
-	opkg-key remove mihomox.pub
-	rm -f mihomox.pub
+	key_file=$(mktemp /tmp/mihomox-key.XXXXXX) || exit 1
+	trap 'rm -f "$key_file"' EXIT HUP INT TERM
+	wget -O "$key_file" "${MIHOMOX_FEED_URL:-https://mihomox.pages.dev}/key-build.pub"
+	opkg-key remove "$key_file"
+	rm -f "$key_file"
+	trap - EXIT HUP INT TERM
 elif [ -x "/usr/bin/apk" ]; then
 	if grep -q mihomox /etc/apk/repositories.d/customfeeds.list; then
 		sed -i '/mihomox/d' /etc/apk/repositories.d/customfeeds.list

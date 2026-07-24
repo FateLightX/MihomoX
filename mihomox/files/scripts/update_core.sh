@@ -15,6 +15,7 @@ LATEST_URL="${MIHOMO_LATEST_URL:-https://github.com/MetaCubeX/mihomo/releases/la
 API_URL="${MIHOMO_API_URL:-https://api.github.com/repos/MetaCubeX/mihomo/releases/latest}"
 ALPHA_ASSETS_URL="${MIHOMO_ALPHA_ASSETS_URL:-https://github.com/MetaCubeX/mihomo/releases/expanded_assets/Prerelease-Alpha}"
 DOWNLOAD_BASE="${MIHOMO_DOWNLOAD_BASE:-https://github.com/MetaCubeX/mihomo/releases/download}"
+CHECKSUM_BASE="https://github.com/MetaCubeX/mihomo/releases/download"
 TMP_DIR=""
 LOCK_HELD=0
 LATEST_VERSION=""
@@ -229,6 +230,55 @@ sha256_file() {
 	fi
 }
 
+valid_sha256() {
+	[ -n "$1" ] || return 1
+	printf '%s\n' "$1" | awk 'length($0) == 64 && $0 !~ /[^0-9a-fA-F]/ { exit 0 } { exit 1 }'
+}
+
+normalize_sha256() {
+	printf '%s' "$1" | tr 'A-F' 'a-f'
+}
+
+resolve_expected_sha256() {
+	local checksum_url checksum_file expected page_url page_file
+	checksum_url="${CHECKSUM_BASE%/}/${RELEASE_TAG}/checksums.txt"
+	checksum_file="$TMP_DIR/checksums.txt"
+	if curl -fsSL --retry 1 --connect-timeout 15 --max-time 60 \
+		-A "MihomoX/OpenWrt" -o "$checksum_file" "$checksum_url" 2>/dev/null; then
+		expected=$(awk -v asset="$ASSET" '
+			{
+				name=$NF
+				sub(/^\.\//, "", name)
+				if (name == asset) { print $1; exit }
+			}' "$checksum_file")
+		if valid_sha256 "$expected"; then
+			normalize_sha256 "$expected"
+			return 0
+		fi
+	fi
+
+	# Stable releases expose the SHA256 digest on the GitHub asset page.
+	page_url="https://github.com/MetaCubeX/mihomo/releases/expanded_assets/$RELEASE_TAG"
+	page_file="$TMP_DIR/release-assets.html"
+	if curl -fsSL --retry 1 --connect-timeout 15 --max-time 60 \
+		-A "MihomoX/OpenWrt" -o "$page_file" "$page_url" 2>/dev/null; then
+		expected=$(awk -v asset="$ASSET" '
+			index($0, ">" asset "<") { found=1; next }
+			found && index($0, "sha256:") {
+				value=$0
+				sub(/^.*sha256:/, "", value)
+				sub(/[^0-9a-fA-F].*$/, "", value)
+				print value
+				exit
+			}' "$page_file")
+		if valid_sha256 "$expected"; then
+			normalize_sha256 "$expected"
+			return 0
+		fi
+	fi
+	return 1
+}
+
 binary_version() {
 	"$1" -v 2>/dev/null | awk '{
 		for (i=1; i<=NF; i++) {
@@ -289,6 +339,7 @@ NORMALIZED_ARCH=$(normalize_arch "$ARCH_SETTING") || fail "无法识别设备架
 SELECTED_ARCH=$(map_release_arch "$NORMALIZED_ARCH") || fail "不支持的设备架构：$NORMALIZED_ARCH"
 MIRROR_PREFIX="${MIHOMO_MIRROR_PREFIX:-$(uci -q get mihomox.core.mirror_prefix 2>/dev/null)}"
 CUSTOM_URL="${MIHOMO_CUSTOM_URL:-$(uci -q get mihomox.core.download_url 2>/dev/null)}"
+CUSTOM_SHA256="${MIHOMO_CUSTOM_SHA256:-$(uci -q get mihomox.core.download_sha256 2>/dev/null)}"
 
 ARCHIVE="$TMP_DIR/mihomo.gz"
 NEW_BIN="$TMP_DIR/mihomo"
@@ -296,6 +347,7 @@ ASSET=""
 DOWNLOADED_URL=""
 
 if [ -n "$CUSTOM_URL" ]; then
+	valid_sha256 "$CUSTOM_SHA256" || fail "自定义内核必须提供有效的 SHA256"
 	LATEST_VERSION="custom"
 	RELEASE_TAG="custom"
 	ASSET=${CUSTOM_URL##*/}
@@ -334,6 +386,15 @@ else
 	fi
 fi
 
+if [ -n "$CUSTOM_URL" ]; then
+	EXPECTED_SHA256=$(normalize_sha256 "$CUSTOM_SHA256")
+else
+	EXPECTED_SHA256=$(resolve_expected_sha256) || fail "无法获取内核可信 SHA256"
+fi
+SHA256=$(sha256_file "$ARCHIVE")
+[ -n "$SHA256" ] || fail "无法计算内核 SHA256"
+[ "$(normalize_sha256 "$SHA256")" = "$EXPECTED_SHA256" ] || fail "内核 SHA256 校验失败"
+
 gzip -t "$ARCHIVE" >/dev/null 2>&1 || fail "下载文件不是有效的 gzip 归档"
 gzip -cd "$ARCHIVE" > "$NEW_BIN" || fail "内核解压失败"
 chmod 0755 "$NEW_BIN"
@@ -341,9 +402,6 @@ verify_binary "$NEW_BIN" || fail "新内核无法在当前设备运行"
 NEW_VERSION=$(binary_version "$NEW_BIN")
 [ -n "$NEW_VERSION" ] || fail "无法读取新内核版本"
 [ "$LATEST_VERSION" = "custom" ] && LATEST_VERSION="$NEW_VERSION"
-
-SHA256=$(sha256_file "$ARCHIVE")
-[ -n "$SHA256" ] || fail "无法计算内核 SHA256"
 
 was_running=0
 [ -f "$STARTED_FLAG" ] && was_running=1

@@ -43,19 +43,41 @@ if [ -x "/bin/opkg" ]; then
 	languages=$(opkg list-installed luci-i18n-base-* | cut -d ' ' -f 1 | cut -d '-' -f 4-)
 	# get latest version
 	echo "get latest version"
-	wget -O mihomox.version $feed_url/index.json
+	version_file=$(mktemp /tmp/mihomox-version.XXXXXX) || exit 1
+	trap 'rm -f "$version_file"' EXIT HUP INT TERM
+	wget -O "$version_file" "$feed_url/index.json"
 	# install ipks
 	echo "install ipks"
-	eval "$(jsonfilter -i mihomox.version -e "mihomox_version=@['packages']['mihomox']" -e "luci_app_mihomox_version=@['packages']['luci-app-mihomox']")"
+	mihomox_version=$(jsonfilter -i "$version_file" -e "@['packages']['mihomox']")
+	luci_app_mihomox_version=$(jsonfilter -i "$version_file" -e "@['packages']['luci-app-mihomox']")
+	case "$mihomox_version:$luci_app_mihomox_version" in
+		*[!A-Za-z0-9._+~:-]*) echo "invalid package version metadata" >&2; exit 1 ;;
+	esac
+	[ -n "$mihomox_version" ] && [ -n "$luci_app_mihomox_version" ] || { echo "missing package version metadata" >&2; exit 1; }
 	opkg install "$feed_url/mihomox_${mihomox_version}_${arch}.ipk"
 	opkg install "$feed_url/luci-app-mihomox_${luci_app_mihomox_version}_all.ipk"
 	for lang in $languages; do
-		lang_version=$(jsonfilter -i mihomox.version -e "@['packages']['luci-i18n-mihomox-${lang}']")
+		lang_version=$(jsonfilter -i "$version_file" -e "@['packages']['luci-i18n-mihomox-${lang}']")
+		case "$lang:$lang_version" in
+			*[!A-Za-z0-9._+~:-]*) echo "invalid language package metadata" >&2; exit 1 ;;
+		esac
+		[ -n "$lang" ] && [ -n "$lang_version" ] || continue
 		opkg install "$feed_url/luci-i18n-mihomox-${lang}_${lang_version}_all.ipk"
 	done
 
-	rm -f mihomox.version
+	rm -f "$version_file"
+	trap - EXIT HUP INT TERM
 elif [ -x "/usr/bin/apk" ]; then
+	# add repository signing key before refreshing or installing packages
+	echo "add key"
+	mkdir -p /etc/apk/keys
+	key_tmp="/etc/apk/keys/mihomox.pem.tmp.$$"
+	trap 'rm -f "$key_tmp"' EXIT HUP INT TERM
+	wget -O "$key_tmp" "$repository_url/public-key.pem"
+	[ -s "$key_tmp" ] || { echo "invalid APK signing key" >&2; exit 1; }
+	chmod 0644 "$key_tmp"
+	mv -f "$key_tmp" /etc/apk/keys/mihomox.pem
+	trap - EXIT HUP INT TERM
 	# update feeds
 	echo "update feeds"
 	apk update
@@ -64,9 +86,9 @@ elif [ -x "/usr/bin/apk" ]; then
 	languages=$(apk list --installed --manifest luci-i18n-base-* | cut -d ' ' -f 1 | cut -d '-' -f 4-)
 	# install apks from remote repository
 	echo "install apks from remote repository"
-	apk add --allow-untrusted -X "$feed_url/packages.adb" mihomox luci-app-mihomox
+	apk add -X "$feed_url/packages.adb" mihomox luci-app-mihomox
 	for lang in $languages; do
-		apk add --allow-untrusted -X $feed_url/packages.adb "luci-i18n-mihomox-${lang}"
+		apk add -X "$feed_url/packages.adb" "luci-i18n-mihomox-${lang}"
 	done
 fi
 

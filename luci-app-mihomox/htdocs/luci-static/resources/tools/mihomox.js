@@ -19,12 +19,6 @@ const callRCInit = rpc.declare({
     expect: { '': {} }
 });
 
-const callFileWrite = rpc.declare({
-    object: 'file',
-    method: 'write',
-    params: ['path', 'data', 'append', 'mode']
-});
-
 const callMihomoXVersion = rpc.declare({
     object: 'luci.mihomox',
     method: 'version',
@@ -70,10 +64,24 @@ const callMihomoXCoreStatus = rpc.declare({
     expect: { '': {} }
 });
 
+const callMihomoXLog = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'log',
+    params: ['name'],
+    expect: { log: '' }
+});
+
+const callMihomoXWriteFile = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'write_file',
+    params: ['path', 'data', 'append', 'mode', 'token', 'commit', 'abort'],
+    expect: { '': {} }
+});
+
 const callMihomoXUpdateCore = rpc.declare({
     object: 'luci.mihomox',
     method: 'update_core',
-    params: ['channel', 'architecture', 'mirror_prefix', 'download_url'],
+    params: ['channel', 'architecture', 'mirror_prefix', 'download_url', 'download_sha256'],
     expect: { '': {} }
 });
 
@@ -124,22 +132,38 @@ return baseclass.extend({
         const encoder = new TextEncoder();
         const decoder = new TextDecoder();
         const chunkSize = 8 * 1024;
+        const randomPart = (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)).slice(0, 24).padEnd(16, '0');
+        const token = `${Date.now().toString(36)}-${randomPart}`;
+
+        const writeChunk = function (chunk, append, commit) {
+            return callMihomoXWriteFile(path, chunk, append, mode, token, commit, false).then(function (result) {
+                if (!result?.success)
+                    return Promise.reject(new Error(result?.error || 'write_failed'));
+                return result;
+            });
+        };
 
         const bytes = encoder.encode(data);
 
+        let promise;
         if (bytes.length <= chunkSize) {
-            return callFileWrite(path, data, false, mode);
+            promise = writeChunk(data, false, true);
+        } else {
+            promise = Promise.resolve();
+            for(let offset = 0; offset < bytes.length; offset += chunkSize) {
+                const chunkBytes = bytes.slice(offset, Math.min(offset + chunkSize, bytes.length));
+                const finalChunk = offset + chunkSize >= bytes.length;
+                const chunk = decoder.decode(chunkBytes, { stream: !finalChunk });
+                const append = offset > 0;
+                promise = promise.then(() => writeChunk(chunk, append, finalChunk));
+            }
         }
 
-        let promise = Promise.resolve();
-        for(let offset = 0; offset < bytes.length; offset += chunkSize) {
-            const chunkBytes = bytes.slice(offset, Math.min(offset + chunkSize, bytes.length));
-            const chunk = decoder.decode(chunkBytes);
-            const append = offset > 0;
-            promise = promise.then(() => callFileWrite(path, chunk, append, mode));
-        }
-
-        return promise;
+        return promise.catch(function (error) {
+            return callMihomoXWriteFile(path, '', false, mode, token, false, true)
+                .catch(function () { })
+                .then(function () { return Promise.reject(error); });
+        });
     },
 
     version: function () {
@@ -197,7 +221,7 @@ return baseclass.extend({
             url = `${protocol}://${window.location.hostname}:${port}/ui/?${query}`;
         }
 
-        setTimeout(function () { window.open(url, '_blank') }, 0);
+        setTimeout(function () { window.open(url, '_blank', 'noopener,noreferrer') }, 0);
 
         return Promise.resolve();
     },
@@ -219,11 +243,11 @@ return baseclass.extend({
     },
 
     getAppLog: function () {
-        return L.resolveDefault(fs.read_direct(this.appLogPath));
+        return L.resolveDefault(callMihomoXLog('app'), '');
     },
 
     getCoreLog: function () {
-        return L.resolveDefault(fs.read_direct(this.coreLogPath));
+        return L.resolveDefault(callMihomoXLog('core'), '');
     },
 
     clearAppLog: function () {
@@ -242,7 +266,7 @@ return baseclass.extend({
         return L.resolveDefault(callMihomoXCoreStatus(), {});
     },
 
-    updateCore: function (channel, architecture, mirrorPrefix, downloadUrl) {
-        return callMihomoXUpdateCore(channel, architecture, mirrorPrefix, downloadUrl);
+    updateCore: function (channel, architecture, mirrorPrefix, downloadUrl, downloadSha256) {
+        return callMihomoXUpdateCore(channel, architecture, mirrorPrefix, downloadUrl, downloadSha256);
     },
 })

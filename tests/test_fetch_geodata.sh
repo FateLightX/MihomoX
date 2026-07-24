@@ -35,13 +35,24 @@ rm -rf "$SOURCE_DIR" "$OUTPUT_DIR"
 "$FETCH_SCRIPT" \
 	--dl-dir "$TEST_DIR/dl" \
 	--output-dir "$OUTPUT_DIR" \
-	--geosite-url "file:///unavailable" \
-	--geoip-mmdb-url "file:///unavailable" \
-	--geoip-dat-url "file:///unavailable" \
-	--geoip-asn-url "file:///unavailable"
+	--geosite-url "$(file_url GeoSite.dat)" \
+	--geoip-mmdb-url "$(file_url Country.mmdb)" \
+	--geoip-dat-url "$(file_url GeoIP.dat)" \
+	--geoip-asn-url "$(file_url ASN.mmdb)"
 
 for file in GeoSite.dat Country.mmdb GeoIP.dat ASN.mmdb; do
 	[ -s "$OUTPUT_DIR/$file" ]
 done
+
+if "$FETCH_SCRIPT" \
+	--dl-dir "$TEST_DIR/dl" \
+	--output-dir "$OUTPUT_DIR" \
+	--geosite-url "file:///unavailable" \
+	--geoip-mmdb-url "file:///unavailable" \
+	--geoip-dat-url "file:///unavailable" \
+	--geoip-asn-url "file:///unavailable"; then
+	echo "changed unavailable URLs unexpectedly reused cached geodata" >&2
+	exit 1
+fi
 
 echo "fetch geodata tests passed"

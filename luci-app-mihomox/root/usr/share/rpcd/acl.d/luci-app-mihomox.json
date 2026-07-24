@@ -4,8 +4,8 @@
         "read": {
             "uci": [ "mihomox" ],
             "ubus": {
-                "rc": [ "*" ],
-                "luci.mihomox": [ "*" ]
+                "rc": [ "list" ],
+                "luci.mihomox": [ "version", "profile", "core_status", "log", "get_identifiers" ]
             },
             "file": {
                 "/etc/mihomox/profiles/*.yaml": ["read"],
@@ -21,6 +21,10 @@
         },
         "write": {
             "uci": [ "mihomox" ],
+            "ubus": {
+                "rc": [ "init" ],
+                "luci.mihomox": [ "update_subscription", "update_core", "write_file", "api", "debug" ]
+            },
             "file": {
                 "/etc/mihomox/profiles/*.yaml": ["write"],
                 "/etc/mihomox/profiles/*.yml": ["write"],

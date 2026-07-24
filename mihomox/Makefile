@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.07.24
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
@@ -11,11 +11,17 @@ MIHOMO_AMD64_LEVEL?=v1
 MIHOMO_VERSION?=
 MIHOMO_CHANNEL?=Prerelease-Alpha
 MIHOMO_MIRROR_PREFIX?=
+MIHOMO_SHA256?=
 GEOSITE_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geosite.dat
 GEOIP_MMDB_URL?=https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country.mmdb
 GEOIP_DAT_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geoip.dat
 GEOIP_ASN_URL?=https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb
 ZASHBOARD_URL?=https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip
+GEOSITE_SHA256?=
+GEOIP_MMDB_SHA256?=
+GEOIP_DAT_SHA256?=
+GEOIP_ASN_SHA256?=
+ZASHBOARD_SHA256?=
 
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=MihomoX contributors
@@ -111,6 +117,7 @@ define Build/Prepare
 		--channel "$(MIHOMO_CHANNEL)" \
 		--version "$(MIHOMO_VERSION)" \
 		--mirror-prefix "$(MIHOMO_MIRROR_PREFIX)" \
+		--sha256 "$(MIHOMO_SHA256)" \
 		--dl-dir "$(DL_DIR)" \
 		--output "$(PKG_BUILD_DIR)/mihomo" \
 		--version-file "$(PKG_BUILD_DIR)/mihomo.version"
@@ -120,11 +127,16 @@ define Build/Prepare
 		--geosite-url "$(GEOSITE_URL)" \
 		--geoip-mmdb-url "$(GEOIP_MMDB_URL)" \
 		--geoip-dat-url "$(GEOIP_DAT_URL)" \
-		--geoip-asn-url "$(GEOIP_ASN_URL)"
+		--geoip-asn-url "$(GEOIP_ASN_URL)" \
+		--geosite-sha256 "$(GEOSITE_SHA256)" \
+		--geoip-mmdb-sha256 "$(GEOIP_MMDB_SHA256)" \
+		--geoip-dat-sha256 "$(GEOIP_DAT_SHA256)" \
+		--geoip-asn-sha256 "$(GEOIP_ASN_SHA256)"
 	$(CURDIR)/scripts/fetch_zashboard.sh \
 		--dl-dir "$(DL_DIR)" \
 		--output-dir "$(PKG_BUILD_DIR)/zashboard" \
-		--url "$(ZASHBOARD_URL)"
+		--url "$(ZASHBOARD_URL)" \
+		--sha256 "$(ZASHBOARD_SHA256)"
 endef
 
 $(eval $(call BuildPackage,mihomox))

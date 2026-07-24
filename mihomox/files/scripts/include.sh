@@ -87,3 +87,42 @@ prepare_files() {
 log() {
 	echo "[$(date "+%Y-%m-%d %H:%M:%S")] [$1] $2" >> "$APP_LOG_PATH"
 }
+
+generate_secret() {
+	[ -r /dev/urandom ] || return 1
+	od -An -N32 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n'
+}
+
+is_valid_cron() {
+	[ "$#" -eq 1 ] || return 1
+	[ -n "$1" ] || return 1
+	printf '%s\n' "$1" | awk '
+		BEGIN { valid = 1 }
+		NR != 1 || NF != 5 { valid = 0; exit }
+		{
+			for (i = 1; i <= NF; i++)
+				if ($i !~ /^[0-9*\/,\-]+$/)
+					valid = 0
+		}
+		END { exit !valid }
+	'
+}
+
+is_uint() {
+	[ "$#" -eq 1 ] || return 1
+	[ -n "$1" ] && [ "${#1}" -le 10 ] || return 1
+	case "$1" in *[!0-9]*) return 1 ;; esac
+	return 0
+}
+
+is_safe_identifier() {
+	[ "$#" -eq 1 ] || return 1
+	[ -n "$1" ] && [ "${#1}" -le 64 ] || return 1
+	case "$1" in *[!A-Za-z0-9_.-]*) return 1 ;; esac
+	return 0
+}
+
+is_valid_mark() {
+	[ "$#" -eq 1 ] || return 1
+	printf '%s\n' "$1" | grep -Eq '^(0[xX][0-9A-Fa-f]+|[0-9]+)$'
+}

@@ -58,10 +58,10 @@ profileView.render([null]);
 const upload = options._upload_rule;
 assert.ok(upload);
 assert.strictEqual(upload.type, form.FileUpload);
-assert.strictEqual(upload.browser, true);
+assert.strictEqual(upload.browser, false);
 assert.strictEqual(upload.enable_upload, true);
-assert.strictEqual(upload.enable_remove, false);
-assert.strictEqual(upload.enable_download, false);
+assert.strictEqual(upload.enable_remove, true);
+assert.strictEqual(upload.enable_download, true);
 assert.strictEqual(upload.root_directory, mihomox.ruleProvidersDir);
 assert.strictEqual(upload.write('config', '/tmp/rules.mrs'), true);
 

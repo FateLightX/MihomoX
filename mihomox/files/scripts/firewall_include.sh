@@ -11,6 +11,8 @@ config_get_bool proxy_enabled "proxy" "enabled" 0
 config_get tcp_mode "proxy" "tcp_mode"
 config_get udp_mode "proxy" "udp_mode"
 
+is_safe_identifier "$tun_listener_name" || exit 1
+
 if [ "$enabled" = 1 ] && [ "$core_only" = 0 ] && [ "$proxy_enabled" = 1 ]; then
 	if [ "$tcp_mode" = "tun" ] || [ "$udp_mode" = "tun" ]; then
 		tun_device=$(yq -M "(.tun | select(.enable) | .device) // (.listeners[] | select(.name == \"$tun_listener_name\" and .type == \"tun\") | .device)" "$RUN_PROFILE_PATH")

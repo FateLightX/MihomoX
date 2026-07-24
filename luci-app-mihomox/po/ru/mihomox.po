@@ -1129,3 +1129,18 @@ msgstr "Имя пользователя"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:128
 msgid "procd Config"
 msgstr "Настройки procd"
+
+msgid "Custom Core SHA256"
+msgstr ""
+
+msgid "Required when using Custom Core URL"
+msgstr ""
+
+msgid "Invalid SHA256"
+msgstr ""
+
+msgid "Custom Core SHA256 is required"
+msgstr ""
+
+msgid "Invalid cron expression"
+msgstr ""

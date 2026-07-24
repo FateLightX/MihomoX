@@ -26,10 +26,10 @@ return view.extend({
         };
 
         o = s.option(form.FileUpload, '_upload_rule', _('Upload Rule File'));
-        o.browser = true;
+        o.browser = false;
         o.enable_upload = true;
-        o.enable_remove = false;
-        o.enable_download = false;
+        o.enable_remove = true;
+        o.enable_download = true;
         o.root_directory = mihomox.ruleProvidersDir;
         o.write = function (section_id, formvalue) {
             return true;

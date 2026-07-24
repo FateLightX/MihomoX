@@ -1,28 +1,29 @@
 # MihomoX
 
-MihomoX is an OpenWrt transparent proxy service based on Nikki's UCI, procd, LuCI, and profile mixin design.
+[中文说明](README.zh.md)
 
-## Features
+MihomoX is an OpenWrt LuCI service for Mihomo transparent proxying. Its UCI,
+procd, LuCI, and profile-mixin structure is based on Nikki.
 
-- No Mihomo source compilation
-- Downloads a target-architecture Mihomo Stable binary while building `mihomox`
-- Manual core updates from LuCI or the command line
-- Automatic and manual x86_64 `amd64-v1`, `amd64-v2`, and `amd64-v3` selection
-- Download verification, atomic replacement, and rollback
-- No OpenWrt Mihomo package dependency
+## Highlights
 
-## Runtime paths
+- LuCI management for profiles, rules, logs, and Mihomo core updates
+- Build-time download of the target-architecture core, GeoSite/GeoIP data, and Zashboard
+- `Prerelease-Alpha` by default, with Release and architecture selection
+- SHA256 verification, atomic replacement, and rollback for core updates
+- Rule file upload, download, and deletion
 
-```text
-/etc/config/mihomox
-/etc/init.d/mihomox
-/etc/mihomox/bin/mihomo
-/etc/mihomox/scripts/update_core.sh
+## Install
+
+For OpenWrt 24.10, 25.12, or SNAPSHOT with `firewall4`:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/FateLightX/MihomoX/main/install.sh | sh
 ```
 
 ## Build
 
-Use an OpenWrt SDK matching the firmware release, target, and subtarget:
+Use an OpenWrt SDK matching the target firmware:
 
 ```sh
 make defconfig
@@ -30,17 +31,17 @@ make package/mihomox/compile V=s
 make package/luci-app-mihomox/compile V=s
 ```
 
-The package build needs network access to the Mihomo release. It resolves the latest Stable release by default. Pin a version for reproducible tests:
+The build downloads the latest `Prerelease-Alpha` core by default. For a
+reproducible Release build, pin the version and SHA256:
 
 ```sh
-MIHOMO_VERSION=v1.19.0 make package/mihomox/compile V=s
+MIHOMO_CHANNEL=release MIHOMO_VERSION=v1.19.0 MIHOMO_SHA256=<sha256> \
+  make package/mihomox/compile V=s
 ```
 
-Use an OpenWrt ImageBuilder afterward to assemble a test image with the built packages.
+## Core update
 
-## Manual core update
-
-LuCI: `Services -> MihomoX -> App Config -> Core Update`
+LuCI: `Services → MihomoX → App Config → Core Update`
 
 Command line:
 
@@ -48,39 +49,17 @@ Command line:
 /etc/init.d/mihomox update_core
 ```
 
-Settings are stored in `mihomox.core`:
+Custom core or Zashboard URLs must include an explicit SHA256.
 
-```uci
-option channel 'stable'
-option architecture 'auto'
-option mirror_prefix ''
-option download_url ''
-```
-
-Manual updates replace the binary directly and do not install or upgrade an OpenWrt Mihomo package.
-
-## Dependencies
-
-- ca-bundle
-- curl
-- jsonfilter
-- ucode
-- coreutils-nohup
-- yq
-- firewall4
-- ip-full
-- kmod-inet-diag
-- kmod-nft-socket
-- kmod-nft-tproxy
-- kmod-tun
-- kmod-dummy
-
-## Tests
+## Test
 
 ```sh
 ./tests/run.sh
 ```
 
-## Upstream
+## Acknowledgments
 
-The proxy and LuCI structure is ported from [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki).
+MihomoX is based on the UCI, procd, LuCI, and profile-mixin design of
+[OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki).
+
+Thanks to the Nikki project and its contributors.

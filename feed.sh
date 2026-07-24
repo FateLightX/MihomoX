@@ -37,10 +37,13 @@ feed_url="$repository_url/$branch/$arch/mihomox"
 if [ -x "/bin/opkg" ]; then
 	# add key
 	echo "add key"
-	key_build_pub_file="key-build.pub"
+	key_build_pub_file=$(mktemp /tmp/mihomox-key.XXXXXX) || exit 1
+	trap 'rm -f "$key_build_pub_file"' EXIT HUP INT TERM
 	wget -O "$key_build_pub_file" "$repository_url/key-build.pub"
+	[ -s "$key_build_pub_file" ] || { echo "invalid feed signing key" >&2; exit 1; }
 	opkg-key add "$key_build_pub_file"
 	rm -f "$key_build_pub_file"
+	trap - EXIT HUP INT TERM
 	# add feed
 	echo "add feed"
 	if grep -q mihomox /etc/opkg/customfeeds.conf; then
@@ -53,7 +56,14 @@ if [ -x "/bin/opkg" ]; then
 elif [ -x "/usr/bin/apk" ]; then
 	# add key
 	echo "add key"
-	wget -O "/etc/apk/keys/mihomox.pem" "$repository_url/public-key.pem"
+	mkdir -p /etc/apk/keys
+	key_tmp="/etc/apk/keys/mihomox.pem.tmp.$$"
+	trap 'rm -f "$key_tmp"' EXIT HUP INT TERM
+	wget -O "$key_tmp" "$repository_url/public-key.pem"
+	[ -s "$key_tmp" ] || { echo "invalid APK signing key" >&2; exit 1; }
+	chmod 0644 "$key_tmp"
+	mv -f "$key_tmp" /etc/apk/keys/mihomox.pem
+	trap - EXIT HUP INT TERM
 	# add feed
 	echo "add feed"
 	if grep -q mihomox /etc/apk/repositories.d/customfeeds.list; then

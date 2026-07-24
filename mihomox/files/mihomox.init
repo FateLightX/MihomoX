@@ -21,6 +21,7 @@ boot_func() {
 	local enabled start_delay
 	config_get_bool enabled "config" "enabled" 0
 	config_get start_delay "config" "start_delay" 0
+	is_uint "$start_delay" || start_delay=0
 	if [ "$enabled" = 1 ] && [ "$start_delay" -gt 0 ]; then
 		log "App" "Start after $start_delay seconds."
 		sleep "$start_delay"
@@ -40,6 +41,31 @@ update_core() {
 start_service() {
 	# prepare files
 	prepare_files
+	# ensure credentials exist before generating the core profile
+	local api_secret; api_secret=$(uci -q get mihomox.mixin.api_secret)
+	local credentials_changed; credentials_changed=0
+	if [ -z "$api_secret" ]; then
+		api_secret=$(generate_secret) || {
+			log "Security" "Unable to generate API secret."
+			return
+		}
+		uci set mihomox.mixin.api_secret="$api_secret"
+		credentials_changed=1
+	fi
+	local auth_section auth_enabled auth_password
+	for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@authentication\[[0-9][0-9]*\]\)=authentication$/\1/p'); do
+		auth_enabled=$(uci -q get "$auth_section.enabled")
+		auth_password=$(uci -q get "$auth_section.password")
+		if [ "$auth_enabled" = 1 ] && [ -z "$auth_password" ]; then
+			auth_password=$(generate_secret) || {
+				log "Security" "Unable to generate authentication password."
+				return
+			}
+			uci set "$auth_section.password=$auth_password"
+			credentials_changed=1
+		fi
+	done
+	[ "$credentials_changed" = 1 ] && uci commit mihomox
 	# load config
 	config_load mihomox
 	# check if enabled
@@ -94,12 +120,13 @@ start_service() {
 	config_get_bool env_skip_system_ipv6_check "procd" "env_skip_system_ipv6_check" 0
 	## mixin config
 	### overwrite
-	local overwrite_authentication overwrite_tun_dns_hijack overwrite_fake_ip_filter overwrite_hosts overwrite_dns_nameserver overwrite_dns_nameserver_policy overwrite_sniffer_sniff overwrite_sniffer_force_domain_name overwrite_sniffer_ignore_domain_name
+	local overwrite_authentication overwrite_tun_dns_hijack overwrite_fake_ip_filter overwrite_hosts overwrite_dns_nameserver overwrite_dns_proxy_server_nameserver_policy overwrite_dns_nameserver_policy overwrite_sniffer_sniff overwrite_sniffer_force_domain_name overwrite_sniffer_ignore_domain_name
 	config_get_bool overwrite_authentication "mixin" "authentication" 0
 	config_get_bool overwrite_tun_dns_hijack "mixin" "tun_dns_hijack" 0
 	config_get_bool overwrite_fake_ip_filter "mixin" "fake_ip_filter" 0
 	config_get_bool overwrite_hosts "mixin" "hosts" 0
 	config_get_bool overwrite_dns_nameserver "mixin" "dns_nameserver" 0
+	config_get_bool overwrite_dns_proxy_server_nameserver_policy "mixin" "dns_proxy_server_nameserver_policy" 0
 	config_get_bool overwrite_dns_nameserver_policy "mixin" "dns_nameserver_policy" 0
 	config_get_bool overwrite_sniffer_force_domain_name "mixin" "sniffer_force_domain_name" 0
 	config_get_bool overwrite_sniffer_ignore_domain_name "mixin" "sniffer_ignore_domain_name" 0
@@ -112,6 +139,13 @@ start_service() {
 	config_get redirect_listener_name "core" "redirect_listener_name"
 	config_get tproxy_listener_name "core" "tproxy_listener_name"
 	config_get tun_listener_name "core" "tun_listener_name"
+	for listener_name in "$redirect_listener_name" "$tproxy_listener_name" "$tun_listener_name"; do
+		if ! is_safe_identifier "$listener_name"; then
+			log "Core" "Invalid listener name."
+			log "App" "Exit."
+			return
+		fi
+	done
 	## proxy config
 	local proxy_enabled ipv4_dns_hijack ipv6_dns_hijack tcp_mode udp_mode
 	config_get_bool proxy_enabled "proxy" "enabled" 0
@@ -128,6 +162,19 @@ start_service() {
 	local profile_id; profile_id=$(echo "$profile" | cut -d ':' -f 2)
 	if [ "$profile_type" = "file" ]; then
 		local profile_name; profile_name="$profile_id"
+		case "$profile_name" in
+			''|*/*|*\\*|.|..)
+				log "Profile" "Invalid profile filename."
+				log "App" "Exit."
+				return
+				;;
+			*.yaml|*.yml) ;;
+			*)
+				log "Profile" "Profile must be a YAML file."
+				log "App" "Exit."
+				return
+				;;
+		esac
 		local profile_file; profile_file="$PROFILES_DIR/$profile_name"
 		log "Profile" "Use file: $profile_name."
 		if [ ! -f "$profile_file" ]; then
@@ -138,6 +185,18 @@ start_service() {
 		cp -f "$profile_file" "$RUN_PROFILE_PATH"
 	elif [ "$profile_type" = "subscription" ]; then
 		local subscription_section; subscription_section="$profile_id"
+		case "$subscription_section" in
+			''|*[!A-Za-z0-9_-]*)
+				log "Profile" "Invalid subscription section."
+				log "App" "Exit."
+				return
+				;;
+		esac
+		if [ "$(uci -q get "mihomox.$subscription_section")" != "subscription" ]; then
+			log "Profile" "Subscription section not found."
+			log "App" "Exit."
+			return
+		fi
 		local subscription_name subscription_prefer
 		config_get subscription_name "$subscription_section" "name"
 		config_get subscription_prefer "$subscription_section" "prefer" "remote"
@@ -174,6 +233,9 @@ start_service() {
 		fi
 		if [ "$overwrite_dns_nameserver" = 1 ]; then
 			yq -M -i 'del(.dns.default-nameserver) | del(.dns.proxy-server-nameserver) | del(.dns.direct-nameserver) | del(.dns.nameserver) | del(.dns.fallback) ' "$RUN_PROFILE_PATH"
+		fi
+		if [ "$overwrite_dns_proxy_server_nameserver_policy" = 1 ]; then
+			yq -M -i 'del(.dns.proxy-server-nameserver-policy)' "$RUN_PROFILE_PATH"
 		fi
 		if [ "$overwrite_dns_nameserver_policy" = 1 ]; then
 			yq -M -i 'del(.dns.nameserver-policy)' "$RUN_PROFILE_PATH"
@@ -280,14 +342,21 @@ start_service() {
 	procd_close_instance
 	# cron
 	local reload_cron; reload_cron=0
-	if [ "$scheduled_restart" = 1 ] && [ -n "$scheduled_restart_cron" ]; then
+	sed -i '/#mihomox/d' "/etc/crontabs/root" > /dev/null 2>&1
+	if [ "$scheduled_restart" = 1 ] && is_valid_cron "$scheduled_restart_cron"; then
 		log "App" "Set scheduled restart."
 		echo "$scheduled_restart_cron /etc/init.d/mihomox restart #mihomox scheduled restart" >> "/etc/crontabs/root"
 		reload_cron=1
+	elif [ "$scheduled_restart" = 1 ] && [ -n "$scheduled_restart_cron" ]; then
+		log "App" "Invalid scheduled restart cron expression; skipped."
+		reload_cron=1
 	fi
-	if [ "$log_scheduled_clear" = 1 ] && [ -n "$log_scheduled_clear_cron" ]; then
+	if [ "$log_scheduled_clear" = 1 ] && is_valid_cron "$log_scheduled_clear_cron"; then
 		log "App" "Set log scheduled clear."
 		echo "$log_scheduled_clear_cron /etc/init.d/mihomox clear_logs #mihomox log scheduled clear" >> "/etc/crontabs/root"
+		reload_cron=1
+	elif [ "$log_scheduled_clear" = 1 ] && [ -n "$log_scheduled_clear_cron" ]; then
+		log "App" "Invalid log scheduled clear cron expression; skipped."
 		reload_cron=1
 	fi
 	if [ "$reload_cron" = 1 ]; then
@@ -340,6 +409,21 @@ service_started() {
 	config_get cgroup_id "routing" "cgroup_id" "0x12061206"
 	config_get cgroup_name "routing" "cgroup_name" "mihomox"
 	config_get dummy_device "routing" "dummy_device" "mihomox-dummy"
+	is_uint "$tun_timeout" && [ "$tun_timeout" -gt 0 ] || tun_timeout=30
+	is_uint "$tun_interval" && [ "$tun_interval" -gt 0 ] || tun_interval=1
+	is_valid_mark "$tproxy_fw_mark" || tproxy_fw_mark=0x80
+	is_valid_mark "$tproxy_fw_mask" || tproxy_fw_mask=0xFF
+	is_valid_mark "$tun_fw_mark" || tun_fw_mark=0x81
+	is_valid_mark "$tun_fw_mask" || tun_fw_mask=0xFF
+	is_uint "$tproxy_rule_pref" || tproxy_rule_pref=1024
+	is_uint "$tun_rule_pref" || tun_rule_pref=1025
+	is_uint "$tproxy_route_table" || tproxy_route_table=80
+	is_uint "$tun_route_table" || tun_route_table=81
+	is_valid_mark "$cgroup_id" || cgroup_id=0x12061206
+	is_safe_identifier "$cgroup_name" || cgroup_name=mihomox
+	if ! is_safe_identifier "$dummy_device" || [ "${#dummy_device}" -gt 15 ]; then
+		dummy_device=mihomox-dummy
+	fi
 	# prepare config
 	local tproxy_enable; tproxy_enable=0
 	if [ "$tcp_mode" = "tproxy" ] || [ "$udp_mode" = "tproxy" ]; then
@@ -514,6 +598,10 @@ clear_logs() {
 	local log_scheduled_clear_size_limit log_scheduled_clear_size_limit_unit
 	config_get log_scheduled_clear_size_limit "log" "scheduled_clear_size_limit" 1
 	config_get log_scheduled_clear_size_limit_unit "log" "scheduled_clear_size_limit_unit" "MB"
+	if ! is_uint "$log_scheduled_clear_size_limit" || [ "$log_scheduled_clear_size_limit" -gt 1048576 ]; then
+		log "Log" "Invalid scheduled clear size limit."
+		return 1
+	fi
 	# prepare config
 	local log_scheduled_clear_size_limit_in_bytes; log_scheduled_clear_size_limit_in_bytes=0
 	case "$log_scheduled_clear_size_limit_unit" in
@@ -529,6 +617,10 @@ clear_logs() {
 		GB)
 			log_scheduled_clear_size_limit_in_bytes=$((log_scheduled_clear_size_limit * 1024 * 1024 * 1024))
 		;;
+		*)
+			log "Log" "Invalid scheduled clear size unit."
+			return 1
+		;;
 	esac
 	# clear logs
 	if [ -f "$APP_LOG_PATH" ] && [ "$(wc -c < "$APP_LOG_PATH")" -ge "$log_scheduled_clear_size_limit_in_bytes" ]; then
@@ -543,6 +635,16 @@ clear_logs() {
 
 update_subscription() {
 	local subscription_section; subscription_section="$1"
+	case "$subscription_section" in
+		''|*[!A-Za-z0-9_-]*)
+			log "Profile" "Invalid subscription section."
+			return 1
+			;;
+	esac
+	if [ "$(uci -q get "mihomox.$subscription_section")" != "subscription" ]; then
+		log "Profile" "Subscription section not found."
+		return 1
+	fi
 	if [ -z "$subscription_section" ]; then
 		return
 	fi
@@ -554,6 +656,20 @@ update_subscription() {
 	config_get subscription_info_url "$subscription_section" "info_url"
 	config_get subscription_url "$subscription_section" "url"
 	config_get subscription_user_agent "$subscription_section" "user_agent"
+	case "$subscription_url" in
+		http://*|https://*) ;;
+		*)
+			log "Profile" "Subscription URL must use HTTP or HTTPS."
+			return 1
+			;;
+	esac
+	case "$subscription_info_url" in
+		''|http://*|https://*) ;;
+		*)
+			log "Profile" "Subscription info URL must use HTTP or HTTPS."
+			return 1
+			;;
+	esac
 	# reset subscription info
 	uci_remove "mihomox" "$subscription_section" "expire" > /dev/null 2>&1
 	uci_remove "mihomox" "$subscription_section" "upload" > /dev/null 2>&1
@@ -574,7 +690,7 @@ update_subscription() {
 	# fetch subscription info
 	if [ -n "$subscription_info_url" ]; then
 		log "Profile" "Fetch subscription info."
-		if curl -s -f -m 120 --connect-timeout 15 --retry 3 -L -X GET -A "$subscription_user_agent" -D "$subscription_info_header_tmpfile" "$subscription_info_url" > /dev/null 2>&1; then
+		if curl -s -f -m 120 --connect-timeout 15 --retry 3 -L --proto '=http,https' --proto-redir '=http,https' -X GET -A "$subscription_user_agent" -D "$subscription_info_header_tmpfile" "$subscription_info_url" > /dev/null 2>&1; then
 			if [ ! -f "$subscription_info_file" ] && grep -q -i "subscription-userinfo:" "$subscription_info_header_tmpfile"; then
 				subscription_info_file="$subscription_info_header_tmpfile"
 			fi
@@ -582,7 +698,7 @@ update_subscription() {
 	fi
 	# download subscription
 	log "Profile" "Download subscription."
-	if curl -s -f -m 120 --connect-timeout 15 --retry 3 -L -X GET -A "$subscription_user_agent" -D "$subscription_header_tmpfile" -o "$subscription_tmpfile" "$subscription_url" > /dev/null 2>&1; then
+	if curl -s -f -m 120 --connect-timeout 15 --retry 3 -L --proto '=http,https' --proto-redir '=http,https' -X GET -A "$subscription_user_agent" -D "$subscription_header_tmpfile" -o "$subscription_tmpfile" "$subscription_url" > /dev/null 2>&1; then
 		log "Profile" "Subscription download successful."
 		if [ ! -f "$subscription_info_file" ] && grep -q -i "subscription-userinfo:" "$subscription_header_tmpfile"; then
 			subscription_info_file="$subscription_header_tmpfile"
