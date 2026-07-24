@@ -50,7 +50,6 @@ const CORE_CHANNELS = {
 };
 let detected_core_architecture = '';
 let cached_app_version = null;
-const DETECTED_ARCH_CACHE = '/var/run/mihomox/detected-arch';
 
 function shell_read(command) {
 	let process = popen(command);
@@ -69,29 +68,13 @@ function lock_pid_alive() {
 	return system('kill -0 ' + pid + ' 2>/dev/null') == 0;
 }
 
-function now_ts() {
-	return int(shell_read('date +%s 2>/dev/null') || 0);
-}
-
-function clear_stale_core_update_markers() {
-	if (access(CORE_LOCK_DIR, 'r') && !lock_pid_alive())
-		system('rm -rf ' + CORE_LOCK_DIR);
-	if (access(CORE_PENDING_FILE, 'r') && !lock_pid_alive()) {
-		let pending = stat(CORE_PENDING_FILE);
-		let age = pending?.mtime != null ? (now_ts() - int(pending.mtime)) : 9999;
-		if (age > 120)
-			unlink(CORE_PENDING_FILE);
-	}
-}
-
 function core_update_running() {
-	clear_stale_core_update_markers();
-	if (lock_pid_alive())
-		return true;
-	if (access(CORE_PENDING_FILE, 'r'))
-		return true;
-	let state = read_kv(CORE_STATUS_FILE);
-	return state.state == 'running';
+	/* The updater's pid lock is authoritative; a stale pending marker is not. */
+	try {
+		return lock_pid_alive();
+	} catch (e) {
+		return false;
+	}
 }
 
 function read_kv(path) {
@@ -188,27 +171,28 @@ const methods = {
 	},
 	core_status: {
 		call: function() {
-			let metadata = read_kv(CORE_VERSION_FILE);
-			let state = read_kv(CORE_STATUS_FILE);
-			let uci = cursor();
-			uci.load('mihomox');
-			let configured = uci.get('mihomox', 'core', 'architecture') || 'auto';
+			let metadata = {};
+			let state = {};
+			try { metadata = read_kv(CORE_VERSION_FILE) || {}; } catch (e) {}
+			try { state = read_kv(CORE_STATUS_FILE) || {}; } catch (e) {}
+			/* Keep this RPC side-effect free and compatible with older ucode builds. */
+			let configured = 'auto';
+			try {
+				configured = shell_read("uci -q get mihomox.core.architecture 2>/dev/null") || 'auto';
+			} catch (e) {}
 			if (!detected_core_architecture) {
-				if (access(DETECTED_ARCH_CACHE, 'r'))
-					detected_core_architecture = trim(readfile(DETECTED_ARCH_CACHE) || '');
-				if (!detected_core_architecture) {
+				try {
 					detected_core_architecture = shell_read('/etc/mihomox/scripts/update_core.sh --detect-arch 2>/dev/null');
-					if (detected_core_architecture) {
-						system('mkdir -p /var/run/mihomox');
-						writefile(DETECTED_ARCH_CACHE, detected_core_architecture + '\n');
-					}
+				} catch (e) {
+					detected_core_architecture = '';
 				}
 			}
 			let detected = detected_core_architecture;
 			let updating = core_update_running();
+			let installed_architecture = metadata.architecture || state.architecture || detected || '';
 			return {
 				installed: metadata.version || '',
-				installed_architecture: metadata.architecture || '',
+				installed_architecture: installed_architecture,
 				latest: state.version || '',
 				architecture: state.architecture || detected,
 				detected_architecture: detected,

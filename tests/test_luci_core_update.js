@@ -8,6 +8,16 @@ const source = fs.readFileSync(path.join(
     __dirname,
     '../luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js'
 ), 'utf8');
+const rpcSource = fs.readFileSync(path.join(
+    __dirname,
+    '../luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox'
+), 'utf8');
+
+assert.ok(!rpcSource.includes('DETECTED_ARCH_CACHE'), 'core_status must not depend on a runtime cache file');
+assert.ok(
+    rpcSource.includes("metadata.architecture || state.architecture || detected || ''"),
+    'installed architecture should fall back to the detected architecture'
+);
 
 const formValues = {
     channel: 'Prerelease-Alpha',
@@ -116,6 +126,8 @@ const mihomox = {
                 });
             });
         }
+        if (updateCallCount === 3)
+            throw new Error('rpc unavailable');
         return Promise.resolve({
             success: true,
             started: false,
@@ -135,7 +147,7 @@ const document = {
     },
     querySelectorAll: () => {
         const btn = {
-            value: 'Update Core',
+            textContent: 'Update Core',
             parentNode: {
                 appendChild: (span) => {
                     nodes[span.id] = span;
@@ -192,6 +204,17 @@ Promise.resolve()
     .then(() => {
         assert.strictEqual(updateCallCount, 2);
         assert.strictEqual(nodes.core_update_span.textContent, 'Update already running');
+        // A synchronous RPC failure must not leave the LuCI button locked.
+        return renderedMap.options._update_core.onclick({ type: 'click' }, 'core');
+    })
+    .then(() => {
+        assert.strictEqual(updateCallCount, 3);
+        assert.strictEqual(nodes.core_update_span.textContent, 'rpc unavailable');
+        // The next click is accepted after the synchronous failure settles.
+        return renderedMap.options._update_core.onclick({ type: 'click' }, 'core');
+    })
+    .then(() => {
+        assert.strictEqual(updateCallCount, 4);
         console.log('LuCI core update tests passed');
     })
     .catch((error) => {

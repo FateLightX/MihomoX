@@ -33,6 +33,32 @@ function updateReadonlyText(element, value) {
 
 var coreUpdateSessionActive = false;
 var coreUpdateInFlight = false;
+var coreUpdateWatchdog = null;
+
+function clearCoreUpdateWatchdog() {
+    if (coreUpdateWatchdog !== null) {
+        clearTimeout(coreUpdateWatchdog);
+        coreUpdateWatchdog = null;
+    }
+}
+
+function runCoreUpdateRequest(request) {
+    clearCoreUpdateWatchdog();
+    return new Promise(function (resolve, reject) {
+        coreUpdateWatchdog = setTimeout(function () {
+            coreUpdateWatchdog = null;
+            reject(new Error(_('Update request timed out')));
+        }, 30000);
+
+        Promise.resolve().then(request).then(resolve, reject);
+    }).then(function (result) {
+        clearCoreUpdateWatchdog();
+        return result;
+    }, function (error) {
+        clearCoreUpdateWatchdog();
+        return Promise.reject(error);
+    });
+}
 
 function renderCoreUpdateTime(updatedAt) {
     return updateCoreUpdateTime(E('input', {
@@ -54,10 +80,10 @@ function getOrCreateCoreUpdateSpan() {
         return span;
 
     var btn = null;
-    var buttons = document.querySelectorAll('input[type="button"]');
+    var buttons = document.querySelectorAll('button, input[type="button"]');
     var title = _('Update Core');
     for (var i = 0; i < buttons.length; i++) {
-        if ((buttons[i].value || '') === title) {
+        if ((buttons[i].value || buttons[i].textContent || '') === title) {
             btn = buttons[i];
             break;
         }
@@ -261,7 +287,7 @@ return view.extend({
         };
 
         poll.add(function () {
-            return mihomox.coreStatus().then(function (status) {
+            return L.resolveDefault(mihomox.coreStatus(), {}).then(function (status) {
                 updateCoreUpdateTime(document.getElementById('core_update_time'), status.updated_at);
                 if (!coreUpdateSessionActive)
                     return;
@@ -299,7 +325,10 @@ return view.extend({
             coreUpdateInFlight = true;
             updateCoreUpdateSpan({ updating: true });
 
-            return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl, downloadSha256).then(function (result) {
+            /* A broken ubus response must not leave LuCI's Button handler locked. */
+            return runCoreUpdateRequest(function () {
+                return mihomox.updateCore(channel, architecture, mirrorPrefix, downloadUrl, downloadSha256);
+            }).then(function (result) {
                 if (!result || !result.success) {
                     updateCoreUpdateSpan({ state: 'failed', message: result?.error || _('Failed') });
                     return;
@@ -322,6 +351,7 @@ return view.extend({
                 updateCoreUpdateSpan({ state: 'failed', message: message });
             }).then(function () {
                 coreUpdateInFlight = false;
+                clearCoreUpdateWatchdog();
             });
         };
 
