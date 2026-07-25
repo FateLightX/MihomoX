@@ -78,7 +78,7 @@ export function get_cgroups() {
 	for (let root in roots) {
 		if (!access(root.path, 'r'))
 			continue;
-		const process = popen(['find', root.path, '-type', 'd', '-mindepth', '1', '-maxdepth', '2'], 'r');
+		const process = popen("find '" + root.path + "' -type d -mindepth 1 -maxdepth 2", 'r');
 		if (!process)
 			continue;
 		for (let line = process.read('line'); length(line); line = process.read('line')) {

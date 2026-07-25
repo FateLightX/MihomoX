@@ -6,76 +6,12 @@
 'require poll';
 'require tools.mihomox as mihomox';
 
-function validateCron(value) {
-    const fields = String(value || '').trim().split(/\s+/);
-    if (fields.length !== 5 || fields.some(function (field) {
-        return !/^[0-9*/,-]+$/.test(field);
-    }))
-        return _('Invalid cron expression');
-    return true;
-}
-
-function getOptionUI(option, sectionId) {
-    if (!option || typeof option.getUIElement !== 'function')
-        return null;
-    try {
-        return option.getUIElement(sectionId) || null;
-    } catch (e) {
-        return null;
-    }
-}
-
-function getTextareaNode(uiElement) {
-    if (!uiElement)
-        return null;
-    if (uiElement.node) {
-        if (uiElement.node.tagName === 'TEXTAREA')
-            return uiElement.node;
-        if (uiElement.node.firstChild && uiElement.node.firstChild.tagName === 'TEXTAREA')
-            return uiElement.node.firstChild;
-        return uiElement.node;
-    }
-    if (uiElement.tagName === 'TEXTAREA')
-        return uiElement;
-    return null;
-}
-
-function isVisibleNode(node) {
-    return !!(node && node.offsetParent !== null && !document.hidden);
-}
-
-function setLogValue(option, sectionId, value) {
-    const uiElement = getOptionUI(option, sectionId);
-    if (!uiElement || typeof uiElement.setValue !== 'function')
-        return false;
-    const node = getTextareaNode(uiElement);
-    if (node && !isVisibleNode(node) && !(uiElement.node && isVisibleNode(uiElement.node)))
-        return false;
-    try {
-        uiElement.setValue(value);
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-function scrollLogToBottom(map, optionName, sectionId) {
-    const option = map.lookupOption(optionName, sectionId);
-    if (!option || !option[0])
-        return;
-    const uiElement = getOptionUI(option[0], sectionId);
-    const node = getTextareaNode(uiElement);
-    if (!node)
-        return;
-    node.scrollTop = node.scrollHeight;
-}
-
 return view.extend({
     load: function () {
         return Promise.all([
             uci.load('mihomox'),
-            L.resolveDefault(mihomox.getAppLog(), ''),
-            L.resolveDefault(mihomox.getCoreLog(), '')
+            mihomox.getAppLog(),
+            mihomox.getCoreLog()
         ]);
     },
     render: function (data) {
@@ -101,9 +37,6 @@ return view.extend({
         o = s.taboption('log_config', form.Value, 'scheduled_clear_cron', _('Scheduled Clear Cron'));
         o.retain = true;
         o.rmempty = false;
-        o.validate = function (_, value) {
-            return validateCron(value);
-        };
         o.depends('scheduled_clear', '1');
 
         o = s.taboption('log_config', form.Value, 'scheduled_clear_size_limit', _('Scheduled Clear Size Limit'));
@@ -125,26 +58,26 @@ return view.extend({
         o = s.taboption('app_log', form.Button, 'clear_app_log');
         o.inputstyle = 'negative';
         o.inputtitle = _('Clear Log');
-        o.onclick = function (ev, section_id) {
-            setLogValue(appLogOption, section_id, '');
+        o.onclick = function (_, section_id) {
+            m.lookupOption('_app_log', section_id)[0].getUIElement(section_id).setValue('');
             return mihomox.clearAppLog();
         };
 
         appLogOption = s.taboption('app_log', form.TextValue, '_app_log');
         appLogOption.rows = 25;
         appLogOption.wrap = false;
-        appLogOption.readonly = true;
-        appLogOption.load = function () {
+        appLogOption.load = function (section_id) {
             return appLog;
         };
-        appLogOption.write = function () {
+        appLogOption.write = function (section_id, formvalue) {
             return true;
         };
 
         o = s.taboption('app_log', form.Button, 'scroll_app_log_to_bottom');
         o.inputtitle = _('Scroll To Bottom');
-        o.onclick = function (ev, section_id) {
-            scrollLogToBottom(m, '_app_log', section_id);
+        o.onclick = function (_, section_id) {
+            const element = m.lookupOption('_app_log', section_id)[0].getUIElement(section_id).node.firstChild;
+            element.scrollTop = element.scrollHeight;
         };
 
         s.tab('core_log', _('Core Log'));
@@ -152,26 +85,26 @@ return view.extend({
         o = s.taboption('core_log', form.Button, 'clear_core_log');
         o.inputstyle = 'negative';
         o.inputtitle = _('Clear Log');
-        o.onclick = function (ev, section_id) {
-            setLogValue(coreLogOption, section_id, '');
+        o.onclick = function (_, section_id) {
+            m.lookupOption('_core_log', section_id)[0].getUIElement(section_id).setValue('');
             return mihomox.clearCoreLog();
         };
 
         coreLogOption = s.taboption('core_log', form.TextValue, '_core_log');
         coreLogOption.rows = 25;
         coreLogOption.wrap = false;
-        coreLogOption.readonly = true;
-        coreLogOption.load = function () {
+        coreLogOption.load = function (section_id) {
             return coreLog;
         };
-        coreLogOption.write = function () {
+        coreLogOption.write = function (section_id, formvalue) {
             return true;
         };
 
         o = s.taboption('core_log', form.Button, 'scroll_core_log_to_bottom');
         o.inputtitle = _('Scroll To Bottom');
-        o.onclick = function (ev, section_id) {
-            scrollLogToBottom(m, '_core_log', section_id);
+        o.onclick = function (_, section_id) {
+            const element = m.lookupOption('_core_log', section_id)[0].getUIElement(section_id).node.firstChild;
+            element.scrollTop = element.scrollHeight;
         };
 
         s.tab('debug_log', _('Debug Log'));
@@ -181,7 +114,7 @@ return view.extend({
         o.inputtitle = _('Generate & Download');
         o.onclick = function () {
             return mihomox.debug().then(function () {
-                return fs.read_direct(mihomox.debugLogPath, 'blob').then(function (data) {
+                fs.read_direct(mihomox.debugLogPath, 'blob').then(function (data) {
                     const url = window.URL.createObjectURL(data, { type: 'text/markdown' });
                     const link = document.createElement('a');
                     link.href = url;
@@ -194,21 +127,22 @@ return view.extend({
             });
         };
 
+        // Nikki registers poll during option setup; on current LuCI/Aurora that
+        // can run before map root exists. Keep Nikki read/update style, but
+        // only start polling after render.
         return m.render().then(function (viewNode) {
-            // Register poll only after map DOM root exists to avoid
-            // getUIElement -> root.querySelectorAll on undefined.
             poll.add(function () {
-                if (document.hidden)
-                    return Promise.resolve();
-                return L.resolveDefault(mihomox.getAppLog(), '').then(function (log) {
-                    setLogValue(appLogOption, 'log', log);
+                return L.resolveDefault(mihomox.getAppLog()).then(function (log) {
+                    try {
+                        appLogOption.getUIElement('log').setValue(log);
+                    } catch (e) { }
                 });
             });
             poll.add(function () {
-                if (document.hidden)
-                    return Promise.resolve();
-                return L.resolveDefault(mihomox.getCoreLog(), '').then(function (log) {
-                    setLogValue(coreLogOption, 'log', log);
+                return L.resolveDefault(mihomox.getCoreLog()).then(function (log) {
+                    try {
+                        coreLogOption.getUIElement('log').setValue(log);
+                    } catch (e) { }
                 });
             });
             return viewNode;

@@ -59,6 +59,12 @@ function shell_read(command) {
 	return value;
 }
 
+// Older ucode builds only accept string commands in popen(); quote each
+// argument so array-style invocations can be flattened into one string.
+function shell_quote(value) {
+	return "'" + replace("" + value, /'/g, "'\\''") + "'";
+}
+
 function lock_pid_alive() {
 	if (!access(CORE_LOCK_DIR + '/pid', 'r'))
 		return false;
@@ -95,7 +101,15 @@ function installed_core_version() {
 }
 
 function valid_api_value(value, maximum) {
-	return value != null && length(value) <= maximum && !match(value, /[\x00-\x1f\x7f]/);
+	// Avoid regex \xNN classes; older ucode lexers reject them at match time.
+	if (value == null || length(value) > maximum)
+		return false;
+	for (let i = 0; i < length(value); i++) {
+		const code = ord(substr(value, i, 1));
+		if (code < 32 || code == 127)
+			return false;
+	}
+	return true;
 }
 
 function controller_url(listen, protocol, path) {
@@ -214,11 +228,15 @@ const methods = {
 			const path = paths[req.args?.name];
 			if (!path)
 				return { log: '' };
-			const process = popen(['tail', '-c', '65536', path], 'r');
-			if (!process)
+			// Read via fs, not popen/tail: rpcd sandbox often cannot exec
+			// helpers, which made LuCI log tabs look empty on config errors.
+			let result = readfile(path);
+			if (result == null)
 				return { log: '' };
-			const result = process.read('all') || '';
-			process.close();
+			result = '' + result;
+			const max_bytes = 65536;
+			if (length(result) > max_bytes)
+				result = substr(result, length(result) - max_bytes);
 			return { log: result };
 		}
 	},
@@ -227,17 +245,19 @@ const methods = {
 		call: function(req) {
 			const path = req.args?.path;
 			const data = req.args?.data ?? '';
-			const append = req.args?.append == true;
-			const commit = req.args?.commit == true;
+			// Older rpcd ucode plugins only accept string arguments, so
+			// booleans/numbers may arrive serialized as strings.
+			const append = req.args?.append == true || req.args?.append == 'true';
+			const commit = req.args?.commit == true || req.args?.commit == 'true';
 			const token = req.args?.token || '';
-			let mode = req.args?.mode;
+			let mode = int(req.args?.mode);
 			if (!writable_path(path) || !match(token, /^[A-Za-z0-9_-]{16,80}$/))
 				return { success: false, error: 'invalid_path' };
 			if (mode != 384 && mode != 420)
 				mode = 420;
 
 			const temporary = path + '.mihomox-' + token + '.tmp';
-			if (req.args?.abort == true) {
+			if (req.args?.abort == true || req.args?.abort == 'true') {
 				unlink(temporary);
 				return { success: true };
 			}
@@ -368,7 +388,7 @@ const methods = {
 				push(curl_args, '--oauth2-bearer', api_secret);
 			push(curl_args, '--url-query', query, '--data', body, '--url', url);
 
-			const process = popen(curl_args, 'r');
+			const process = popen(join(' ', map(curl_args, shell_quote)), 'r');
 			if (process) {
 				const output = process.read('all') || '';
 				process.close();

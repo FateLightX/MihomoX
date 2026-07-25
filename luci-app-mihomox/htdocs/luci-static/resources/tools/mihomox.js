@@ -64,13 +64,6 @@ const callMihomoXCoreStatus = rpc.declare({
     expect: { '': {} }
 });
 
-const callMihomoXLog = rpc.declare({
-    object: 'luci.mihomox',
-    method: 'log',
-    params: ['name'],
-    expect: { log: '' }
-});
-
 const callMihomoXWriteFile = rpc.declare({
     object: 'luci.mihomox',
     method: 'write_file',
@@ -136,7 +129,8 @@ return baseclass.extend({
         const token = `${Date.now().toString(36)}-${randomPart}`;
 
         const writeChunk = function (chunk, append, commit) {
-            return callMihomoXWriteFile(path, chunk, append, mode, token, commit, false).then(function (result) {
+            // Older rpcd ucode plugins only accept string arguments.
+            return callMihomoXWriteFile(path, chunk, String(!!append), String(mode), token, String(!!commit), 'false').then(function (result) {
                 if (!result?.success)
                     return Promise.reject(new Error(result?.error || 'write_failed'));
                 return result;
@@ -160,7 +154,7 @@ return baseclass.extend({
         }
 
         return promise.catch(function (error) {
-            return callMihomoXWriteFile(path, '', false, mode, token, false, true)
+            return callMihomoXWriteFile(path, '', 'false', String(mode), token, 'false', 'true')
                 .catch(function () { })
                 .then(function () { return Promise.reject(error); });
         });
@@ -243,11 +237,11 @@ return baseclass.extend({
     },
 
     getAppLog: function () {
-        return L.resolveDefault(callMihomoXLog('app'), '');
+        return L.resolveDefault(fs.read_direct(this.appLogPath));
     },
 
     getCoreLog: function () {
-        return L.resolveDefault(callMihomoXLog('core'), '');
+        return L.resolveDefault(fs.read_direct(this.coreLogPath));
     },
 
     clearAppLog: function () {
