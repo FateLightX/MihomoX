@@ -19,8 +19,6 @@ return view.extend({
         const coreLog = data[2];
 
         let m, s, o;
-        let appLogOption;
-        let coreLogOption;
 
         m = new form.Map('mihomox');
 
@@ -63,15 +61,21 @@ return view.extend({
             return mihomox.clearAppLog();
         };
 
-        appLogOption = s.taboption('app_log', form.TextValue, '_app_log');
-        appLogOption.rows = 25;
-        appLogOption.wrap = false;
-        appLogOption.load = function (section_id) {
+        o = s.taboption('app_log', form.TextValue, '_app_log');
+        o.rows = 25;
+        o.wrap = false;
+        o.load = function (section_id) {
             return appLog;
         };
-        appLogOption.write = function (section_id, formvalue) {
+        o.write = function (section_id, formvalue) {
             return true;
         };
+        poll.add(L.bind(function () {
+            const option = this;
+            return L.resolveDefault(mihomox.getAppLog()).then(function (log) {
+                option.getUIElement('log').setValue(log);
+            });
+        }, o));
 
         o = s.taboption('app_log', form.Button, 'scroll_app_log_to_bottom');
         o.inputtitle = _('Scroll To Bottom');
@@ -90,15 +94,21 @@ return view.extend({
             return mihomox.clearCoreLog();
         };
 
-        coreLogOption = s.taboption('core_log', form.TextValue, '_core_log');
-        coreLogOption.rows = 25;
-        coreLogOption.wrap = false;
-        coreLogOption.load = function (section_id) {
+        o = s.taboption('core_log', form.TextValue, '_core_log');
+        o.rows = 25;
+        o.wrap = false;
+        o.load = function (section_id) {
             return coreLog;
         };
-        coreLogOption.write = function (section_id, formvalue) {
+        o.write = function (section_id, formvalue) {
             return true;
         };
+        poll.add(L.bind(function () {
+            const option = this;
+            return L.resolveDefault(mihomox.getCoreLog()).then(function (log) {
+                option.getUIElement('log').setValue(log);
+            });
+        }, o));
 
         o = s.taboption('core_log', form.Button, 'scroll_core_log_to_bottom');
         o.inputtitle = _('Scroll To Bottom');
@@ -115,37 +125,24 @@ return view.extend({
         o.onclick = function () {
             return mihomox.debug().then(function () {
                 fs.read_direct(mihomox.debugLogPath, 'blob').then(function (data) {
+                    // create url
                     const url = window.URL.createObjectURL(data, { type: 'text/markdown' });
+                    // create link
                     const link = document.createElement('a');
                     link.href = url;
                     link.download = 'debug.log';
+                    // append to body
                     document.body.appendChild(link);
+                    // download
                     link.click();
+                    // remove from body
                     document.body.removeChild(link);
+                    // revoke url
                     window.URL.revokeObjectURL(url);
                 });
             });
         };
 
-        // Nikki registers poll during option setup; on current LuCI/Aurora that
-        // can run before map root exists. Keep Nikki read/update style, but
-        // only start polling after render.
-        return m.render().then(function (viewNode) {
-            poll.add(function () {
-                return L.resolveDefault(mihomox.getAppLog()).then(function (log) {
-                    try {
-                        appLogOption.getUIElement('log').setValue(log);
-                    } catch (e) { }
-                });
-            });
-            poll.add(function () {
-                return L.resolveDefault(mihomox.getCoreLog()).then(function (log) {
-                    try {
-                        coreLogOption.getUIElement('log').setValue(log);
-                    } catch (e) { }
-                });
-            });
-            return viewNode;
-        });
+        return m.render();
     }
 });
