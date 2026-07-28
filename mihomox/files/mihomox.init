@@ -366,6 +366,13 @@ start_service() {
 	touch "$STARTED_FLAG_PATH"
 }
 
+rollback_failed_start() {
+	log "App" "Startup failed, rolling back."
+	procd_kill mihomox mihomox > /dev/null 2>&1
+	cleanup
+	log "App" "Startup rollback completed."
+}
+
 service_started() {
 	# check if started
 	if [ ! -f "$STARTED_FLAG_PATH" ]; then
@@ -453,7 +460,8 @@ service_started() {
 			if [ "$tun_timeout" -le 0 ]; then
 				log "Proxy" "Timeout, TUN device is not online."
 				log "App" "Exit."
-				return
+				rollback_failed_start
+				return 1
 			fi
 		fi
 		# fix compatible with dockerd
@@ -517,6 +525,8 @@ service_started() {
 		else
 			log "Proxy" "Hijack failed."
 			log "App" "Exit."
+			rollback_failed_start
+			return 1
 		fi
 	fi
 }
