@@ -22,7 +22,8 @@ const rpcSource = fs.readFileSync(path.join(
     root,
     'luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox'
 ), 'utf8');
-assert.ok(rpcSource.includes("popen(curl_args, 'r')"));
+assert.ok(rpcSource.includes("popen(join(' ', map(curl_args, shell_quote)), 'r')"));
+assert.ok(rpcSource.includes('function shell_quote(value)'));
 assert.ok(!rpcSource.includes('popen(`curl'));
 assert.ok(rpcSource.includes("match(section_id, /^[A-Za-z0-9_-]{1,64}$/)"));
 

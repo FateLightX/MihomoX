@@ -49,10 +49,17 @@ jobs:
           - i386_pentium4
           - x86_64
         branch:
+          - openwrt-23.05
           - openwrt-24.10
           - openwrt-25.12
           - SNAPSHOT
         exclude:
+          - arch: aarch64_cortex-a76
+            branch: openwrt-23.05
+          - arch: riscv64_generic
+            branch: openwrt-23.05
+          - arch: loongarch64_generic
+            branch: openwrt-23.05
           - arch: mips_4kec
             branch: openwrt-25.12
           - arch: mips_4kec
@@ -71,7 +78,7 @@ jobs:
       - name: build
         uses: openwrt/gh-action-sdk@797d0e3d0eb13b355c3447f60d0179d4b43089e2 # main
         env:
-          ARCH: ${{ matrix.arch }}-${{ matrix.branch }}
+          ARCH: ${{ matrix.arch }}-${{ matrix.branch == 'openwrt-23.05' && '23.05.5' || matrix.branch }}
           FEEDNAME: mihomox
           PACKAGES: mihomox luci-app-mihomox
           NO_REFRESH_CHECK: true

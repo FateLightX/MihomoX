@@ -33,11 +33,12 @@ const content = 'a'.repeat(8191) + '中' + 'b'.repeat(9000) + '文';
 Promise.resolve(mihomox.writefile('/etc/mihomox/profiles/test.yaml', content))
     .then(() => {
         assert.ok(writes.length > 1);
-        assert.strictEqual(writes[0].append, false);
-        assert.ok(writes.slice(1).every((write) => write.append === true));
+        assert.strictEqual(writes[0].append, 'false');
+        assert.ok(writes.slice(1).every((write) => write.append === 'true'));
         assert.ok(writes.every((write) => write.token === writes[0].token));
-        assert.strictEqual(writes[writes.length - 1].commit, true);
-        assert.ok(writes.slice(0, -1).every((write) => write.commit === false));
+        assert.ok(writes.every((write) => write.mode === '420'));
+        assert.strictEqual(writes[writes.length - 1].commit, 'true');
+        assert.ok(writes.slice(0, -1).every((write) => write.commit === 'false'));
         assert.strictEqual(writes.map((write) => write.data).join(''), content);
         assert.ok(!writes.some((write) => write.data.includes('\uFFFD')));
         console.log('LuCI UTF-8 write tests passed');

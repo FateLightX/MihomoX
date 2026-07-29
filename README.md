@@ -18,9 +18,11 @@ Mihomo 内核。
 
 ## 系统要求
 
-- OpenWrt 24.10、25.12 或 SNAPSHOT
+- OpenWrt 23.05、24.10、25.12 或 SNAPSHOT
 - `firewall4`
 - MetaCubeX/mihomo Release 支持的目标架构
+
+OpenWrt 23.05 软件源使用该系列最后一个正式版 SDK 23.05.5 构建。
 
 ## 安装
 
