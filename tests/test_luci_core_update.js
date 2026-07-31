@@ -8,6 +8,10 @@ const source = fs.readFileSync(path.join(
     __dirname,
     '../luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js'
 ), 'utf8');
+const iconPath = path.join(
+    __dirname,
+    '../luci-app-mihomox/htdocs/luci-static/resources/icons/mihomox.svg'
+);
 const rpcSource = fs.readFileSync(path.join(
     __dirname,
     '../luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox'
@@ -18,6 +22,12 @@ assert.ok(
     rpcSource.includes("metadata.architecture || state.architecture || detected || ''"),
     'installed architecture should fall back to the detected architecture'
 );
+assert.ok(source.includes("L.resource('icons/mihomox.svg')"), 'MihomoX title icon is missing');
+assert.ok(fs.existsSync(iconPath), 'MihomoX SVG icon is missing');
+const iconSource = fs.readFileSync(iconPath, 'utf8');
+assert.ok(/<svg\b[^>]*viewBox="0 0 512 512"/.test(iconSource), 'MihomoX SVG viewBox is invalid');
+assert.ok(/<path\b/.test(iconSource), 'MihomoX SVG must contain vector paths');
+assert.ok(!/<image\b/.test(iconSource), 'MihomoX SVG must not embed the source PNG');
 
 const formValues = {
     channel: 'Prerelease-Alpha',
@@ -140,7 +150,10 @@ const mihomox = {
 };
 const E = (_, attributes) => Object.assign({ style: {}, value: '' }, attributes);
 const translate = (value) => value;
-const L = { resolveDefault: (value) => value };
+const L = {
+    resolveDefault: (value) => value,
+    resource: (path) => `/luci-static/resources/${path}`
+};
 const document = {
     getElementById: (id) => {
         nodes[id] ||= { style: {}, value: '', textContent: nodes[id]?.textContent || '', parentNode: { appendChild: () => {} } };

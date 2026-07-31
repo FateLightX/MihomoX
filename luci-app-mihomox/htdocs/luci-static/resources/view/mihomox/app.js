@@ -158,7 +158,19 @@ return view.extend({
 
         let m, s, o;
 
-        m = new form.Map('mihomox', _('MihomoX'), _('Transparent Proxy with Mihomo on OpenWrt.'));
+        const titleIconUrl = L.resource('icons/mihomox.svg');
+        const title = E('span', {
+            style: 'display:inline-flex;align-items:center;gap:0.45em;'
+        }, [
+            E('span', {
+                'aria-hidden': 'true',
+                style: 'display:inline-block;width:1.2em;height:1.2em;flex:none;background:currentColor;' +
+                    `-webkit-mask:url("${titleIconUrl}") center/contain no-repeat;mask:url("${titleIconUrl}") center/contain no-repeat;`
+            }),
+            E('span', {}, _('MihomoX'))
+        ]);
+
+        m = new form.Map('mihomox', title, _('Transparent Proxy with Mihomo on OpenWrt.'));
 
         s = m.section(form.TableSection, 'status', _('Status'));
         s.anonymous = true;
