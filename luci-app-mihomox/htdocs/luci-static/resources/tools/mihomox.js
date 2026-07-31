@@ -75,7 +75,8 @@ const callMihomoXNetworkTest = rpc.declare({
     object: 'luci.mihomox',
     method: 'network_test',
     params: ['test'],
-    expect: { '': {} }
+    expect: { '': {} },
+    nobatch: true
 });
 
 const callMihomoXWriteFile = rpc.declare({

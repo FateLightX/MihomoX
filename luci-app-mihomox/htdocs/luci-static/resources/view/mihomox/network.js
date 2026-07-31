@@ -13,6 +13,8 @@ const tests = [
     { id: 'ipv6', label: 'IPv6', icon: 'ipv6' },
     { id: 'nat', label: _('NAT Type'), icon: 'nat' }
 ];
+const TEST_TIMEOUT_MS = 8000;
+const NAT_TIMEOUT_MS = 14000;
 
 function iconUrl(name) {
     return L.resource(`icons/mihomox/network/${name}.svg`);
@@ -73,17 +75,41 @@ function updateRow(row, state, value) {
     row.value.textContent = value;
 }
 
+function requestTest(test) {
+    let timeoutId;
+    const timeout = new Promise(function (resolve) {
+        timeoutId = setTimeout(function () {
+            resolve({ success: false, error: 'timeout', timedOut: true });
+        }, test.id === 'nat' ? NAT_TIMEOUT_MS : TEST_TIMEOUT_MS);
+    });
+
+    return Promise.race([
+        L.resolveDefault(mihomox.networkTest(test.id), { success: false }),
+        timeout
+    ]).then(function (result) {
+        clearTimeout(timeoutId);
+        return result;
+    });
+}
+
 function runTests(button, rows) {
     button.disabled = true;
     for (const test of tests)
         updateRow(rows[test.id], 'idle', _('Not Tested'));
 
     let sequence = Promise.resolve();
+    let stopped = false;
     for (const test of tests) {
         sequence = sequence.then(function () {
+            if (stopped) {
+                updateRow(rows[test.id], 'failed', _('Unavailable'));
+                return;
+            }
             updateRow(rows[test.id], 'loading', _('Testing'));
-            return L.resolveDefault(mihomox.networkTest(test.id), { success: false }).then(function (result) {
+            return requestTest(test).then(function (result) {
                 updateRow(rows[test.id], result?.success ? 'success' : 'failed', resultText(test, result));
+                if (result?.timedOut)
+                    stopped = true;
             });
         });
     }

@@ -13,6 +13,10 @@ const rpcSource = fs.readFileSync(path.join(
     root,
     'luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox'
 ), 'utf8');
+const toolSource = fs.readFileSync(path.join(
+    root,
+    'luci-app-mihomox/htdocs/luci-static/resources/tools/mihomox.js'
+), 'utf8');
 const menu = JSON.parse(fs.readFileSync(path.join(
     root,
     'luci-app-mihomox/root/usr/share/luci/menu.d/luci-app-mihomox.json'
@@ -32,6 +36,8 @@ assert.ok(
 );
 for (const test of ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4', 'ipv6', 'nat'])
     assert.ok(rpcSource.includes(`case '${test}':`), `network RPC is missing ${test}`);
+assert.ok(/method:\s*'network_test'[\s\S]*?nobatch:\s*true/.test(toolSource), 'network tests must bypass RPC batching');
+assert.ok(source.includes('Promise.race(['), 'network tests must enforce a browser-side timeout');
 
 for (const icon of ['core', 'dns', 'shield', 'home', 'globe', 'ipv4', 'ipv6', 'nat', 'check', 'warning', 'close', 'loading']) {
     const iconPath = path.join(
