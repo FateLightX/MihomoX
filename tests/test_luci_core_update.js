@@ -109,6 +109,7 @@ const coreStatus = {
 let updateCallCount = 0;
 let resolveUpdate;
 const mihomox = {
+    inlineDescriptions: (node) => node,
     version: () => Promise.resolve({ app: '1.0', core: 'v1' }),
     status: () => Promise.resolve(false),
     coreStatus: () => Promise.resolve(coreStatus),

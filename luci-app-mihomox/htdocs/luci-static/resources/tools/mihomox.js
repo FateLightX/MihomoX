@@ -255,6 +255,25 @@ return baseclass.extend({
         });
     },
 
+    inlineDescriptions: function (node) {
+        if (!node?.querySelectorAll)
+            return node;
+
+        for (const description of node.querySelectorAll('.cbi-value-description')) {
+            const field = description.parentNode;
+            if (!field?.classList?.contains('cbi-value-field'))
+                continue;
+
+            field.style.display = 'flex';
+            field.style.alignItems = 'center';
+            description.style.order = '1';
+            description.style.margin = '0 0 0 0.5em';
+            description.style.whiteSpace = 'nowrap';
+        }
+
+        return node;
+    },
+
     clearAppLog: function () {
         return this.writefile(this.appLogPath, '');
     },

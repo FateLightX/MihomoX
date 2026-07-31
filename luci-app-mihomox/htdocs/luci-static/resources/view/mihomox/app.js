@@ -469,6 +469,6 @@ return view.extend({
         o = s.taboption('environment_variable', form.Flag, 'env_skip_system_ipv6_check', _('Skip System IPv6 Check'));
         o.rmempty = false;
 
-        return m.render();
+        return Promise.resolve(m.render()).then(mihomox.inlineDescriptions);
     }
 });

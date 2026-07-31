@@ -218,6 +218,6 @@ return view.extend({
         o.rmempty = false;
         o.description = _('Seconds.');
 
-        return m.render();
+        return Promise.resolve(m.render()).then(mihomox.inlineDescriptions);
     }
 });

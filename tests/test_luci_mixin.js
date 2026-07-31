@@ -32,5 +32,6 @@ for (const ruleType of [
 assert.ok(source.includes("value === 'mrs'"), 'MRS format validation is missing');
 assert.ok(source.includes("behaviorOption.formvalue(section_id) === 'classical'"), 'MRS/Classical guard is missing');
 assert.ok(source.includes("description = _('Bytes; 0 means unlimited.')"), 'size limit unit is missing');
+assert.ok(source.includes('mihomox.inlineDescriptions'), 'tips must render inline beside their fields');
 
 console.log('LuCI mixin tests passed');

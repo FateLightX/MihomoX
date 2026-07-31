@@ -96,7 +96,7 @@ start_service() {
 	## procd config
 	### general
 	local fast_reload
-	config_get_bool fast_reload "procd" "fast_reload" 0
+	config_get_bool fast_reload "procd" "fast_reload" 1
 	### rlimit
 	local rlimit_nproc_soft rlimit_nproc_hard rlimit_address_space_soft rlimit_address_space_hard rlimit_data_soft rlimit_data_hard rlimit_stack_soft rlimit_stack_hard rlimit_nofile_soft rlimit_nofile_hard
 	config_get rlimit_nproc_soft "procd" "rlimit_nproc_soft" "$(ulimit -Su)"

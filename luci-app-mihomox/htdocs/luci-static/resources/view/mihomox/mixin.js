@@ -687,6 +687,6 @@ return view.extend({
         o = s.taboption('mixin_file_content', form.Flag, 'mixin_file_content', _('Enable'), _('Please go to the editor tab to edit the file for mixin'));
         o.rmempty = false;
 
-        return m.render();
+        return Promise.resolve(m.render()).then(mihomox.inlineDescriptions);
     }
 });

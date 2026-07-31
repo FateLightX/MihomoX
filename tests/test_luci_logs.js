@@ -46,6 +46,21 @@ async function testTools() {
         rpcCalls.filter((call) => call.method === 'log').map((call) => call.args[0]),
         ['app', 'core']
     );
+
+    const field = {
+        classList: { contains: (name) => name === 'cbi-value-field' },
+        style: {},
+        firstChild: 'input',
+        insertBefore: function (node) {
+            this.firstChild = node;
+        }
+    };
+    const description = { parentNode: field, style: {} };
+    const renderedNode = { querySelectorAll: () => [description] };
+    assert.strictEqual(mihomox.inlineDescriptions(renderedNode), renderedNode);
+    assert.strictEqual(field.style.display, 'flex');
+    assert.strictEqual(description.style.order, '1');
+    assert.strictEqual(field.firstChild, 'input');
 }
 
 const logSource = fs.readFileSync(path.join(

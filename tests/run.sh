@@ -14,6 +14,7 @@ done
 "$ROOT_DIR/tests/test_fetch_zashboard.sh"
 "$ROOT_DIR/tests/test_update_core.sh"
 "$ROOT_DIR/tests/test_security_helpers.sh"
+"$ROOT_DIR/tests/test_default_settings.sh"
 node "$ROOT_DIR/tests/test_luci_core_update.js"
 node "$ROOT_DIR/tests/test_luci_editor.js"
 node "$ROOT_DIR/tests/test_mixin_generator.js"
