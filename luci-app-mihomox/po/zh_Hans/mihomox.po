@@ -1171,6 +1171,21 @@ msgstr "正式版"
 msgid "Unknown"
 msgstr "未知"
 
+msgid "IPv4 Domestic"
+msgstr "IPv4 国内"
+
+msgid "IPv4 Overseas"
+msgstr "IPv4 国外"
+
+msgid "IPv6 Domestic"
+msgstr "IPv6 国内"
+
+msgid "IPv6 Overseas"
+msgstr "IPv6 国外"
+
+msgid "Test"
+msgstr "测试"
+
 msgid "Update Core"
 msgstr "更新内核"
 

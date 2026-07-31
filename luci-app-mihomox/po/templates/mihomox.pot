@@ -1164,6 +1164,21 @@ msgstr ""
 msgid "Unknown"
 msgstr ""
 
+msgid "IPv4 Domestic"
+msgstr ""
+
+msgid "IPv4 Overseas"
+msgstr ""
+
+msgid "IPv6 Domestic"
+msgstr ""
+
+msgid "IPv6 Overseas"
+msgstr ""
+
+msgid "Test"
+msgstr ""
+
 msgid "Update Core"
 msgstr ""
 

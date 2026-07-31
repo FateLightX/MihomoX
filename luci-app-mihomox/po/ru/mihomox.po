@@ -1340,3 +1340,18 @@ msgstr ""
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Open Internet"
 msgstr ""
+
+msgid "IPv4 Domestic"
+msgstr "IPv4 внутри Китая"
+
+msgid "IPv4 Overseas"
+msgstr "IPv4 за пределами Китая"
+
+msgid "IPv6 Domestic"
+msgstr "IPv6 внутри Китая"
+
+msgid "IPv6 Overseas"
+msgstr "IPv6 за пределами Китая"
+
+msgid "Test"
+msgstr "Тест"

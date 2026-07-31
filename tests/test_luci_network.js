@@ -34,10 +34,17 @@ assert.ok(
     acl['luci-app-mihomox'].read.ubus['luci.mihomox'].includes('network_test'),
     'network_test RPC is missing from the read ACL'
 );
-for (const test of ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4', 'ipv6', 'nat'])
+for (const test of ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'ipv6_overseas', 'nat'])
     assert.ok(rpcSource.includes(`case '${test}':`), `network RPC is missing ${test}`);
 assert.ok(/method:\s*'network_test'[\s\S]*?nobatch:\s*true/.test(toolSource), 'network tests must bypass RPC batching');
 assert.ok(source.includes('Promise.race(['), 'network tests must enforce a browser-side timeout');
+assert.ok(rpcSource.includes("readfile('/etc/resolv.conf')"), 'system DNS servers must be read from resolv.conf');
+assert.ok(rpcSource.includes('version: installed_core_version()'), 'core version must be returned by the network RPC');
+assert.ok(rpcSource.includes("plain_ip_probe('https://v4.ipgg.cn', 4)"), 'domestic IPv4 must use ipgg');
+assert.ok(rpcSource.includes("plain_ip_probe('https://4.wsmdn.dpdns.org/', 4)"), 'overseas IPv4 must use wsmdn');
+assert.ok(rpcSource.includes("plain_ip_probe('https://v6.ipgg.cn', 6)"), 'domestic IPv6 must use ipgg');
+assert.ok(rpcSource.includes("plain_ip_probe('https://6.wsmdn.dpdns.org/', 6)"), 'overseas IPv6 must use wsmdn');
+assert.ok(rpcSource.includes("push(args, '--noproxy', '*')"), 'IP protocol probes must bypass environment proxies');
 
 for (const icon of ['core', 'dns', 'shield', 'home', 'globe', 'ipv4', 'ipv6', 'nat', 'check', 'warning', 'close', 'loading']) {
     const iconPath = path.join(
@@ -70,13 +77,15 @@ function E(tag, attributes, children) {
 const calls = [];
 let releaseCore;
 const results = {
-    core: { success: true },
-    system_dns: { success: true, latency: 12 },
-    mihomo_dns: { success: true, latency: 8 },
+    core: { success: true, version: 'v1.19.12' },
+    system_dns: { success: true, latency: 12, server: '192.0.2.53' },
+    mihomo_dns: { success: true, latency: 8, server: '127.0.0.1#1053' },
     domestic: { success: true, latency: 35 },
     international: { success: true, latency: 86 },
-    ipv4: { success: true, address: '203.0.113.1' },
-    ipv6: { success: false },
+    ipv4_domestic: { success: true, address: '198.51.100.10' },
+    ipv4_overseas: { success: true, address: '203.0.113.1' },
+    ipv6_domestic: { success: true, address: '2001:db8::10' },
+    ipv6_overseas: { success: false },
     nat: { success: true, type: 'Full Cone' }
 };
 const mihomox = {
@@ -100,6 +109,9 @@ const networkView = new Function('view', 'ui', 'mihomox', 'L', 'E', '_', source)
 networkView.render();
 const button = created.find((node) => node.tag === 'button');
 assert.ok(button?.listeners?.click, 'start test button is missing');
+const singleButtons = created.filter((node) => node.attributes?.['data-test-id']);
+assert.strictEqual(singleButtons.length, 10, 'each network row must have a test button');
+assert.ok(singleButtons.every((node) => node.listeners?.click), 'a network row test button is missing its handler');
 
 const run = button.listeners.click();
 Promise.resolve().then(() => {
@@ -112,9 +124,31 @@ Promise.resolve().then(() => {
     releaseCore();
     return run;
 }).then(() => {
-    assert.deepStrictEqual(calls, ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4', 'ipv6', 'nat']);
+    assert.deepStrictEqual(calls, ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'ipv6_overseas', 'nat']);
     assert.strictEqual(button.disabled, false);
-    console.log('LuCI network test page tests passed');
+    const values = created
+        .filter((node) => node.attributes?.class === 'mihomox-network-value')
+        .map((node) => node.textContent);
+    assert.deepStrictEqual(values.slice(0, 5), [
+        'v1.19.12 · Normal',
+        '192.0.2.53 · 12 ms',
+        '127.0.0.1#1053 · 8 ms',
+        'connect.rom.miui.com · 35 ms',
+        'cp.cloudflare.com · 86 ms'
+    ]);
+    assert.deepStrictEqual(values.slice(5, 9), [
+        '198.51.100.10',
+        '203.0.113.1',
+        '2001:db8::10',
+        'Unavailable'
+    ]);
+    const ipv4Button = singleButtons.find((node) => node.attributes['data-test-id'] === 'ipv4_domestic');
+    return ipv4Button.listeners.click().then(() => {
+        assert.strictEqual(calls.at(-1), 'ipv4_domestic');
+        assert.strictEqual(button.disabled, false);
+        assert.ok(singleButtons.every((node) => node.disabled === false));
+        console.log('LuCI network test page tests passed');
+    });
 }).catch((error) => {
     console.error(error);
     process.exitCode = 1;

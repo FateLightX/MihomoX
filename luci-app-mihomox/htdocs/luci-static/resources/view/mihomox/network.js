@@ -7,14 +7,15 @@ const tests = [
     { id: 'core', label: _('Mihomo Core'), icon: 'core' },
     { id: 'system_dns', label: _('System DNS'), icon: 'dns' },
     { id: 'mihomo_dns', label: _('Mihomo DNS'), icon: 'shield' },
-    { id: 'domestic', label: _('Domestic Connection'), icon: 'home' },
-    { id: 'international', label: _('International Proxy'), icon: 'globe' },
-    { id: 'ipv4', label: 'IPv4', icon: 'ipv4' },
-    { id: 'ipv6', label: 'IPv6', icon: 'ipv6' },
-    { id: 'nat', label: _('NAT Type'), icon: 'nat' }
+    { id: 'domestic', label: _('Domestic Connection'), icon: 'home', target: 'connect.rom.miui.com' },
+    { id: 'international', label: _('International Proxy'), icon: 'globe', target: 'cp.cloudflare.com' },
+    { id: 'ipv4_domestic', label: _('IPv4 Domestic'), icon: 'ipv4' },
+    { id: 'ipv4_overseas', label: _('IPv4 Overseas'), icon: 'ipv4' },
+    { id: 'ipv6_domestic', label: _('IPv6 Domestic'), icon: 'ipv6' },
+    { id: 'ipv6_overseas', label: _('IPv6 Overseas'), icon: 'ipv6' },
+    { id: 'nat', label: _('NAT Type'), icon: 'nat', timeout: 14000 }
 ];
 const TEST_TIMEOUT_MS = 8000;
-const NAT_TIMEOUT_MS = 14000;
 
 function iconUrl(name) {
     return L.resource(`icons/mihomox/network/${name}.svg`);
@@ -43,13 +44,22 @@ function natType(value) {
 }
 
 function resultText(test, result) {
-    if (!result?.success)
-        return _('Unavailable');
+    const state = result?.success ? _('Normal') : _('Unavailable');
     if (test.id === 'core')
-        return _('Normal');
+        return result?.version ? `${result.version} · ${state}` : state;
+    if (test.id === 'system_dns' || test.id === 'mihomo_dns') {
+        const status = result?.success ? `${result.latency ?? 0} ms` : state;
+        return result?.server ? `${result.server} · ${status}` : status;
+    }
+    if (test.target) {
+        const status = result?.success ? `${result.latency ?? 0} ms` : state;
+        return `${test.target} · ${status}`;
+    }
+    if (!result?.success)
+        return state;
     if (test.id === 'nat')
         return natType(result.type);
-    if (test.id === 'ipv4' || test.id === 'ipv6')
+    if (/^ipv[46]_/.test(test.id))
         return result.address || _('Normal');
     return `${result.latency ?? 0} ms`;
 }
@@ -80,7 +90,7 @@ function requestTest(test) {
     const timeout = new Promise(function (resolve) {
         timeoutId = setTimeout(function () {
             resolve({ success: false, error: 'timeout', timedOut: true });
-        }, test.id === 'nat' ? NAT_TIMEOUT_MS : TEST_TIMEOUT_MS);
+        }, test.timeout || TEST_TIMEOUT_MS);
     });
 
     return Promise.race([
@@ -92,8 +102,27 @@ function requestTest(test) {
     });
 }
 
+function setBusy(button, rows, busy) {
+    button.disabled = busy;
+    for (const test of tests)
+        rows[test.id].button.disabled = busy;
+}
+
+function runSingleTest(button, rows, test) {
+    setBusy(button, rows, true);
+    updateRow(rows[test.id], 'loading', _('Testing'));
+    return requestTest(test).then(function (result) {
+        updateRow(rows[test.id], result?.success ? 'success' : 'failed', resultText(test, result));
+        setBusy(button, rows, false);
+    }, function (error) {
+        updateRow(rows[test.id], 'failed', _('Unavailable'));
+        setBusy(button, rows, false);
+        return Promise.reject(error);
+    });
+}
+
 function runTests(button, rows) {
-    button.disabled = true;
+    setBusy(button, rows, true);
     for (const test of tests)
         updateRow(rows[test.id], 'idle', _('Not Tested'));
 
@@ -115,9 +144,9 @@ function runTests(button, rows) {
     }
 
     return sequence.then(function () {
-        button.disabled = false;
+        setBusy(button, rows, false);
     }, function (error) {
-        button.disabled = false;
+        setBusy(button, rows, false);
         return Promise.reject(error);
     });
 }
@@ -136,13 +165,21 @@ return view.extend({
         const rowNodes = tests.map(function (test) {
             const statusIcon = renderIcon('warning', 'mihomox-network-status-icon');
             const value = E('span', { 'class': 'mihomox-network-value' }, _('Not Tested'));
-            rows[test.id] = { statusIcon: statusIcon, value: value };
+            const testButton = E('button', {
+                'class': 'cbi-button cbi-button-neutral mihomox-network-test-button',
+                'type': 'button',
+                'data-test-id': test.id
+            }, _('Test'));
+            rows[test.id] = { statusIcon: statusIcon, value: value, button: testButton };
+            testButton.addEventListener('click', function () {
+                return runSingleTest(button, rows, test);
+            });
             return E('div', { 'class': 'mihomox-network-row' }, [
                 E('div', { 'class': 'mihomox-network-label' }, [
                     renderIcon(test.icon),
                     E('span', {}, test.label)
                 ]),
-                E('div', { 'class': 'mihomox-network-result' }, [ statusIcon, value ])
+                E('div', { 'class': 'mihomox-network-result' }, [ statusIcon, value, testButton ])
             ]);
         });
 
@@ -158,6 +195,7 @@ return view.extend({
                 .mihomox-network-icon{width:1.45em;height:1.45em;color:#526176}
                 .mihomox-network-status-icon{width:1.25em;height:1.25em;background-color:#64748b}
                 .mihomox-network-value{font-weight:600;color:#64748b;overflow-wrap:anywhere;text-align:right}
+                .mihomox-network-test-button{flex:none;margin-left:.25em}
                 @media(max-width:600px){.mihomox-network-row{grid-template-columns:1fr}.mihomox-network-result{justify-content:flex-start;padding-left:2.1em}.mihomox-network-header{align-items:flex-start}}
             `),
             E('div', { 'class': 'mihomox-network-header' }, [

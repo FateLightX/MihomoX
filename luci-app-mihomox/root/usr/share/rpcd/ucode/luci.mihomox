@@ -144,7 +144,18 @@ function elapsed_ms(started) {
 	return (ended[0] - started[0]) * 1000 + int((ended[1] - started[1]) / 1000000);
 }
 
-function dns_test(nameserver) {
+function system_dns_nameservers() {
+	const content = readfile('/etc/resolv.conf') || '';
+	let nameservers = [];
+	for (let line in split(content, '\n')) {
+		const fields = split(trim(line), /[ \t]+/);
+		if (fields[0] == 'nameserver' && fields[1] && index(nameservers, fields[1]) < 0)
+			push(nameservers, fields[1]);
+	}
+	return nameservers;
+}
+
+function dns_test(nameserver, server) {
 	const started = clock(true);
 	let result = null;
 	try {
@@ -163,16 +174,19 @@ function dns_test(nameserver) {
 	return {
 		success: length(records) > 0,
 		latency: elapsed_ms(started),
+		server: server || '',
 		error: length(records) > 0 ? '' : 'resolve_failed'
 	};
 }
 
-function curl_probe(url, family, proxy, proxy_auth, include_body) {
+function curl_probe(url, family, proxy, proxy_auth, include_body, direct) {
 	const args = [
 		'curl', '--silent', '--show-error', '--location',
 		'--connect-timeout', '3', '--max-time', '6',
 		family == 6 ? '-6' : '-4'
 	];
+	if (direct)
+		push(args, '--noproxy', '*');
 	if (proxy) {
 		push(args, '--proxy', proxy);
 		if (proxy_auth)
@@ -202,6 +216,20 @@ function curl_probe(url, family, proxy, proxy_auth, include_body) {
 		remote: metadata[2] ?? '',
 		error: status >= 200 && status < 400 ? '' : 'request_failed'
 	};
+}
+
+function plain_ip_probe(url, family) {
+	const result = curl_probe(url, family, null, null, true, true);
+	if (!result.success)
+		return result;
+	const address = trim(result.address || '');
+	const valid_address = family == 6
+		? index(address, ':') >= 0
+		: match(address, /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
+	result.success = !!valid_address;
+	result.address = valid_address ? address : '';
+	result.error = valid_address ? '' : 'invalid_result';
+	return result;
 }
 
 function local_dns_nameserver() {
@@ -356,12 +384,19 @@ const methods = {
 			const test = req.args?.test;
 			switch (test) {
 			case 'core':
-				return { success: system('/etc/init.d/mihomox running >/dev/null 2>&1') == 0 };
-			case 'system_dns':
-				return dns_test(null);
+				return {
+					success: system('/etc/init.d/mihomox running >/dev/null 2>&1') == 0,
+					version: installed_core_version()
+				};
+			case 'system_dns': {
+				const nameservers = system_dns_nameservers();
+				return dns_test(null, join(', ', nameservers));
+			}
 			case 'mihomo_dns': {
 				const nameserver = local_dns_nameserver();
-				return nameserver ? dns_test(nameserver) : { success: false, latency: 0, error: 'not_configured' };
+				return nameserver
+					? dns_test(nameserver, nameserver)
+					: { success: false, latency: 0, server: '', error: 'not_configured' };
 			}
 			case 'domestic':
 				return curl_probe('https://connect.rom.miui.com/generate_204', 4, null, null, false);
@@ -371,10 +406,14 @@ const methods = {
 					? curl_probe('https://cp.cloudflare.com/generate_204', 4, proxy.url, proxy.auth, false)
 					: { success: false, latency: 0, error: 'not_configured' };
 			}
-			case 'ipv4':
-				return curl_probe('https://api.ipify.org', 4, null, null, true);
-			case 'ipv6':
-				return curl_probe('https://api6.ipify.org', 6, null, null, true);
+			case 'ipv4_domestic':
+				return plain_ip_probe('https://v4.ipgg.cn', 4);
+			case 'ipv4_overseas':
+				return plain_ip_probe('https://4.wsmdn.dpdns.org/', 4);
+			case 'ipv6_domestic':
+				return plain_ip_probe('https://v6.ipgg.cn', 6);
+			case 'ipv6_overseas':
+				return plain_ip_probe('https://6.wsmdn.dpdns.org/', 6);
 			case 'nat':
 				return nat_test();
 			default:
