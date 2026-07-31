@@ -41,6 +41,14 @@
             "path": "mihomox/proxy"
         }
     },
+    "admin/services/mihomox/network": {
+        "title": "Network Test",
+        "order": 45,
+        "action": {
+            "type": "view",
+            "path": "mihomox/network"
+        }
+    },
     "admin/services/mihomox/editor": {
         "title": "Editor",
         "order": 50,

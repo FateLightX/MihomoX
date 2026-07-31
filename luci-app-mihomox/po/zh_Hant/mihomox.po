@@ -1326,3 +1326,71 @@ msgstr "最終設定還必須定義 proxy-server-nameserver。"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:274
 msgid "Time to wait for an AAAA response during dual-stack DNS queries."
 msgstr "雙棧 DNS 查詢時等待 AAAA 回應的時間。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Network Test"
+msgstr "網路測試"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Start Test"
+msgstr "開始測試"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "System DNS"
+msgstr "系統 DNS"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Mihomo DNS"
+msgstr "Mihomo DNS"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Domestic Connection"
+msgstr "國內連線"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "International Proxy"
+msgstr "國際代理"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "NAT Type"
+msgstr "NAT 類型"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Normal"
+msgstr "正常"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Unavailable"
+msgstr "不可用"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Not Tested"
+msgstr "未測試"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Testing"
+msgstr "測試中"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Full Cone"
+msgstr "完全錐形"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Restricted Cone"
+msgstr "受限錐形"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Port Restricted Cone"
+msgstr "連接埠受限錐形"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Symmetric NAT"
+msgstr "對稱型 NAT"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Cone/Restricted"
+msgstr "錐形/受限型"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Open Internet"
+msgstr "公網直連"

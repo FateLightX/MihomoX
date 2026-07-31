@@ -84,6 +84,9 @@ define Package/mihomox/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) $(CURDIR)/files/mihomox.init $(1)/etc/init.d/mihomox
 
+	$(INSTALL_DIR) $(1)/usr/libexec/mihomox
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mihomox-stun $(1)/usr/libexec/mihomox/stun-test
+
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) $(CURDIR)/files/uci-defaults/import_nikki.sh $(1)/etc/uci-defaults/98_import_nikki_to_mihomox
 	$(INSTALL_BIN) $(CURDIR)/files/uci-defaults/firewall.sh $(1)/etc/uci-defaults/99_firewall_mihomox
@@ -105,7 +108,8 @@ fi
 endef
 
 define Build/Compile
-
+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -std=c99 -Wall -Wextra \
+		-o $(PKG_BUILD_DIR)/mihomox-stun $(CURDIR)/src/mihomox-stun.c $(TARGET_LDFLAGS)
 endef
 
 define Build/Prepare

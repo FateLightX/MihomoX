@@ -4,6 +4,7 @@
 
 import { access, chmod, open, popen, readfile, rename, stat, unlink, writefile } from 'fs';
 import { cursor } from 'uci';
+import { query as dns_query } from 'resolv';
 import { get_users, get_groups, get_cgroups, load_profile } from '/etc/mihomox/ucode/include.uc';
 
 const CORE_PATH = '/etc/mihomox/bin/mihomo';
@@ -12,6 +13,7 @@ const CORE_UPDATE_SCRIPT = '/etc/mihomox/scripts/update_core.sh';
 const CORE_STATUS_FILE = '/var/run/mihomox/core-update.status';
 const CORE_LOCK_DIR = '/var/run/mihomox/core-update.lock';
 const CORE_PENDING_FILE = '/var/run/mihomox/core-update.pending';
+const STUN_TEST_HELPER = '/usr/libexec/mihomox/stun-test';
 const APP_LOG_FILE = '/var/log/mihomox/app.log';
 const CORE_LOG_FILE = '/var/log/mihomox/core.log';
 const MAX_EDIT_FILE_SIZE = 16 * 1024 * 1024;
@@ -135,6 +137,114 @@ function writable_path(path) {
 	return false;
 }
 
+function elapsed_ms(started) {
+	const ended = clock(true);
+	if (!started || !ended)
+		return 0;
+	return (ended[0] - started[0]) * 1000 + int((ended[1] - started[1]) / 1000000);
+}
+
+function dns_test(nameserver) {
+	const started = clock(true);
+	let result = null;
+	try {
+		const options = {
+			type: [ 'A' ],
+			timeout: 4000,
+			retries: 1
+		};
+		if (nameserver)
+			options.nameserver = [ nameserver ];
+		result = dns_query('cp.cloudflare.com', options);
+	} catch (e) {
+		result = null;
+	}
+	const records = result?.['cp.cloudflare.com']?.A ?? [];
+	return {
+		success: length(records) > 0,
+		latency: elapsed_ms(started),
+		error: length(records) > 0 ? '' : 'resolve_failed'
+	};
+}
+
+function curl_probe(url, family, proxy, proxy_auth, include_body) {
+	const args = [
+		'curl', '--silent', '--show-error', '--location',
+		'--connect-timeout', '5', '--max-time', '10',
+		family == 6 ? '-6' : '-4'
+	];
+	if (proxy) {
+		push(args, '--proxy', proxy);
+		if (proxy_auth)
+			push(args, '--proxy-user', proxy_auth);
+	}
+	if (!include_body)
+		push(args, '--output', '/dev/null');
+	push(args, '--write-out', '\n__MIHOMOX__%{http_code}|%{time_total}|%{remote_ip}', url);
+
+	const process = popen(join(' ', map(args, shell_quote)) + ' 2>/dev/null', 'r');
+	if (!process)
+		return { success: false, latency: 0, error: 'start_failed' };
+	const output = process.read('all') || '';
+	process.close();
+	const marker = '\n__MIHOMOX__';
+	const marker_position = rindex(output, marker);
+	if (marker_position < 0)
+		return { success: false, latency: 0, error: 'request_failed' };
+	const body = trim(substr(output, 0, marker_position));
+	const metadata = split(trim(substr(output, marker_position + length(marker))), '|');
+	const status = int(metadata[0]);
+	const latency = int((metadata[1] ?? 0) * 1000);
+	return {
+		success: status >= 200 && status < 400,
+		latency: latency,
+		address: body,
+		remote: metadata[2] ?? '',
+		error: status >= 200 && status < 400 ? '' : 'request_failed'
+	};
+}
+
+function local_dns_nameserver() {
+	const profile = load_profile();
+	const listen = profile?.dns?.listen ?? '';
+	const parts = split(listen, ':');
+	const port = int(parts[length(parts) - 1]);
+	if (port <= 0 || port > 65535)
+		return null;
+	return `127.0.0.1#${port}`;
+}
+
+function local_proxy() {
+	const profile = load_profile();
+	const port = int(profile?.['mixed-port']);
+	if (port <= 0 || port > 65535)
+		return null;
+	let auth = '';
+	const uci = cursor();
+	uci.load('mihomox');
+	uci.foreach('mihomox', 'authentication', (section) => {
+		if (!auth && (section.enabled == '1' || section.enabled == true) && section.username && section.password)
+			auth = `${section.username}:${section.password}`;
+	});
+	return { url: `http://127.0.0.1:${port}`, auth: auth };
+}
+
+function nat_test() {
+	if (!access(STUN_TEST_HELPER, 'x'))
+		return { success: false, type: 'Unknown', error: 'missing_helper' };
+	const process = popen(STUN_TEST_HELPER, 'r');
+	if (!process)
+		return { success: false, type: 'Unknown', error: 'start_failed' };
+	const output = process.read('all') || '';
+	process.close();
+	try {
+		const result = json(output);
+		return result || { success: false, type: 'Unknown', error: 'invalid_result' };
+	} catch (e) {
+		return { success: false, type: 'Unknown', error: 'invalid_result' };
+	}
+}
+
 const methods = {
 	version: {
 		call: function() {
@@ -238,6 +348,38 @@ const methods = {
 			if (length(result) > max_bytes)
 				result = substr(result, length(result) - max_bytes);
 			return { log: result };
+		}
+	},
+	network_test: {
+		args: { test: 'test' },
+		call: function(req) {
+			const test = req.args?.test;
+			switch (test) {
+			case 'core':
+				return { success: system('/etc/init.d/mihomox running >/dev/null 2>&1') == 0 };
+			case 'system_dns':
+				return dns_test(null);
+			case 'mihomo_dns': {
+				const nameserver = local_dns_nameserver();
+				return nameserver ? dns_test(nameserver) : { success: false, latency: 0, error: 'not_configured' };
+			}
+			case 'domestic':
+				return curl_probe('https://connect.rom.miui.com/generate_204', 4, null, null, false);
+			case 'international': {
+				const proxy = local_proxy();
+				return proxy
+					? curl_probe('https://cp.cloudflare.com/generate_204', 4, proxy.url, proxy.auth, false)
+					: { success: false, latency: 0, error: 'not_configured' };
+			}
+			case 'ipv4':
+				return curl_probe('https://api.ipify.org', 4, null, null, true);
+			case 'ipv6':
+				return curl_probe('https://api6.ipify.org', 6, null, null, true);
+			case 'nat':
+				return nat_test();
+			default:
+				return { success: false, error: 'invalid_test' };
+			}
 		}
 	},
 	write_file: {

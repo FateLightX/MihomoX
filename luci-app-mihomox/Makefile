@@ -4,7 +4,7 @@ PKG_VERSION:=2026.7.25
 PKG_RELEASE:=1
 
 LUCI_TITLE:=LuCI Support for MihomoX
-LUCI_DEPENDS:=+luci-base +mihomox
+LUCI_DEPENDS:=+luci-base +mihomox +ucode-mod-resolv
 
 include $(TOPDIR)/feeds/luci/luci.mk
 

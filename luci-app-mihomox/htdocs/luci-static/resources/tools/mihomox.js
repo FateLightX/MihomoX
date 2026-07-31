@@ -71,6 +71,13 @@ const callMihomoXLog = rpc.declare({
     expect: { '': {} }
 });
 
+const callMihomoXNetworkTest = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'network_test',
+    params: ['test'],
+    expect: { '': {} }
+});
+
 const callMihomoXWriteFile = rpc.declare({
     object: 'luci.mihomox',
     method: 'write_file',
@@ -253,6 +260,10 @@ return baseclass.extend({
         return L.resolveDefault(callMihomoXLog('core'), { log: '' }).then(function (result) {
             return result?.log || '';
         });
+    },
+
+    networkTest: function (test) {
+        return callMihomoXNetworkTest(test);
     },
 
     inlineDescriptions: function (node) {
