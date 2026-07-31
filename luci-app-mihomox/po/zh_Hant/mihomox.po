@@ -1287,8 +1287,8 @@ msgid "Only applies when Allow Lan is enabled; use * for all addresses."
 msgstr "僅在啟用允許區域網路時生效；使用 * 表示所有位址。"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
-msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
-msgstr "Alpha 預發行版本更新頻繁；需要穩定性時請選擇 Release。"
+msgid "Only MihomoX cores with Provider Discard support are accepted; unpatched Release or Alpha cores are rejected."
+msgstr "僅接受支援 Provider 失效節點丟棄的 MihomoX 核心；未套用補丁的 Release 或 Alpha 核心會被拒絕。"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
 msgid "Process Path"
@@ -1409,3 +1409,76 @@ msgstr "錐形/受限型"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Open Internet"
 msgstr "公網直連"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js
+msgid "Available / Total"
+msgstr "可用 / 總數"
+
+msgid "Collapse"
+msgstr "收起"
+
+msgid "Current core does not support provider discard mode."
+msgstr "目前核心不支援 Provider 丟棄模式。"
+
+msgid "Disabled"
+msgstr "已關閉"
+
+msgid "Discard Mode"
+msgstr "丟棄模式"
+
+msgid "Discarded"
+msgstr "已丟棄"
+
+msgid "Enabled"
+msgstr "已開啟"
+
+msgid "Expand"
+msgstr "展開"
+
+msgid "Failed Retries"
+msgstr "失敗重試"
+
+msgid "Keep All"
+msgstr "保留全部"
+
+msgid "No proxy providers found."
+msgstr "未發現代理 Provider。"
+
+msgid "Node Concurrency"
+msgstr "節點檢測並行數"
+
+msgid "Node Management"
+msgstr "節點管理"
+
+msgid "Previous Version"
+msgstr "上一版本"
+
+msgid "Provider"
+msgstr "Provider"
+
+msgid "Save"
+msgstr "儲存"
+
+msgid "Saved"
+msgstr "已儲存"
+
+msgid "Saving"
+msgstr "正在儲存"
+
+msgid "Starting Update"
+msgstr "正在啟動更新"
+
+msgid "Test Timeout"
+msgstr "測試逾時"
+
+msgid "Test URL"
+msgstr "測試位址"
+
+msgid "Update All"
+msgstr "全部更新"
+
+msgid "Update Started"
+msgstr "更新已啟動"
+
+msgid "Update and Test"
+msgstr "更新並檢測"

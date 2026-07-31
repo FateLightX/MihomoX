@@ -79,6 +79,28 @@ const callMihomoXNetworkTest = rpc.declare({
     nobatch: true
 });
 
+const callMihomoXProviderDiscard = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'provider_discard',
+    expect: { '': {} }
+});
+
+const callMihomoXSetProviderDiscard = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'set_provider_discard',
+    params: ['provider', 'enabled', 'url', 'timeout', 'retries', 'concurrency'],
+    expect: { '': {} },
+    nobatch: true
+});
+
+const callMihomoXUpdateProviderDiscard = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'update_provider_discard',
+    params: ['provider'],
+    expect: { '': {} },
+    nobatch: true
+});
+
 const callMihomoXWriteFile = rpc.declare({
     object: 'luci.mihomox',
     method: 'write_file',
@@ -265,6 +287,25 @@ return baseclass.extend({
 
     networkTest: function (test) {
         return callMihomoXNetworkTest(test);
+    },
+
+    providerDiscard: function () {
+        return callMihomoXProviderDiscard();
+    },
+
+    setProviderDiscard: function (provider, policy, concurrency) {
+        return callMihomoXSetProviderDiscard(
+            provider,
+            String(!!policy.enabled),
+            policy.url || '',
+            String(policy.timeout),
+            String(policy.retries),
+            String(concurrency)
+        );
+    },
+
+    updateProviderDiscard: function (provider) {
+        return callMihomoXUpdateProviderDiscard(provider);
     },
 
     inlineDescriptions: function (node) {

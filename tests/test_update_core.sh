@@ -68,7 +68,7 @@ detect_arch() {
 [ "$(detect_arch 'lahf_lm cx16 popcnt pni ssse3 sse4_1 sse4_2 avx avx2 bmi1 bmi2 fma movbe xsave abm')" = "amd64-v3" ]
 
 write_core "$TEST_DIR/core/mihomo" "v1.0.0"
-write_core "$TEST_DIR/new-mihomo" "v9.9.9"
+write_core "$TEST_DIR/new-mihomo" "v9.9.9-mihomox"
 gzip -c "$TEST_DIR/new-mihomo" > "$TEST_DIR/new-mihomo.gz"
 NEW_CORE_SHA256=$(sha256_file "$TEST_DIR/new-mihomo.gz")
 
@@ -76,7 +76,17 @@ run_update release "file://$TEST_DIR/new-mihomo.gz" "$NEW_CORE_SHA256"
 "$TEST_DIR/core/mihomo" -v | grep -q 'v9.9.9'
 grep -q '^version=v9.9.9$' "$TEST_DIR/core/mihomo.version"
 grep -q '^state=success$' "$TEST_DIR/run/core-update.status"
+grep -q '^features=provider-discard$' "$TEST_DIR/core/mihomo.version"
 grep -Eq '^updated_at=[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$' "$TEST_DIR/run/core-update.status"
+
+write_core "$TEST_DIR/unpatched-mihomo" "v9.9.9"
+gzip -c "$TEST_DIR/unpatched-mihomo" > "$TEST_DIR/unpatched-mihomo.gz"
+UNPATCHED_SHA256=$(sha256_file "$TEST_DIR/unpatched-mihomo.gz")
+if run_update release "file://$TEST_DIR/unpatched-mihomo.gz" "$UNPATCHED_SHA256"; then
+	echo "unpatched core unexpectedly succeeded" >&2
+	exit 1
+fi
+grep -q '^state=failed$' "$TEST_DIR/run/core-update.status"
 
 run_update Prerelease-Alpha "file://$TEST_DIR/new-mihomo.gz" "$NEW_CORE_SHA256"
 grep -q '^channel=Prerelease-Alpha$' "$TEST_DIR/core/mihomo.version"

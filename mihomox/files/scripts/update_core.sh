@@ -285,7 +285,7 @@ binary_version() {
 			if ($i ~ /^v[0-9]+([.][0-9]+)+/) {
 				gsub(/[^v0-9.].*$/, "", $i); print $i; exit
 			}
-			if ($i ~ /^alpha-[0-9a-f]+$/) { print $i; exit }
+			if ($i ~ /^alpha-[0-9a-f]+(-mihomox)?$/) { print $i; exit }
 		}
 	}'
 }
@@ -294,6 +294,10 @@ verify_binary() {
 	[ -x "$1" ] || return 1
 	version=$(binary_version "$1")
 	[ -n "$version" ]
+}
+
+verify_provider_discard_core() {
+	"$1" -v 2>/dev/null | grep -q 'mihomox'
 }
 
 metadata_value() {
@@ -399,6 +403,7 @@ gzip -t "$ARCHIVE" >/dev/null 2>&1 || fail "下载文件不是有效的 gzip 归
 gzip -cd "$ARCHIVE" > "$NEW_BIN" || fail "内核解压失败"
 chmod 0755 "$NEW_BIN"
 verify_binary "$NEW_BIN" || fail "新内核无法在当前设备运行"
+verify_provider_discard_core "$NEW_BIN" || fail "新内核缺少 Provider 丢弃模式支持"
 NEW_VERSION=$(binary_version "$NEW_BIN")
 [ -n "$NEW_VERSION" ] || fail "无法读取新内核版本"
 [ "$LATEST_VERSION" = "custom" ] && LATEST_VERSION="$NEW_VERSION"
@@ -424,6 +429,7 @@ architecture=$SELECTED_ARCH
 asset=$ASSET
 source=$DOWNLOADED_URL
 sha256=$SHA256
+features=provider-discard
 EOF
 then
 	rm -f "$CORE_TMP" "$VERSION_TMP"

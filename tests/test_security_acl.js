@@ -17,6 +17,9 @@ assert.ok(acl.read.ubus['luci.mihomox'].includes('log'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('update_core'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('write_file'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('api'));
+assert.ok(acl.read.ubus['luci.mihomox'].includes('provider_discard'));
+assert.ok(acl.write.ubus['luci.mihomox'].includes('set_provider_discard'));
+assert.ok(acl.write.ubus['luci.mihomox'].includes('update_provider_discard'));
 
 const rpcSource = fs.readFileSync(path.join(
     root,
@@ -26,6 +29,8 @@ assert.ok(rpcSource.includes("popen(join(' ', map(curl_args, shell_quote)), 'r')
 assert.ok(rpcSource.includes('function shell_quote(value)'));
 assert.ok(!rpcSource.includes('popen(`curl'));
 assert.ok(rpcSource.includes("match(section_id, /^[A-Za-z0-9_-]{1,64}$/)"));
+assert.ok(rpcSource.includes("match(url, /^https?:\\/\\//)"));
+assert.ok(rpcSource.includes("chmod(temporary, 384)"));
 
 const installSource = fs.readFileSync(path.join(root, 'install.sh'), 'utf8');
 assert.ok(!installSource.includes('eval "$(jsonfilter'));

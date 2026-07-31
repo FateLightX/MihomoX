@@ -1218,8 +1218,8 @@ msgid "Only applies when Allow Lan is enabled; use * for all addresses."
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
-msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
-msgstr ""
+msgid "Only MihomoX cores with Provider Discard support are accepted; unpatched Release or Alpha cores are rejected."
+msgstr "Принимаются только ядра MihomoX с поддержкой отбрасывания Provider; версии Release или Alpha без патча отклоняются."
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
 msgid "Process Path"
@@ -1355,3 +1355,76 @@ msgstr "IPv6 за пределами Китая"
 
 msgid "Test"
 msgstr "Тест"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js
+msgid "Available / Total"
+msgstr "Доступно / Всего"
+
+msgid "Collapse"
+msgstr "Свернуть"
+
+msgid "Current core does not support provider discard mode."
+msgstr "Текущее ядро не поддерживает режим отбрасывания провайдеров."
+
+msgid "Disabled"
+msgstr "Отключено"
+
+msgid "Discard Mode"
+msgstr "Режим отбрасывания"
+
+msgid "Discarded"
+msgstr "Отброшено"
+
+msgid "Enabled"
+msgstr "Включено"
+
+msgid "Expand"
+msgstr "Развернуть"
+
+msgid "Failed Retries"
+msgstr "Повторы при ошибке"
+
+msgid "Keep All"
+msgstr "Сохранять все"
+
+msgid "No proxy providers found."
+msgstr "Прокси-провайдеры не найдены."
+
+msgid "Node Concurrency"
+msgstr "Параллельная проверка узлов"
+
+msgid "Node Management"
+msgstr "Управление узлами"
+
+msgid "Previous Version"
+msgstr "Предыдущая версия"
+
+msgid "Provider"
+msgstr "Провайдер"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "Saved"
+msgstr "Сохранено"
+
+msgid "Saving"
+msgstr "Сохранение"
+
+msgid "Starting Update"
+msgstr "Запуск обновления"
+
+msgid "Test Timeout"
+msgstr "Тайм-аут проверки"
+
+msgid "Test URL"
+msgstr "URL проверки"
+
+msgid "Update All"
+msgstr "Обновить все"
+
+msgid "Update Started"
+msgstr "Обновление запущено"
+
+msgid "Update and Test"
+msgstr "Обновить и проверить"

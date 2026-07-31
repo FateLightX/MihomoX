@@ -57,28 +57,14 @@ Mihomo YAML 必须保持一致；修改字段时应沿完整链路验证。
 
 ## 4. 编译期交付
 
-`mihomox/Makefile` 的准备阶段依次运行：
+`mihomox/Makefile` 的准备阶段依次执行：
 
-1. `fetch_mihomo.sh`：选择目标架构并下载内核。
+1. 下载固定 SHA256 的 Mihomo 源码并应用 `mihomox/patches/`。
 2. `fetch_geodata.sh`：准备 GeoSite、Country.mmdb、GeoIP.dat 和 ASN.mmdb。
 3. `fetch_zashboard.sh`：准备离线面板。
 
-资源缓存在 OpenWrt `DL_DIR`。内核必须通过 SHA256、gzip/ELF、版本和目标架构校验；
-未知架构必须让构建失败，不能默认使用 amd64。
-
-| OpenWrt 架构 | Mihomo 资产 |
-| --- | --- |
-| `x86_64` | `linux-amd64-v1/v2/v3` |
-| `i386_*` | `linux-386` |
-| `aarch64_*` | `linux-arm64` |
-| ARMv5/v6/v7 | 对应 `linux-armv*` |
-| `mips*` / `mipsel*` | 对应 softfloat 资产 |
-| `mips64*` / `mips64el*` | `linux-mips64*` |
-| `riscv64_*` | `linux-riscv64` |
-| `loongarch64_*` | `linux-loong64-abi2` |
-
-关键构建参数：`MIHOMO_CHANNEL`、`MIHOMO_VERSION`、`MIHOMO_SHA256`、
-`MIHOMO_AMD64_LEVEL`、`MIHOMO_MIRROR_PREFIX`。
+源码和资源缓存在 OpenWrt `DL_DIR`。内核由 OpenWrt Go 工具链按目标架构构建，
+源码版本、归档 SHA256 和补丁必须固定；未知架构由 `GO_ARCH_DEPENDS` 拒绝。
 
 ## 5. 运行时内核更新
 
@@ -87,7 +73,7 @@ LuCI 和 `/etc/init.d/mihomox update_core` 最终都调用
 
 1. 建立带 PID 的互斥锁并清理失效锁。
 2. 解析通道、架构、镜像或自定义 URL。
-3. 下载并校验 SHA256、压缩格式、架构和可执行版本。
+3. 下载并校验 SHA256、压缩格式、架构、可执行版本和 `provider-discard` 能力。
 4. 在同一文件系统备份并原子替换内核和元数据。
 5. 新内核验证失败时回滚。
 6. 仅当服务更新前正在运行时重启。
@@ -95,7 +81,42 @@ LuCI 和 `/etc/init.d/mihomox update_core` 最终都调用
 
 自定义 URL 必须是 HTTP(S)，且必须同时提供 64 位 SHA256。
 
-## 6. 持久化和迁移
+## 6. Provider 丢弃模式
+
+Provider 策略保存在 `/etc/mihomox/provider-discard.json`，不写入用户 YAML 或 UCI，
+避免触发服务 reload。页面只管理当前配置已经加载的 HTTP/File Proxy Provider，不创建
+第二个订阅，也不修改 Provider 的 URL、类型或 `interval`。
+
+内核保持两份逻辑视图：
+
+- 完整候选列表：保存本次 Provider 全量更新解析出的所有节点，供后续重新检测。
+- 已发布列表：通过 `baseProvider.setProxies()` 提供给引用该 Provider 的策略组。
+
+更新顺序固定为：
+
+1. Provider 按原 `interval` 或手动请求获取并解析完整候选列表。
+2. 已发布的上一版列表继续承载流量。
+3. 按全局单 Provider、Provider 内有限并发检测完整候选列表。
+4. 至少一个候选通过时，原子发布本轮有效列表。
+5. 全部失败且已有上一版时保留上一版；首次加载无上一版时发布完整候选列表，避免空组。
+
+内容未变化的订阅也必须重新检测，使上个周期丢弃的节点可以恢复。关闭丢弃模式时立即
+发布当前完整候选列表。更新和发布过程禁止发送 HUP、重载完整配置、重启核心或调用连接
+关闭 API；已有连接保持原出站链，新连接使用新发布列表。
+
+内核能力通过 `/version` 的 `features` 数组声明，当前接口为：
+
+```text
+GET   /providers/proxies/{name}/discard-status
+PATCH /providers/proxies/{name}/discard-policy
+POST  /providers/proxies/{name}/discard-update
+```
+
+策略接口同步应用运行时设置；更新接口返回 `202` 后异步执行。状态至少区分 `testing`、
+`active`、`retained`、`fallback` 和 `disabled`，并报告总数、已检测、已发布/保留数和本轮
+丢弃数。LuCI RPC 对 JSON 请求必须显式发送 `Content-Type: application/json`。
+
+## 7. 持久化和迁移
 
 首次安装可复制 Nikki 的 UCI、profiles、subscriptions 和 mixin，但不得修改或启用
 Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
@@ -107,6 +128,7 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 /etc/mihomox/profiles/
 /etc/mihomox/subscriptions/
 /etc/mihomox/mixin.yaml
+/etc/mihomox/provider-discard.json
 /etc/mihomox/bin/
 /etc/mihomox/run/providers/rule/
 /etc/mihomox/run/providers/proxy/
@@ -114,7 +136,7 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 
 二进制 conffile 在 `opkg` 和 `apk` 下的升级行为必须分别真机验证。
 
-## 7. 兼容与安全约束
+## 8. 兼容与安全约束
 
 - OpenWrt 23.05 是 API 和依赖兼容下限。
 - rpcd ucode 外部命令参数必须引用；兼容字符串形式的布尔值和数字。
@@ -124,7 +146,7 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 - 分块文本使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - ACL 只开放页面实际需要的方法和文件范围。
 
-## 8. 验收
+## 9. 验收
 
 基础检查：
 
@@ -139,6 +161,8 @@ git diff --check
 - 首次启动、Redirect/TPROXY/TUN、IPv4/IPv6 和防火墙规则正常。
 - LuCI 菜单、RPC、编辑器、日志和网络测试在真机工作。
 - 网络失败或 RPC 缺失时页面会超时恢复，不永久显示加载状态。
+- Provider 首次全失败不会发布空组，已有版本后全失败会保留上一版。
+- Provider 更新过程中长连接 ID 保持不变，传输内容完整且不调用完整配置 reload。
 - 内核更新失败会回滚，停止状态更新后仍保持停止。
 - 包升级和 sysupgrade 后配置、订阅、规则及用户内核按预期保留。
 - Nikki 与 MihomoX 同时安装时不会默认同时启用。

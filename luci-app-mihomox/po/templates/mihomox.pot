@@ -1280,7 +1280,7 @@ msgid "Only applies when Allow Lan is enabled; use * for all addresses."
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
-msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
+msgid "Only MihomoX cores with Provider Discard support are accepted; unpatched Release or Alpha cores are rejected."
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
@@ -1401,4 +1401,77 @@ msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Open Internet"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js
+msgid "Available / Total"
+msgstr ""
+
+msgid "Collapse"
+msgstr ""
+
+msgid "Current core does not support provider discard mode."
+msgstr ""
+
+msgid "Disabled"
+msgstr ""
+
+msgid "Discard Mode"
+msgstr ""
+
+msgid "Discarded"
+msgstr ""
+
+msgid "Enabled"
+msgstr ""
+
+msgid "Expand"
+msgstr ""
+
+msgid "Failed Retries"
+msgstr ""
+
+msgid "Keep All"
+msgstr ""
+
+msgid "No proxy providers found."
+msgstr ""
+
+msgid "Node Concurrency"
+msgstr ""
+
+msgid "Node Management"
+msgstr ""
+
+msgid "Previous Version"
+msgstr ""
+
+msgid "Provider"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Saved"
+msgstr ""
+
+msgid "Saving"
+msgstr ""
+
+msgid "Starting Update"
+msgstr ""
+
+msgid "Test Timeout"
+msgstr ""
+
+msgid "Test URL"
+msgstr ""
+
+msgid "Update All"
+msgstr ""
+
+msgid "Update Started"
+msgstr ""
+
+msgid "Update and Test"
 msgstr ""

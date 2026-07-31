@@ -36,7 +36,8 @@ printf '%s\n' '<a href="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mih
 [ "$($FETCH_SCRIPT --arch x86_64 --alpha-assets-url "file://$ALPHA_TEST_DIR/assets.html" --resolve-alpha-only)" = "mihomo-linux-amd64-v1-alpha-test123.gz" ]
 rm -rf "$ALPHA_TEST_DIR"
 
-grep -q '^MIHOMO_CHANNEL?=Prerelease-Alpha$' "$ROOT_DIR/mihomox/Makefile"
+grep -q '^MIHOMO_SOURCE_VERSION:=7198c9dc1eeba39e12cf37176a6ad1ff9cda3732$' "$ROOT_DIR/mihomox/Makefile"
+grep -q '^PKG_BUILD_DEPENDS:=golang/host$' "$ROOT_DIR/mihomox/Makefile"
 grep -q "option 'channel' 'Prerelease-Alpha'" "$ROOT_DIR/mihomox/files/mihomox.conf"
 
 echo "fetch architecture tests passed"

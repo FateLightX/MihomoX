@@ -1,5 +1,6 @@
 /etc/mihomox/profiles/
 /etc/mihomox/subscriptions/
+/etc/mihomox/provider-discard.json
 /etc/mihomox/mixin.yaml
 /etc/mihomox/bin/
 /etc/mihomox/run/providers/rule/

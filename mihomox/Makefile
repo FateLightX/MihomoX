@@ -2,16 +2,17 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
-
-MIHOMO_TARGET_ARCH:=$(if $(ARCH_PACKAGES),$(ARCH_PACKAGES),$(ARCH))
-MIHOMO_AMD64_LEVEL?=v1
-MIHOMO_VERSION?=
-MIHOMO_CHANNEL?=Prerelease-Alpha
-MIHOMO_MIRROR_PREFIX?=
-MIHOMO_SHA256?=
+MIHOMO_SOURCE_VERSION:=7198c9dc1eeba39e12cf37176a6ad1ff9cda3732
+MIHOMO_BUILD_VERSION:=alpha-7198c9d-mihomox
+PKG_SOURCE:=mihomo-$(MIHOMO_SOURCE_VERSION).tar.gz
+PKG_SOURCE_URL:=https://codeload.github.com/MetaCubeX/mihomo/tar.gz/$(MIHOMO_SOURCE_VERSION)?
+PKG_HASH:=6d42395e39e58e051df397c5e8289de7ada0e3f9bb22867b81e6ad3b9c4c1e99
+PKG_BUILD_DIR:=$(BUILD_DIR)/mihomo-$(MIHOMO_SOURCE_VERSION)
+PKG_BUILD_DEPENDS:=golang/host
+PKG_BUILD_PARALLEL:=1
+PKG_BUILD_FLAGS:=no-mips16
 GEOSITE_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geosite.dat
 GEOIP_MMDB_URL?=https://raw.githubusercontent.com/Loyalsoldier/geoip/release/Country.mmdb
 GEOIP_DAT_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geoip.dat
@@ -26,19 +27,27 @@ ZASHBOARD_SHA256?=
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=MihomoX contributors
 
+GO_PKG:=github.com/metacubex/mihomo
+GO_PKG_BUILD_PKG:=github.com/metacubex/mihomo
+GO_PKG_LDFLAGS_X:=$(GO_PKG)/constant.Version=$(MIHOMO_BUILD_VERSION) $(GO_PKG)/constant.BuildTime=$(SOURCE_DATE_EPOCH)
+GO_PKG_TAGS:=with_gvisor
+GO_PKG_INSTALL_BIN_PATH:=/etc/mihomox/bin
+
 include $(INCLUDE_DIR)/package.mk
+include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
 
 define Package/mihomox
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Transparent Proxy with Mihomo on OpenWrt.
   URL:=https://github.com/nikkinikki-org/OpenWrt-nikki
-  DEPENDS:=+ca-bundle +curl +yq +firewall4 +ip-full +jsonfilter +ucode +coreutils-nohup +kmod-inet-diag +kmod-nft-socket +kmod-nft-tproxy +kmod-tun +kmod-dummy
+  DEPENDS:=$(GO_ARCH_DEPENDS) +ca-bundle +curl +yq +firewall4 +ip-full +jsonfilter +ucode +coreutils-nohup +kmod-inet-diag +kmod-nft-socket +kmod-nft-tproxy +kmod-tun +kmod-dummy
 endef
 
 define Package/mihomox/conffiles
 /etc/config/mihomox
 /etc/mihomox/mixin.yaml
+/etc/mihomox/provider-discard.json
 /etc/mihomox/bin/mihomo
 /etc/mihomox/bin/mihomo.version
 endef
@@ -58,8 +67,14 @@ define Package/mihomox/install
 	$(INSTALL_DIR) $(1)/etc/mihomox/run/ui
 
 	$(INSTALL_DATA) $(CURDIR)/files/mixin.yaml $(1)/etc/mihomox/mixin.yaml
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mihomo $(1)/etc/mihomox/bin/mihomo
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/mihomo.version $(1)/etc/mihomox/bin/mihomo.version
+	$(INSTALL_DATA) $(CURDIR)/files/provider-discard.json $(1)/etc/mihomox/provider-discard.json
+	$(call GoPackage/Package/Install/Bin,$(1))
+	printf '%s\n' \
+		'version=$(MIHOMO_BUILD_VERSION)' \
+		'channel=patched-alpha' \
+		'release=$(MIHOMO_SOURCE_VERSION)' \
+		'features=provider-discard' \
+		> $(1)/etc/mihomox/bin/mihomo.version
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoSite.dat $(1)/etc/mihomox/run/GeoSite.dat
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/Country.mmdb $(1)/etc/mihomox/run/Country.mmdb
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoIP.dat $(1)/etc/mihomox/run/GeoIP.dat
@@ -108,23 +123,14 @@ fi
 endef
 
 define Build/Compile
+	$(call GoPackage/Build/Compile)
 	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -std=c99 -Wall -Wextra \
 		-o $(PKG_BUILD_DIR)/mihomox-stun $(CURDIR)/src/mihomox-stun.c $(TARGET_LDFLAGS)
 endef
 
 define Build/Prepare
-	$(RM) -r $(PKG_BUILD_DIR)
-	$(INSTALL_DIR) $(PKG_BUILD_DIR)
-	$(CURDIR)/scripts/fetch_mihomo.sh \
-		--arch "$(MIHOMO_TARGET_ARCH)" \
-		--amd64-level "$(MIHOMO_AMD64_LEVEL)" \
-		--channel "$(MIHOMO_CHANNEL)" \
-		--version "$(MIHOMO_VERSION)" \
-		--mirror-prefix "$(MIHOMO_MIRROR_PREFIX)" \
-		--sha256 "$(MIHOMO_SHA256)" \
-		--dl-dir "$(DL_DIR)" \
-		--output "$(PKG_BUILD_DIR)/mihomo" \
-		--version-file "$(PKG_BUILD_DIR)/mihomo.version"
+	$(call Build/Prepare/Default)
+	$(RM) -r $(PKG_BUILD_DIR)/rules/logic_test
 	$(CURDIR)/scripts/fetch_geodata.sh \
 		--dl-dir "$(DL_DIR)" \
 		--output-dir "$(PKG_BUILD_DIR)" \

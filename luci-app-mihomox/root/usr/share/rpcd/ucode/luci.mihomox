@@ -13,6 +13,7 @@ const CORE_UPDATE_SCRIPT = '/etc/mihomox/scripts/update_core.sh';
 const CORE_STATUS_FILE = '/var/run/mihomox/core-update.status';
 const CORE_LOCK_DIR = '/var/run/mihomox/core-update.lock';
 const CORE_PENDING_FILE = '/var/run/mihomox/core-update.pending';
+const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json';
 const STUN_TEST_HELPER = '/usr/libexec/mihomox/stun-test';
 const APP_LOG_FILE = '/var/log/mihomox/app.log';
 const CORE_LOG_FILE = '/var/log/mihomox/core.log';
@@ -121,6 +122,83 @@ function controller_url(listen, protocol, path) {
 	if (length(base) > 0 && substr(base, length(base) - 1, 1) == '/' && substr(path, 0, 1) == '/')
 		base = substr(base, 0, length(base) - 1);
 	return base + path;
+}
+
+function url_encode_component(value) {
+	let encoded = '';
+	value = '' + value;
+	for (let i = 0; i < length(value); i++) {
+		const character = substr(value, i, 1);
+		const code = ord(character);
+		if ((code >= 48 && code <= 57) || (code >= 65 && code <= 90) ||
+			(code >= 97 && code <= 122) || character == '-' || character == '_' ||
+			character == '.' || character == '~')
+			encoded += character;
+		else
+			encoded += sprintf('%%%02X', code);
+	}
+	return encoded;
+}
+
+function provider_discard_config() {
+	let config = { global: { concurrency: 5 }, providers: {} };
+	try {
+		const stored = json(readfile(PROVIDER_DISCARD_FILE) || '');
+		if (stored && type(stored) == 'object')
+			config = stored;
+	} catch (e) {}
+	if (!config.global || type(config.global) != 'object')
+		config.global = { concurrency: 5 };
+	if (!config.providers || type(config.providers) != 'object')
+		config.providers = {};
+	let concurrency = int(config.global.concurrency);
+	config.global.concurrency = concurrency >= 1 && concurrency <= 20 ? concurrency : 5;
+	return config;
+}
+
+function write_provider_discard_config(config) {
+	const temporary = PROVIDER_DISCARD_FILE + '.tmp';
+	if (writefile(temporary, sprintf('%J\n', config)) == null)
+		return false;
+	chmod(temporary, 384);
+	if (!rename(temporary, PROVIDER_DISCARD_FILE)) {
+		unlink(temporary);
+		return false;
+	}
+	return true;
+}
+
+function core_api_request(method, path, query, body) {
+	let result = {};
+	const profile = load_profile();
+	const api_listen = profile['external-controller'];
+	const api_tls_listen = profile['external-controller-tls'];
+	const api_secret = profile['secret'];
+	if (!api_listen && !api_tls_listen)
+		return result;
+
+	const protocol = api_tls_listen ? 'https' : 'http';
+	const listen = api_tls_listen || api_listen;
+	const url = controller_url(listen, protocol, path);
+	const curl_args = [
+		'curl', '--silent', '--show-error', '--max-time', '30',
+		'--connect-timeout', '10', '--proto-default', protocol,
+		'--insecure', '--request', method
+	];
+	if (api_secret)
+		push(curl_args, '--oauth2-bearer', api_secret);
+	push(curl_args, '--url-query', query || '');
+	if (body)
+		push(curl_args, '--header', 'Content-Type: application/json', '--data', body);
+	push(curl_args, '--url', url);
+
+	const process = popen(join(' ', map(curl_args, shell_quote)), 'r');
+	if (process) {
+		const output = process.read('all') || '';
+		process.close();
+		try { result = json(output) || {}; } catch (e) { result = {}; }
+	}
+	return result;
 }
 
 function writable_path(path) {
@@ -421,6 +499,69 @@ const methods = {
 			}
 		}
 	},
+	provider_discard: {
+		call: function() {
+			const version = core_api_request('GET', '/version', '', '');
+			const response = core_api_request('GET', '/providers/proxies', '', '');
+			return {
+				supported: index(version.features || [], 'provider-discard') >= 0,
+				providers: response.providers || {},
+				config: provider_discard_config()
+			};
+		}
+	},
+	set_provider_discard: {
+		args: { provider: 'provider', enabled: 'enabled', url: 'url', timeout: 'timeout', retries: 'retries', concurrency: 'concurrency' },
+		call: function(req) {
+			const provider = req.args?.provider || '';
+			const enabled = req.args?.enabled == true || req.args?.enabled == 'true' || req.args?.enabled == '1';
+			const url = trim(req.args?.url || '');
+			const timeout = int(req.args?.timeout);
+			const retries = int(req.args?.retries);
+			const concurrency = int(req.args?.concurrency);
+			if (!valid_api_value(provider, 256) || provider == '' ||
+				!valid_api_value(url, 2048) || (url != '' && !match(url, /^https?:\/\//)) ||
+				timeout < 500 || timeout > 30000 || retries < 0 || retries > 5 ||
+				concurrency < 1 || concurrency > 20)
+				return { success: false, error: 'invalid_policy' };
+
+			const policy = {
+				enabled: enabled,
+				url: url,
+				timeout: timeout,
+				retries: retries,
+				concurrency: concurrency
+			};
+			const config = provider_discard_config();
+			config.global.concurrency = concurrency;
+			config.providers[provider] = policy;
+			if (!write_provider_discard_config(config))
+				return { success: false, error: 'write_failed' };
+
+			const result = core_api_request(
+				'PATCH',
+				'/providers/proxies/' + url_encode_component(provider) + '/discard-policy',
+				'',
+				sprintf('%J', policy)
+			);
+			return { success: true, applied: !!result.policy, policy: policy };
+		}
+	},
+	update_provider_discard: {
+		args: { provider: 'provider' },
+		call: function(req) {
+			const provider = req.args?.provider || '';
+			if (!valid_api_value(provider, 256) || provider == '')
+				return { success: false, error: 'invalid_provider' };
+			const result = core_api_request(
+				'POST',
+				'/providers/proxies/' + url_encode_component(provider) + '/discard-update',
+				'',
+				''
+			);
+			return { success: !!result.started, started: !!result.started };
+		}
+	},
 	write_file: {
 		args: { path: 'path', data: 'data', append: 'append', mode: 'mode', token: 'token', commit: 'commit', abort: 'abort' },
 		call: function(req) {
@@ -536,8 +677,6 @@ const methods = {
 	api: {
 		args: { method: 'method', path: 'path', query: 'query', body: 'body' },
 		call: function(req) {
-			let result = {};
-
 			const method = req.args?.method || 'GET';
 			const path = req.args?.path || '/';
 			const query = req.args?.query || '';
@@ -547,40 +686,8 @@ const methods = {
 				!valid_api_value(path, 4096) ||
 				!valid_api_value(query, 8192) ||
 				!valid_api_value(body, 1048576))
-				return result;
-
-			const profile = load_profile();
-			const api_listen = profile['external-controller'];
-			const api_tls_listen = profile['external-controller-tls'];
-			const api_secret = profile['secret'];
-			if (!api_listen && !api_tls_listen) {
-				return result;
-			}
-
-			const protocol = api_tls_listen ? 'https' : 'http';
-			const listen = api_tls_listen || api_listen;
-			const url = controller_url(listen, protocol, path);
-			const curl_args = [
-				'curl', '--silent', '--show-error', '--max-time', '30',
-				'--connect-timeout', '10', '--proto-default', protocol,
-				'--insecure', '--request', method
-			];
-			if (api_secret)
-				push(curl_args, '--oauth2-bearer', api_secret);
-			push(curl_args, '--url-query', query, '--data', body, '--url', url);
-
-			const process = popen(join(' ', map(curl_args, shell_quote)), 'r');
-			if (process) {
-				const output = process.read('all') || '';
-				process.close();
-				try {
-					result = json(output) || {};
-				} catch (e) {
-					result = {};
-				}
-			}
-
-			return result;
+					return {};
+			return core_api_request(method, path, query, body);
 		}
 	},
 	get_identifiers: {
