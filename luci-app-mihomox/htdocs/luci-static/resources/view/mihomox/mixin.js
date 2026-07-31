@@ -316,8 +316,7 @@ return view.extend({
         o.depends('fake_ip_filter', '1');
 
         o = s.taboption('dns', form.ListValue, 'fake_ip_filter_mode', _('Fake-IP Filter Mode'));
-        o.optional = true;
-        o.placeholder = _('Unmodified');
+        o.default = 'blacklist';
         o.value('blacklist', _('Block Mode'));
         o.value('whitelist', _('Allow Mode'));
         o.value('rule', _('Rule Mode'));
