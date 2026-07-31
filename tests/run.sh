@@ -16,7 +16,6 @@ done
 "$ROOT_DIR/tests/test_security_helpers.sh"
 node "$ROOT_DIR/tests/test_luci_core_update.js"
 node "$ROOT_DIR/tests/test_luci_editor.js"
-node "$ROOT_DIR/tests/test_luci_profile_upload.js"
 node "$ROOT_DIR/tests/test_luci_writefile.js"
 node "$ROOT_DIR/tests/test_security_acl.js"
 

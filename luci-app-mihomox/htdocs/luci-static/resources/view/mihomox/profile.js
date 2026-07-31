@@ -25,16 +25,6 @@ return view.extend({
             return true;
         };
 
-        o = s.option(form.FileUpload, '_upload_rule', _('Upload Rule File'));
-        o.browser = false;
-        o.enable_upload = true;
-        o.enable_remove = true;
-        o.enable_download = true;
-        o.root_directory = mihomox.ruleProvidersDir;
-        o.write = function (section_id, formvalue) {
-            return true;
-        };
-
         s = m.section(form.GridSection, 'subscription', _('Subscription'));
         s.addremove = true;
         s.anonymous = true;
