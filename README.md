@@ -10,8 +10,8 @@ Mihomo 内核。
 - 通过 LuCI 管理配置文件、订阅、混入配置、访问控制、规则、编辑器、面板和日志
 - 编译时打包目标架构的 Mihomo 内核，不依赖独立的 `mihomo-meta` 或
   `mihomo-alpha` 软件包
-- 基于固定 Mihomo Alpha 源码构建并应用 Provider 丢弃模式补丁
-- 运行时内核更新包含可信 SHA256、功能兼容校验、原子替换及失败回滚
+- 基于固定 Mihomo Alpha 源码构建官方兼容内核
+- 运行时内核更新包含可信 SHA256、原子替换及失败回滚
 - 编译时打包 GeoSite、GeoIP、ASN 数据和 Zashboard
 - 节点管理可在 Provider 全量更新后丢弃失效节点，不关闭已有连接
 - 首次安装时可导入现有 Nikki 配置，但不会修改或启用 Nikki
@@ -42,9 +42,8 @@ make package/mihomox/compile V=s
 make package/luci-app-mihomox/compile V=s
 ```
 
-构建使用 `mihomox/Makefile` 固定的 Mihomo 源码版本，并自动应用
-`mihomox/patches/100-provider-discard-mode.patch`。源码、规则数据和面板资源会缓存在
-OpenWrt `DL_DIR`，源码或资源校验不通过时构建直接失败。
+构建使用 `mihomox/Makefile` 固定的 Mihomo 源码版本。源码、规则数据和面板资源会缓存
+在 OpenWrt `DL_DIR`，源码或资源校验不通过时构建直接失败。
 
 ## 使用
 
@@ -61,9 +60,9 @@ LuCI 页面位于 `服务 → MihomoX`：
 
 ### Provider 失效节点丢弃
 
-`服务 → MihomoX → 节点管理` 会读取当前配置中的 HTTP/File Proxy Provider。该功能
-不修改 Provider URL、类型、更新间隔或用户 YAML；原 Provider 仍按自身 `interval`
-全量更新，内核在每次更新完成后检测完整候选列表，再向策略组发布有效节点。
+`服务 → MihomoX → 节点管理` 会读取当前配置中的 HTTP Proxy Provider。用户原 YAML
+保持不变；MihomoX 在生成的运行配置中将其转换为同名本地 File Provider，并按原
+`interval` 接管一次上游下载、检测和发布。
 
 每个 Provider 可设置：
 
@@ -74,12 +73,13 @@ LuCI 页面位于 `服务 → MihomoX`：
 
 页面还可设置全局节点检测并发（1–20），并提供“保存”“更新并检测”和“全部更新”。
 设置直接保存到 `/etc/mihomox/provider-discard.json`，不会写 UCI、重载完整配置或重启
-MihomoX。
+MihomoX。检测使用临时官方 Mihomo 核心和独立路由标记，绕过当前系统代理、Redirect、
+TPROXY 与 TUN；完成后自动退出。
 
 检测期间继续使用上一版节点。检测完成后，`url-test`、`fallback` 和 `load-balance`
 等引用该 Provider 的策略组只看到本轮发布的有效节点；被丢弃节点仍保留在完整候选列表
-中，后续定时更新会再次检测，因此恢复后可以重新加入。已有连接不会被关闭，新连接使用
-新发布的节点列表。
+中，后续定时更新会再次检测，因此恢复后可以重新加入。过滤文件通过原子替换触发原生
+File Provider 局部更新；已有连接不会被关闭，新连接使用新发布的节点列表。
 
 当本轮所有候选节点均失败时：已有可用版本继续保留上一版；首次启动尚无上一版时保留
 完整候选列表，避免发布空 Provider。关闭丢弃模式会立即恢复当前完整候选列表。
@@ -90,8 +90,8 @@ MihomoX。
 /etc/init.d/mihomox update_core
 ```
 
-自定义内核地址必须同时填写 64 位 SHA256，且内核版本必须包含 MihomoX Provider
-丢弃模式支持。运行时更新不会通过 `opkg` 或 `apk` 安装、删除或升级软件包。
+自定义内核地址必须同时填写 64 位 SHA256。运行时更新不会通过 `opkg` 或 `apk` 安装、
+删除或升级软件包。
 
 ## 迁移与保留
 
@@ -107,7 +107,7 @@ MihomoX。
 ./tests/run.sh
 ```
 
-测试覆盖 Shell 语法、架构映射、资源下载、内核更新、Provider 丢弃补丁与页面、LuCI
+测试覆盖 Shell 语法、架构映射、资源下载、内核更新、Provider 过滤管理器与页面、LuCI
 请求流程、文件编辑、上传、网络检测/STUN 以及 RPC/ACL 安全检查。
 
 ## 设计与上游审计

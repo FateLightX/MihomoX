@@ -1218,8 +1218,8 @@ msgid "Only applies when Allow Lan is enabled; use * for all addresses."
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
-msgid "Only MihomoX cores with Provider Discard support are accepted; unpatched Release or Alpha cores are rejected."
-msgstr "Принимаются только ядра MihomoX с поддержкой отбрасывания Provider; версии Release или Alpha без патча отклоняются."
+msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
+msgstr "Предварительная версия Alpha часто меняется; для стабильности используйте Release."
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
 msgid "Process Path"
@@ -1363,8 +1363,17 @@ msgstr "Доступно / Всего"
 msgid "Collapse"
 msgstr "Свернуть"
 
-msgid "Current core does not support provider discard mode."
-msgstr "Текущее ядро не поддерживает режим отбрасывания провайдеров."
+msgid "Downloading"
+msgstr "Загрузка"
+
+msgid "Detection Route"
+msgstr "Маршрут проверки"
+
+msgid "Direct Isolation"
+msgstr "Прямая изоляция"
+
+msgid "Unsupported"
+msgstr "Не поддерживается"
 
 msgid "Disabled"
 msgstr "Отключено"

@@ -14,6 +14,9 @@ const CORE_STATUS_FILE = '/var/run/mihomox/core-update.status';
 const CORE_LOCK_DIR = '/var/run/mihomox/core-update.lock';
 const CORE_PENDING_FILE = '/var/run/mihomox/core-update.pending';
 const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json';
+const PROVIDER_FILTER_SCRIPT = '/etc/mihomox/scripts/provider_filter.sh';
+const PROVIDER_FILTER_DIR = '/etc/mihomox/run/provider-filter';
+const PROVIDER_FILTER_MANIFEST = PROVIDER_FILTER_DIR + '/manifest.json';
 const STUN_TEST_HELPER = '/usr/libexec/mihomox/stun-test';
 const APP_LOG_FILE = '/var/log/mihomox/app.log';
 const CORE_LOG_FILE = '/var/log/mihomox/core.log';
@@ -166,6 +169,33 @@ function write_provider_discard_config(config) {
 		return false;
 	}
 	return true;
+}
+
+function provider_filter_manifest() {
+	try {
+		const manifest = json(readfile(PROVIDER_FILTER_MANIFEST) || '');
+		return manifest && type(manifest) == 'object' ? manifest : { providers: {} };
+	} catch (e) {
+		return { providers: {} };
+	}
+}
+
+function provider_filter_state(key) {
+	if (!match(key || '', /^[0-9a-f]+$/))
+		return {};
+	try {
+		return json(readfile(PROVIDER_FILTER_DIR + '/' + key + '/state.json') || '') || {};
+	} catch (e) {
+		return {};
+	}
+}
+
+function provider_filter_enqueue(provider) {
+	const process = popen(join(' ', map([PROVIDER_FILTER_SCRIPT, 'enqueue', provider], shell_quote)), 'r');
+	if (!process)
+		return false;
+	process.read('all');
+	return process.close() == 0;
 }
 
 function core_api_request(method, path, query, body) {
@@ -501,12 +531,35 @@ const methods = {
 	},
 	provider_discard: {
 		call: function() {
-			const version = core_api_request('GET', '/version', '', '');
 			const response = core_api_request('GET', '/providers/proxies', '', '');
+			const manifest = provider_filter_manifest();
+			const config = provider_discard_config();
+			const providers = response.providers || {};
+			for (let name in manifest.providers || {})
+				if (!providers[name])
+					providers[name] = { name: name, vehicleType: 'HTTP', proxies: [] };
+			for (let name in providers) {
+				const meta = manifest.providers?.[name];
+				if (!meta && providers[name]?.vehicleType != 'HTTP')
+					continue;
+				const saved = config.providers?.[name] || {};
+				providers[name].vehicleType = meta?.vehicleType || providers[name].vehicleType;
+				providers[name].filterSupported = meta?.supported != false;
+				providers[name].testUrl = saved.url || meta?.testUrl || providers[name].testUrl || '';
+				providers[name].discardPolicy = {
+					enabled: saved.enabled == true,
+					url: saved.url || '',
+					timeout: int(saved.timeout) || 3000,
+					retries: int(saved.retries) || 0,
+					concurrency: int(saved.concurrency) || config.global.concurrency
+				};
+				providers[name].discardStatus = provider_filter_state(meta?.key);
+			}
 			return {
-				supported: index(version.features || [], 'provider-discard') >= 0,
-				providers: response.providers || {},
-				config: provider_discard_config()
+				supported: true,
+				isolation: 'direct',
+				providers: providers,
+				config: config
 			};
 		}
 	},
@@ -538,13 +591,8 @@ const methods = {
 			if (!write_provider_discard_config(config))
 				return { success: false, error: 'write_failed' };
 
-			const result = core_api_request(
-				'PATCH',
-				'/providers/proxies/' + url_encode_component(provider) + '/discard-policy',
-				'',
-				sprintf('%J', policy)
-			);
-			return { success: true, applied: !!result.policy, policy: policy };
+			const queued = !enabled && provider_filter_enqueue(provider);
+			return { success: true, applied: queued, queued: queued, policy: policy };
 		}
 	},
 	update_provider_discard: {
@@ -553,13 +601,8 @@ const methods = {
 			const provider = req.args?.provider || '';
 			if (!valid_api_value(provider, 256) || provider == '')
 				return { success: false, error: 'invalid_provider' };
-			const result = core_api_request(
-				'POST',
-				'/providers/proxies/' + url_encode_component(provider) + '/discard-update',
-				'',
-				''
-			);
-			return { success: !!result.started, started: !!result.started };
+			const started = provider_filter_enqueue(provider);
+			return { success: started, started: started };
 		}
 	},
 	write_file: {

@@ -37,6 +37,7 @@ printf '%s\n' '<a href="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mih
 rm -rf "$ALPHA_TEST_DIR"
 
 grep -q '^MIHOMO_SOURCE_VERSION:=7198c9dc1eeba39e12cf37176a6ad1ff9cda3732$' "$ROOT_DIR/mihomox/Makefile"
+grep -q '^MIHOMO_BUILD_VERSION:=alpha-7198c9d$' "$ROOT_DIR/mihomox/Makefile"
 grep -q '^PKG_BUILD_DEPENDS:=golang/host$' "$ROOT_DIR/mihomox/Makefile"
 grep -Fq '$(RM) $(PKG_BUILD_DIR)/mihomox-stun.c' "$ROOT_DIR/mihomox/Makefile"
 grep -q "option 'channel' 'Prerelease-Alpha'" "$ROOT_DIR/mihomox/files/mihomox.conf"

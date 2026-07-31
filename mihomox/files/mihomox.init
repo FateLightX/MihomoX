@@ -263,6 +263,14 @@ start_service() {
 			fi
 		fi
 	fi
+	# Replace supported HTTP providers only in the generated runtime profile.
+	# The original profile remains untouched and provider updates stay local.
+	if [ -x "$PROVIDER_FILTER_SH" ]; then
+		log "Provider" "Preparing managed provider subscriptions."
+		if ! "$PROVIDER_FILTER_SH" prepare "$RUN_PROFILE_PATH"; then
+			log "Provider" "Provider filter preparation failed; keeping original providers."
+		fi
+	fi
 	# check profile
 	if [ "$core_only" = 0 ] && [ "$proxy_enabled" = 1 ]; then
 		log "Profile" "Checking..."
@@ -338,7 +346,6 @@ start_service() {
 	procd_append_param env QUIC_GO_DISABLE_GSO="$env_disable_quic_go_gso"
 	procd_append_param env QUIC_GO_DISABLE_ECN="$env_disable_quic_go_ecn"
 	procd_append_param env SKIP_SYSTEM_IPV6_CHECK="$env_skip_system_ipv6_check"
-	procd_append_param env MIHOMO_PROVIDER_DISCARD_FILE="/etc/mihomox/provider-discard.json"
 
 	procd_close_instance
 	# cron
@@ -358,6 +365,10 @@ start_service() {
 		reload_cron=1
 	elif [ "$log_scheduled_clear" = 1 ] && [ -n "$log_scheduled_clear_cron" ]; then
 		log "App" "Invalid log scheduled clear cron expression; skipped."
+		reload_cron=1
+	fi
+	if [ -s "/etc/mihomox/run/provider-filter/manifest.json" ]; then
+		echo "* * * * * $PROVIDER_FILTER_SH tick #mihomox provider filter" >> "/etc/crontabs/root"
 		reload_cron=1
 	fi
 	if [ "$reload_cron" = 1 ]; then
@@ -546,6 +557,7 @@ service_triggers() {
 }
 
 cleanup() {
+	[ ! -x "$PROVIDER_FILTER_SH" ] || "$PROVIDER_FILTER_SH" stop > /dev/null 2>&1
 	# load config
 	config_load mihomox
 	# get config

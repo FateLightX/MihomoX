@@ -25,6 +25,7 @@ grep -q "option 'geox_auto_update' '1'" "$CONFIG"
 grep -q "option 'geox_update_interval' '72'" "$CONFIG"
 grep -q "option 'bypass_china_mainland_ip' '1'" "$CONFIG"
 grep -q "option 'bypass_china_mainland_ip6' '1'" "$CONFIG"
+grep -q "option 'provider_probe_fw_mark' '0x82'" "$CONFIG"
 grep -q 'config_get_bool fast_reload "procd" "fast_reload" 1' "$INIT_SCRIPT"
 
 awk '

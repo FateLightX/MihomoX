@@ -247,7 +247,7 @@ return view.extend({
         const channelOption = s.option(form.ListValue, 'channel', _('Core Channel'));
         channelOption.rmempty = false;
         channelOption.default = 'Prerelease-Alpha';
-        channelOption.description = _('Only MihomoX cores with Provider Discard support are accepted; unpatched Release or Alpha cores are rejected.');
+        channelOption.description = _('Prerelease Alpha changes frequently; use Release for maximum stability.');
         channelOption.value('release', _('Release'));
         channelOption.value('Prerelease-Alpha', _('Prerelease Alpha'));
 

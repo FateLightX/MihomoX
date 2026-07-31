@@ -21,10 +21,13 @@ const rpcSource = fs.readFileSync(path.join(
     root,
     'luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox'
 ), 'utf8');
-const corePatch = fs.readFileSync(path.join(
+const managerSource = fs.readFileSync(path.join(
     root,
-    'mihomox/patches/100-provider-discard-mode.patch'
+    'mihomox/files/scripts/provider_filter.sh'
 ), 'utf8');
+const initSource = fs.readFileSync(path.join(root, 'mihomox/files/mihomox.init'), 'utf8');
+const includeSource = fs.readFileSync(path.join(root, 'mihomox/files/scripts/include.sh'), 'utf8');
+const hijackSource = fs.readFileSync(path.join(root, 'mihomox/files/ucode/hijack.ut'), 'utf8');
 const menu = JSON.parse(fs.readFileSync(path.join(
     root,
     'luci-app-mihomox/root/usr/share/luci/menu.d/luci-app-mihomox.json'
@@ -50,19 +53,24 @@ assert.ok(viewSource.includes('mihomox-provider-details'));
 assert.ok(!viewSource.includes('ui.showModal'), 'node settings must remain inline');
 assert.ok(!viewSource.includes('mihomox.restart'), 'saving discard settings must not restart MihomoX');
 assert.ok(!viewSource.includes('mihomox.reload'), 'saving discard settings must not reload MihomoX');
-assert.ok(appSource.includes('unpatched Release or Alpha cores are rejected'));
+assert.ok(appSource.includes('Prerelease Alpha changes frequently'));
+assert.ok(viewSource.includes("_('Direct Isolation')"));
 
 assert.ok(rpcSource.includes("const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json'"));
-assert.ok(rpcSource.includes("'/discard-policy'"));
-assert.ok(rpcSource.includes("'/discard-update'"));
 assert.ok(rpcSource.includes("sprintf('%J\\n', config)"));
-assert.ok(rpcSource.includes("'Content-Type: application/json'"));
-assert.ok(corePatch.includes('pp.baseProvider.setProxies(available)'));
-assert.ok(corePatch.includes('all candidates unavailable; kept complete candidate set on initial load'));
-assert.ok(corePatch.includes('status.State = "fallback"'));
-assert.ok(corePatch.includes('status.Discarded = 0'));
-assert.ok(corePatch.includes('SetOnUnchanged(pd.retestCandidates)'));
-assert.ok(corePatch.includes('"features": []string{"provider-discard"}'));
-assert.ok(!corePatch.includes('+\tpp.closeAllConnections()'), 'provider updates must not close active connections');
+assert.ok(rpcSource.includes('provider_filter_enqueue(provider)'));
+assert.ok(managerSource.includes("--noproxy '*'"));
+assert.ok(managerSource.includes('routing-mark: $PROBE_MARK'));
+assert.ok(managerSource.includes('HTTP_PROXY= HTTPS_PROXY= ALL_PROXY='));
+assert.ok(managerSource.includes('probe_mark_available'));
+assert.ok(managerSource.includes('expected=$EXPECTED_STATUS'));
+assert.ok(managerSource.includes('select(.supported == true)'));
+assert.ok(managerSource.includes('.type = "file"'));
+assert.ok(managerSource.includes('mv -f "$filtered_file" "$current_file"'));
+assert.ok(!managerSource.includes('/etc/init.d/mihomox reload'));
+assert.ok(!managerSource.includes('/etc/init.d/mihomox restart'));
+assert.ok(initSource.includes('PROVIDER_FILTER_SH'));
+assert.ok(includeSource.includes('provider_filter.sh'));
+assert.ok(hijackSource.includes('provider_probe_fw_mark'));
 
-console.log('LuCI provider discard tests passed');
+console.log('provider subscription filter tests passed');

@@ -29,10 +29,12 @@ function savedPolicy(data, name, provider) {
 function statusLabel(status) {
     const labels = {
         active: _('Normal'),
+        downloading: _('Downloading'),
         testing: _('Testing'),
         retained: _('Previous Version'),
         fallback: _('Keep All'),
         failed: _('Failed'),
+        unsupported: _('Unsupported'),
         disabled: _('Keep All')
     };
     if (status?.state === 'testing')
@@ -77,7 +79,7 @@ function saveProvider(name) {
 }
 
 function saveAll() {
-    const names = Object.keys(controls);
+    const names = Object.keys(controls).filter((name) => controls[name].supported);
     pageMessage(_('Saving'));
     return Promise.all(names.map(saveProvider)).then(function () {
         pageMessage(_('Saved'));
@@ -103,7 +105,7 @@ function updateProvider(name) {
 }
 
 function updateAll() {
-    const names = Object.keys(controls).filter((name) => controls[name].enabled.checked);
+    const names = Object.keys(controls).filter((name) => controls[name].supported && controls[name].enabled.checked);
     pageMessage(_('Starting Update'));
     return saveAll().then(function () {
         return Promise.all(names.map((name) => mihomox.updateProviderDiscard(name)));
@@ -127,7 +129,8 @@ function providerRow(name, provider, concurrency) {
     const total = status.total || active;
     const discarded = status.discarded || 0;
     const expanded = expandedProvider === name;
-    const enabled = E('input', { type: 'checkbox', checked: policy.enabled ? '' : null });
+    const supported = provider.filterSupported !== false && status.state !== 'unsupported';
+    const enabled = E('input', { type: 'checkbox', checked: policy.enabled ? '' : null, disabled: supported ? null : '' });
     enabled.checked = !!policy.enabled;
     const url = E('input', {
         'class': 'cbi-input-text',
@@ -137,15 +140,17 @@ function providerRow(name, provider, concurrency) {
     });
     const timeout = E('input', { 'class': 'cbi-input-text', type: 'number', min: '500', max: '30000', step: '500', value: String(policy.timeout) });
     const retries = E('input', { 'class': 'cbi-input-text', type: 'number', min: '0', max: '5', step: '1', value: String(policy.retries) });
-    controls[name] = { enabled: enabled, url: url, timeout: timeout, retries: retries };
+    for (const input of [url, timeout, retries])
+        input.disabled = !supported;
+    controls[name] = { enabled: enabled, url: url, timeout: timeout, retries: retries, supported: supported };
 
     const details = E('div', { 'class': 'mihomox-provider-details' + (expanded ? '' : ' hidden') }, [
         settingRow(_('Test URL'), url),
         settingRow(_('Test Timeout'), E('span', { 'class': 'mihomox-provider-number' }, [ timeout, E('span', {}, 'ms') ])),
         settingRow(_('Failed Retries'), retries),
         E('div', { 'class': 'mihomox-provider-detail-actions' }, [
-            E('button', { 'class': 'cbi-button cbi-button-neutral', type: 'button', click: () => saveProvider(name).then(() => pageMessage(_('Saved'))) }, _('Save')),
-            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', click: () => updateProvider(name) }, _('Update and Test'))
+            E('button', { 'class': 'cbi-button cbi-button-neutral', type: 'button', disabled: supported ? null : '', click: () => saveProvider(name).then(() => pageMessage(_('Saved'))) }, _('Save')),
+            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', disabled: supported ? null : '', click: () => updateProvider(name) }, _('Update and Test'))
         ])
     ]);
     const toggleDetails = E('button', {
@@ -187,10 +192,6 @@ function renderContent() {
     const content = pageRoot.querySelector('.mihomox-provider-content');
     content.replaceChildren();
 
-    if (!currentData.supported) {
-        content.appendChild(E('div', { 'class': 'alert-message warning' }, _('Current core does not support provider discard mode.')));
-        return;
-    }
     if (!entries.length) {
         content.appendChild(E('div', { 'class': 'alert-message notice' }, _('No proxy providers found.')));
         return;
@@ -201,6 +202,7 @@ function renderContent() {
             E('span', {}, _('Node Concurrency')),
             E('input', { 'class': 'cbi-input-text mihomox-provider-concurrency', type: 'number', min: '1', max: '20', step: '1', value: String(concurrency) })
         ]),
+        E('span', { 'class': 'mihomox-provider-isolation' }, _('Detection Route') + ': ' + _('Direct Isolation')),
         E('span', { 'class': 'mihomox-provider-message' })
     ]));
     content.appendChild(E('div', { 'class': 'mihomox-provider-columns' }, [
@@ -244,7 +246,7 @@ return view.extend({
                 .mihomox-provider-item{border-top:1px solid var(--border-color-medium,#dbe3ed)}.mihomox-provider-item:last-child{border-bottom:1px solid var(--border-color-medium,#dbe3ed)}
                 .mihomox-provider-row{min-height:3.4em;padding:.35em .5em}.mihomox-provider-expand{width:2.2em;min-width:2.2em;padding:.3em}
                 .mihomox-provider-name{overflow-wrap:anywhere}.mihomox-provider-toggle{display:flex;align-items:center;gap:.45em}
-                .mihomox-provider-state{font-weight:600}.state-active{color:#16a34a}.state-testing{color:#2563eb}.state-fallback{color:#b45309}.state-retained,.state-failed{color:#dc2626}
+                .mihomox-provider-state{font-weight:600}.state-active{color:#16a34a}.state-downloading,.state-testing{color:#2563eb}.state-fallback{color:#b45309}.state-retained,.state-failed,.state-unsupported{color:#dc2626}
                 .mihomox-provider-details{display:grid;grid-template-columns:repeat(3,minmax(10em,1fr));gap:.9em;padding:.8em 3.75em 1em;background:var(--background-color-low,#f7f9fc)}
                 .mihomox-provider-details.hidden{display:none}.mihomox-provider-setting{display:grid;gap:.35em}.mihomox-provider-number{display:flex;align-items:center;gap:.4em}.mihomox-provider-number input{width:8em}
                 .mihomox-provider-detail-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:.5em}

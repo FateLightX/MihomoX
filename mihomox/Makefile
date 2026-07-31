@@ -2,10 +2,10 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 MIHOMO_SOURCE_VERSION:=7198c9dc1eeba39e12cf37176a6ad1ff9cda3732
-MIHOMO_BUILD_VERSION:=alpha-7198c9d-mihomox
+MIHOMO_BUILD_VERSION:=alpha-7198c9d
 PKG_SOURCE:=mihomo-$(MIHOMO_SOURCE_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/MetaCubeX/mihomo/tar.gz/$(MIHOMO_SOURCE_VERSION)?
 PKG_HASH:=6d42395e39e58e051df397c5e8289de7ada0e3f9bb22867b81e6ad3b9c4c1e99
@@ -71,9 +71,8 @@ define Package/mihomox/install
 	$(call GoPackage/Package/Install/Bin,$(1))
 	printf '%s\n' \
 		'version=$(MIHOMO_BUILD_VERSION)' \
-		'channel=patched-alpha' \
+		'channel=Prerelease-Alpha' \
 		'release=$(MIHOMO_SOURCE_VERSION)' \
-		'features=provider-discard' \
 		> $(1)/etc/mihomox/bin/mihomo.version
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoSite.dat $(1)/etc/mihomox/run/GeoSite.dat
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/Country.mmdb $(1)/etc/mihomox/run/Country.mmdb
@@ -89,6 +88,7 @@ define Package/mihomox/install
 	$(INSTALL_BIN) $(CURDIR)/files/scripts/firewall_include.sh $(1)/etc/mihomox/scripts/firewall_include.sh
 	$(INSTALL_BIN) $(CURDIR)/files/scripts/debug.sh $(1)/etc/mihomox/scripts/debug.sh
 	$(INSTALL_BIN) $(CURDIR)/files/scripts/update_core.sh $(1)/etc/mihomox/scripts/update_core.sh
+	$(INSTALL_BIN) $(CURDIR)/files/scripts/provider_filter.sh $(1)/etc/mihomox/scripts/provider_filter.sh
 
 	$(INSTALL_BIN) $(CURDIR)/files/nftables/geoip_cn.nft $(1)/etc/mihomox/nftables/geoip_cn.nft
 	$(INSTALL_BIN) $(CURDIR)/files/nftables/geoip6_cn.nft $(1)/etc/mihomox/nftables/geoip6_cn.nft

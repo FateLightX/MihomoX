@@ -1287,8 +1287,8 @@ msgid "Only applies when Allow Lan is enabled; use * for all addresses."
 msgstr "僅在啟用允許區域網路時生效；使用 * 表示所有位址。"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
-msgid "Only MihomoX cores with Provider Discard support are accepted; unpatched Release or Alpha cores are rejected."
-msgstr "僅接受支援 Provider 失效節點丟棄的 MihomoX 核心；未套用補丁的 Release 或 Alpha 核心會被拒絕。"
+msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
+msgstr "Alpha 預發行版本更新頻繁；需要穩定性時請選擇 Release。"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
 msgid "Process Path"
@@ -1417,8 +1417,17 @@ msgstr "可用 / 總數"
 msgid "Collapse"
 msgstr "收起"
 
-msgid "Current core does not support provider discard mode."
-msgstr "目前核心不支援 Provider 丟棄模式。"
+msgid "Downloading"
+msgstr "正在下載"
+
+msgid "Detection Route"
+msgstr "檢測出口"
+
+msgid "Direct Isolation"
+msgstr "直連隔離"
+
+msgid "Unsupported"
+msgstr "不支援"
 
 msgid "Disabled"
 msgstr "已關閉"

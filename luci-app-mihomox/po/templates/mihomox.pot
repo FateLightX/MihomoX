@@ -1280,7 +1280,7 @@ msgid "Only applies when Allow Lan is enabled; use * for all addresses."
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
-msgid "Only MihomoX cores with Provider Discard support are accepted; unpatched Release or Alpha cores are rejected."
+msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
@@ -1410,7 +1410,16 @@ msgstr ""
 msgid "Collapse"
 msgstr ""
 
-msgid "Current core does not support provider discard mode."
+msgid "Downloading"
+msgstr ""
+
+msgid "Detection Route"
+msgstr ""
+
+msgid "Direct Isolation"
+msgstr ""
+
+msgid "Unsupported"
 msgstr ""
 
 msgid "Disabled"
