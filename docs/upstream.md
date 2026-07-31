@@ -32,7 +32,7 @@ git -C ../openwrt-clashoo merge --ff-only origin/main
 ```
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
-[移植边界](../PORTING.md#3-参考来源与继承范围) 的变化才进入 MihomoX；禁止整目录覆盖。
+[移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
 
 ## 2026-07-29：Nikki
 
