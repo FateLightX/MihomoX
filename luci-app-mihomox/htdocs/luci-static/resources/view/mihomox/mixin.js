@@ -87,10 +87,12 @@ return view.extend({
         o = s.taboption('general', form.Value, 'tcp_keep_alive_idle', _('TCP Keep Alive Idle'));
         o.datatype = 'uinteger';
         o.placeholder = _('Unmodified');
+        o.description = _('Seconds.');
 
         o = s.taboption('general', form.Value, 'tcp_keep_alive_interval', _('TCP Keep Alive Interval'));
         o.datatype = 'uinteger';
         o.placeholder = _('Unmodified');
+        o.description = _('Seconds.');
 
         s.tab('external_control', _('External Control Config'));
 
@@ -142,6 +144,26 @@ return view.extend({
         o.placeholder = _('Unmodified');
         o.value('0', _('Disable'));
         o.value('1', _('Enable'));
+
+        o = s.taboption('inbound', form.Value, 'bind_address', _('Bind Address'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.description = _('Only applies when Allow Lan is enabled; use * for all addresses.');
+        o.depends('allow_lan', '1');
+
+        o = s.taboption('inbound', form.DynamicList, 'lan_allowed_ips', _('LAN Allowed IPs'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.datatype = 'cidr';
+        o.description = _('Only applies when Allow Lan is enabled.');
+        o.depends('allow_lan', '1');
+
+        o = s.taboption('inbound', form.DynamicList, 'lan_disallowed_ips', _('LAN Disallowed IPs'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.datatype = 'cidr';
+        o.description = _('Deny entries take precedence over allowed entries.');
+        o.depends('allow_lan', '1');
 
         o = s.taboption('inbound', form.Value, 'http_port', _('HTTP Port'));
         o.datatype = 'port';
@@ -239,6 +261,25 @@ return view.extend({
         o.value('lru', _('Least Recently Used (LRU)'));
         o.value('arc', _('Adaptive Replacement Cache (ARC)'));
 
+        o = s.taboption('dns', form.Value, 'dns_cache_max_size', _('DNS Cache Max Size'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.datatype = 'uinteger';
+        o.description = _('Maximum cached DNS entries; blank leaves Mihomo unchanged, default is 4096.');
+
+        o = s.taboption('dns', form.Value, 'dns_ipv6_timeout', _('IPv6 Query Timeout (ms)'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.datatype = 'uinteger';
+        o.description = _('Time to wait for an AAAA response during dual-stack DNS queries.');
+
+        o = s.taboption('dns', form.ListValue, 'dns_fallback_lazy_query', _('Lazy Fallback Query'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.value('0', _('Disable'));
+        o.value('1', _('Enable'));
+        o.description = _('Check the primary result before sending a fallback query.');
+
         o = s.taboption('dns', form.Value, 'dns_listen', _('DNS Listen'));
         o.datatype = 'ipaddrport(1)';
         o.placeholder = _('Unmodified');
@@ -292,6 +333,7 @@ return view.extend({
         o.placeholder = _('Unmodified');
         o.value('0', _('Disable'));
         o.value('1', _('Enable'));
+        o.description = _('Requires at least one proxy-server-nameserver in the final profile.');
 
         o = s.taboption('dns', form.ListValue, 'dns_doh_prefer_http3', _('DoH Prefer HTTP/3'));
         o.optional = true;
@@ -355,6 +397,7 @@ return view.extend({
 
         o = s.taboption('dns', form.Flag, 'dns_proxy_server_nameserver_policy', _('Overwrite Proxy Server Nameserver Policy'));
         o.rmempty = false;
+        o.description = _('The final profile must also define proxy-server-nameserver.');
 
         o = s.taboption('dns', form.SectionValue, '_dns_proxy_server_nameserver_policies', form.TableSection, 'proxy_server_nameserver_policy', _('Edit Proxy Server Nameserver Policies'));
         o.retain = true;
@@ -416,6 +459,16 @@ return view.extend({
         o.placeholder = _('Unmodified');
         o.value('0', _('Disable'));
         o.value('1', _('Enable'));
+
+        o = s.taboption('sniffer', form.DynamicList, 'sniffer_skip_src_addresses', _('Skip Source Addresses'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.datatype = 'cidr';
+
+        o = s.taboption('sniffer', form.DynamicList, 'sniffer_skip_dst_addresses', _('Skip Destination Addresses'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.datatype = 'cidr';
 
         o = s.taboption('sniffer', form.Flag, 'sniffer_force_domain_name', _('Overwrite Force Sniff Domain Name'));
         o.rmempty = false;
@@ -499,6 +552,7 @@ return view.extend({
         so = o.subsection.option(form.Value, 'file_size_limit', _('File Size Limit'));
         so.datatype = 'uinteger';
         so.default = 0;
+        so.description = _('Bytes; 0 means unlimited.');
         so.modalonly = true;
         so.depends('type', 'http');
 
@@ -508,13 +562,20 @@ return view.extend({
         so.root_directory = mihomox.ruleProvidersDir;
         so.depends('type', 'file');
 
-        so = o.subsection.option(form.ListValue, 'file_format', _('File Format'));
-        so.default = 'yaml';
-        so.value('mrs');
-        so.value('yaml');
-        so.value('text');
+        const fileFormatOption = o.subsection.option(form.ListValue, 'file_format', _('File Format'));
+        fileFormatOption.default = 'yaml';
+        fileFormatOption.value('mrs');
+        fileFormatOption.value('yaml');
+        fileFormatOption.value('text');
 
-        so = o.subsection.option(form.ListValue, 'behavior', _('Behavior'));
+        const behaviorOption = o.subsection.option(form.ListValue, 'behavior', _('Behavior'));
+        fileFormatOption.validate = function (section_id, value) {
+            return value === 'mrs' && behaviorOption.formvalue(section_id) === 'classical'
+                ? _('MRS format only supports Domain or IPCIDR behavior.')
+                : true;
+        };
+
+        so = behaviorOption;
         so.default = 'classical';
         so.rmempty = false;
         so.value('classical');
@@ -523,6 +584,7 @@ return view.extend({
 
         so = o.subsection.option(form.Value, 'update_interval', _('Update Interval'));
         so.datatype = 'uinteger';
+        so.description = _('Seconds; 0 disables periodic refresh.');
         so.default = 0;
         so.modalonly = true;
         so.depends('type', 'http');
@@ -551,10 +613,20 @@ return view.extend({
         so.value('DOMAIN-KEYWORD', _('Domain Name Keyword'));
         so.value('DOMAIN-REGEX', _('Domain Name Regex'));
         so.value('IP-CIDR', _('Destination IP'));
+        so.value('IP-CIDR6', _('Destination IPv6'));
+        so.value('IP-ASN', _('Destination ASN'));
+        so.value('SRC-IP-CIDR', _('Source IP'));
+        so.value('SRC-PORT', _('Source Port'));
         so.value('DST-PORT', _('Destination Port'));
+        so.value('NETWORK', _('Network Type'));
         so.value('PROCESS-NAME', _('Process Name'));
+        so.value('PROCESS-PATH', _('Process Path'));
+        so.value('IN-NAME', _('Inbound Name'));
         so.value('GEOSITE', _('Domain Name Geo'));
         so.value('GEOIP', _('Destination IP Geo'));
+        so.value('REMATCH-NAME', _('Rematch Name'));
+        so.value('SUB-RULE', _('Sub-Rule'));
+        so.value('MATCH', _('Match All'));
 
         so = o.subsection.option(form.Value, 'matcher', _('Matcher'));
         so.rmempty = false;
@@ -608,6 +680,7 @@ return view.extend({
         o = s.taboption('geox', form.Value, 'geox_update_interval', _('GeoX Update Interval'));
         o.datatype = 'uinteger';
         o.placeholder = _('Unmodified');
+        o.description = _('Hours.');
 
         s.tab('mixin_file_content', _('Mixin File Content'));
 

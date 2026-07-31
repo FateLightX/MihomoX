@@ -1194,3 +1194,135 @@ msgstr "必须填写自定义内核 SHA256"
 
 msgid "Invalid cron expression"
 msgstr "Cron 表达式无效"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:148
+msgid "Bind Address"
+msgstr "绑定地址"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:555
+msgid "Bytes; 0 means unlimited."
+msgstr "单位：字节；0 表示不限。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:281
+msgid "Check the primary result before sending a fallback query."
+msgstr "发送回退查询前先检查主查询结果。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:264
+msgid "DNS Cache Max Size"
+msgstr "DNS 缓存最大条目数"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:165
+msgid "Deny entries take precedence over allowed entries."
+msgstr "拒绝项优先于允许项。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:617
+msgid "Destination ASN"
+msgstr "目标 ASN"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:616
+msgid "Destination IPv6"
+msgstr "目标 IPv6"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:683
+msgid "Hours."
+msgstr "单位：小时。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:270
+msgid "IPv6 Query Timeout (ms)"
+msgstr "IPv6 查询超时（毫秒）"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:624
+msgid "Inbound Name"
+msgstr "入站名称"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:154
+msgid "LAN Allowed IPs"
+msgstr "LAN 允许 IP"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:161
+msgid "LAN Disallowed IPs"
+msgstr "LAN 禁止 IP"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:276
+msgid "Lazy Fallback Query"
+msgstr "回退查询延迟执行"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:574
+msgid "MRS format only supports Domain or IPCIDR behavior."
+msgstr "MRS 格式仅支持 Domain 或 IPCIDR 行为。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:629
+msgid "Match All"
+msgstr "匹配全部"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:268
+msgid "Maximum cached DNS entries; blank leaves Mihomo unchanged, default is 4096."
+msgstr "DNS 缓存最大条目数；留空表示不修改 Mihomo，默认值为 4096。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:621
+msgid "Network Type"
+msgstr "网络类型"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:158
+msgid "Only applies when Allow Lan is enabled."
+msgstr "仅在启用允许局域网时生效。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:151
+msgid "Only applies when Allow Lan is enabled; use * for all addresses."
+msgstr "仅在启用允许局域网时生效；使用 * 表示所有地址。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
+msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
+msgstr "Alpha 预发布版本更新频繁；需要稳定性时请选择 Release。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
+msgid "Process Path"
+msgstr "进程路径"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:627
+msgid "Rematch Name"
+msgstr "重新匹配名称"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:336
+msgid "Requires at least one proxy-server-nameserver in the final profile."
+msgstr "最终配置必须至少包含一个 proxy-server-nameserver。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:378
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:90
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:95
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:214
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:219
+msgid "Seconds."
+msgstr "单位：秒。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:587
+msgid "Seconds; 0 disables periodic refresh."
+msgstr "单位：秒；0 表示禁用定期刷新。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:468
+msgid "Skip Destination Addresses"
+msgstr "跳过目标地址"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:463
+msgid "Skip Source Addresses"
+msgstr "跳过源地址"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:618
+msgid "Source IP"
+msgstr "源 IP"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:619
+msgid "Source Port"
+msgstr "源端口"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:628
+msgid "Sub-Rule"
+msgstr "子规则"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:400
+msgid "The final profile must also define proxy-server-nameserver."
+msgstr "最终配置还必须定义 proxy-server-nameserver。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:274
+msgid "Time to wait for an AAAA response during dual-stack DNS queries."
+msgstr "双栈 DNS 查询时等待 AAAA 响应的时间。"

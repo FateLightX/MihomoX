@@ -64,6 +64,13 @@ const callMihomoXCoreStatus = rpc.declare({
     expect: { '': {} }
 });
 
+const callMihomoXLog = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'log',
+    params: ['name'],
+    expect: { '': {} }
+});
+
 const callMihomoXWriteFile = rpc.declare({
     object: 'luci.mihomox',
     method: 'write_file',
@@ -237,11 +244,15 @@ return baseclass.extend({
     },
 
     getAppLog: function () {
-        return L.resolveDefault(fs.read_direct(this.appLogPath));
+        return L.resolveDefault(callMihomoXLog('app'), { log: '' }).then(function (result) {
+            return result?.log || '';
+        });
     },
 
     getCoreLog: function () {
-        return L.resolveDefault(fs.read_direct(this.coreLogPath));
+        return L.resolveDefault(callMihomoXLog('core'), { log: '' }).then(function (result) {
+            return result?.log || '';
+        });
     },
 
     clearAppLog: function () {

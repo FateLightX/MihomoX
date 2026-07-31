@@ -59,8 +59,21 @@ return view.extend({
         o.inputstyle = 'positive';
         o.inputtitle = _('Update');
         o.modalonly = false;
-        o.onclick = function (_, section_id) {
-            return mihomox.updateSubscription(section_id);
+        o.onclick = function (ev, section_id) {
+            return mihomox.updateSubscription(section_id).then(function (result) {
+                if (!result?.success)
+                    return Promise.reject(new Error(_('Subscription') + ': ' + _('Failed')));
+
+                uci.unload('mihomox');
+                return uci.load('mihomox').then(function () {
+                    for (const name of ['used', 'total', 'expire', 'update']) {
+                        const option = m.lookupOption(name, section_id);
+                        const element = option?.[0]?.getUIElement(section_id);
+                        if (element)
+                            element.setValue(uci.get('mihomox', section_id, name) || '');
+                    }
+                });
+            });
         };
 
         o = s.option(form.Value, 'info_url', _('Subscription Info Url'));

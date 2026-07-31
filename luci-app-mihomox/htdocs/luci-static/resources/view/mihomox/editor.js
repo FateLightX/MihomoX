@@ -56,7 +56,7 @@ return view.extend({
             addEditableFileOption(o, mihomox.proxyProvidersDir + '/' + proxyProvider.name, _('Proxy Provider:') + proxyProvider.name, proxyProvider.name);
 
         o.value(mihomox.mixinFilePath, _('File for Mixin'));
-        o.value(mihomox.runProfilePath, _('Profile for Startup'));
+        // The startup profile is generated from the selected source profile and mixin.
         o.write = function () { return true; };
         o.onchange = function (event, section_id, value) {
             if (!isEditablePath(value))
@@ -87,7 +87,7 @@ return view.extend({
         return m.render();
     },
     handleSaveApply: function (ev, mode) {
-        return this.handleSave(ev).finally(function () {
+        return this.handleSave(ev).then(function () {
             return mode === '0' ? mihomox.reload() : mihomox.restart();
         });
     },

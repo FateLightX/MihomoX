@@ -123,8 +123,11 @@ return view.extend({
         o.inputstyle = 'negative';
         o.inputtitle = _('Generate & Download');
         o.onclick = function () {
-            return mihomox.debug().then(function () {
-                fs.read_direct(mihomox.debugLogPath, 'blob').then(function (data) {
+            return mihomox.debug().then(function (result) {
+                if (!result?.success)
+                    return Promise.reject(new Error(_('Debug Log') + ': ' + _('Failed')));
+
+                return fs.read_direct(mihomox.debugLogPath, 'blob').then(function (data) {
                     // create url
                     const url = window.URL.createObjectURL(data, { type: 'text/markdown' });
                     // create link

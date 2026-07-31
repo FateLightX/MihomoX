@@ -38,6 +38,9 @@ config['tls']['ech-key'] = uci.get('mihomox', 'mixin', 'api_tls_ech_key');
 config['secret'] = uci.get('mihomox', 'mixin', 'api_secret');
 
 config['allow-lan'] = uci_bool(uci.get('mihomox', 'mixin', 'allow_lan'));
+config['bind-address'] = uci.get('mihomox', 'mixin', 'bind_address');
+config['lan-allowed-ips'] = uci_array(uci.get('mihomox', 'mixin', 'lan_allowed_ips'));
+config['lan-disallowed-ips'] = uci_array(uci.get('mihomox', 'mixin', 'lan_disallowed_ips'));
 config['port'] = uci_int(uci.get('mihomox', 'mixin', 'http_port'));
 config['socks-port'] = uci_int(uci.get('mihomox', 'mixin', 'socks_port'));
 config['mixed-port'] = uci_int(uci.get('mihomox', 'mixin', 'mixed_port'));
@@ -68,8 +71,11 @@ if (uci_bool(uci.get('mihomox', 'mixin', 'tun_dns_hijack'))) {
 config['dns'] = {};
 config['dns']['enable'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_enabled'));
 config['dns']['cache-algorithm'] = uci.get('mihomox', 'mixin', 'dns_cache_algorithm');
+config['dns']['cache-max-size'] = uci_int(uci.get('mihomox', 'mixin', 'dns_cache_max_size'));
 config['dns']['listen'] = uci.get('mihomox', 'mixin', 'dns_listen');
 config['dns']['ipv6'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_ipv6'));
+config['dns']['ipv6-timeout'] = uci_int(uci.get('mihomox', 'mixin', 'dns_ipv6_timeout'));
+config['dns']['fallback-lazy-query'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_fallback_lazy_query'));
 config['dns']['enhanced-mode'] = uci.get('mihomox', 'mixin', 'dns_mode');
 config['dns']['fake-ip-range'] = uci.get('mihomox', 'mixin', 'fake_ip_range');
 config['dns']['fake-ip-range6'] = uci.get('mihomox', 'mixin', 'fake_ip6_range');
@@ -129,6 +135,8 @@ config['sniffer'] = {};
 config['sniffer']['enable'] = uci_bool(uci.get('mihomox', 'mixin', 'sniffer'));
 config['sniffer']['force-dns-mapping'] = uci_bool(uci.get('mihomox', 'mixin', 'sniffer_sniff_dns_mapping'));
 config['sniffer']['parse-pure-ip'] = uci_bool(uci.get('mihomox', 'mixin', 'sniffer_sniff_pure_ip'));
+config['sniffer']['skip-src-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_src_addresses'));
+config['sniffer']['skip-dst-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_dst_addresses'));
 if (uci_bool(uci.get('mihomox', 'mixin', 'sniffer_force_domain_name'))) {
 	config['sniffer']['force-domain'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_force_domain_names'));
 }
@@ -137,14 +145,12 @@ if (uci_bool(uci.get('mihomox', 'mixin', 'sniffer_ignore_domain_name'))) {
 }
 if (uci_bool(uci.get('mihomox', 'mixin', 'sniffer_sniff'))) {
 	config['sniffer']['sniff'] = {};
-	config['sniffer']['sniff']['HTTP'] = {};
-	config['sniffer']['sniff']['TLS'] = {};
-	config['sniffer']['sniff']['QUIC'] = {};
 	uci.foreach('mihomox', 'sniff', (section) => {
 		if (!uci_bool(section.enabled)) {
 			return;
 		}
-		config['sniffer']['sniff'][section.protocol]['port'] = uci_array(section.port);
+		config['sniffer']['sniff'][section.protocol] = {};
+		config['sniffer']['sniff'][section.protocol]['ports'] = uci_array(section.port);
 		config['sniffer']['sniff'][section.protocol]['override-destination'] = uci_bool(section.overwrite_destination);
 	});
 }
@@ -164,7 +170,7 @@ if (uci_bool(uci.get('mihomox', 'mixin', 'rule_provider'))) {
 				type: section.type,
 				url: section.url,
 				proxy: section.node,
-				size_limit: section.file_size_limit,
+				'size-limit': section.file_size_limit,
 				format: section.file_format,
 				behavior: section.behavior,
 				interval: section.update_interval,

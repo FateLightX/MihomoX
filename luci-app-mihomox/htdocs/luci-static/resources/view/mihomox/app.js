@@ -235,6 +235,7 @@ return view.extend({
         const channelOption = s.option(form.ListValue, 'channel', _('Core Channel'));
         channelOption.rmempty = false;
         channelOption.default = 'Prerelease-Alpha';
+        channelOption.description = _('Prerelease Alpha changes frequently; use Release for maximum stability.');
         channelOption.value('release', _('Release'));
         channelOption.value('Prerelease-Alpha', _('Prerelease Alpha'));
 
@@ -374,6 +375,7 @@ return view.extend({
         o = s.option(form.Value, 'start_delay', _('Start Delay'));
         o.datatype = 'uinteger';
         o.placeholder = _('Start Immidiately');
+        o.description = _('Seconds.');
 
         o = s.option(form.Flag, 'scheduled_restart', _('Scheduled Restart'));
         o.rmempty = false;

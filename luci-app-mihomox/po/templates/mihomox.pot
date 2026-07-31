@@ -1187,3 +1187,135 @@ msgstr ""
 
 msgid "Invalid cron expression"
 msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:148
+msgid "Bind Address"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:555
+msgid "Bytes; 0 means unlimited."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:281
+msgid "Check the primary result before sending a fallback query."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:264
+msgid "DNS Cache Max Size"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:165
+msgid "Deny entries take precedence over allowed entries."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:617
+msgid "Destination ASN"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:616
+msgid "Destination IPv6"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:683
+msgid "Hours."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:270
+msgid "IPv6 Query Timeout (ms)"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:624
+msgid "Inbound Name"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:154
+msgid "LAN Allowed IPs"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:161
+msgid "LAN Disallowed IPs"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:276
+msgid "Lazy Fallback Query"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:574
+msgid "MRS format only supports Domain or IPCIDR behavior."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:629
+msgid "Match All"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:268
+msgid "Maximum cached DNS entries; blank leaves Mihomo unchanged, default is 4096."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:621
+msgid "Network Type"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:158
+msgid "Only applies when Allow Lan is enabled."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:151
+msgid "Only applies when Allow Lan is enabled; use * for all addresses."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:238
+msgid "Prerelease Alpha changes frequently; use Release for maximum stability."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:623
+msgid "Process Path"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:627
+msgid "Rematch Name"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:336
+msgid "Requires at least one proxy-server-nameserver in the final profile."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:378
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:90
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:95
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:214
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:219
+msgid "Seconds."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:587
+msgid "Seconds; 0 disables periodic refresh."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:468
+msgid "Skip Destination Addresses"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:463
+msgid "Skip Source Addresses"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:618
+msgid "Source IP"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:619
+msgid "Source Port"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:628
+msgid "Sub-Rule"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:400
+msgid "The final profile must also define proxy-server-nameserver."
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:274
+msgid "Time to wait for an AAAA response during dual-stack DNS queries."
+msgstr ""

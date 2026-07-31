@@ -17,6 +17,8 @@ const renderedOptions = {};
 let selectedPath = '';
 let readCalls = 0;
 let writeCalls = 0;
+let reloadCalls = 0;
+let restartCalls = 0;
 
 function TextValue() {}
 
@@ -85,6 +87,14 @@ const mihomox = {
     writefile: function () {
         writeCalls++;
         return Promise.resolve();
+    },
+    reload: function () {
+        reloadCalls++;
+        return Promise.resolve();
+    },
+    restart: function () {
+        restartCalls++;
+        return Promise.resolve();
     }
 };
 const L = { resolveDefault: (value) => value };
@@ -118,6 +128,10 @@ async function main() {
     const contentOption = renderedOptions._file_content;
     assert.strictEqual(contentOption.type, form.TextValue);
     assert.ok(fileOption.values.every((entry) => !/\.mrs$/i.test(entry.value)));
+    assert.ok(
+        fileOption.values.every((entry) => entry.value !== mihomox.runProfilePath),
+        'generated startup profile must not be offered as an editable file'
+    );
 
     selectedPath = '/etc/mihomox/run/providers/rule/rules.mrs';
     assert.strictEqual(fileOption.onchange(null, 'editor', selectedPath), undefined);
@@ -125,6 +139,20 @@ async function main() {
     assert.strictEqual(contentOption.remove('editor'), undefined);
     assert.strictEqual(readCalls, 0);
     assert.strictEqual(writeCalls, 0);
+
+    editorView.handleSave = () => Promise.reject(new Error('save failed'));
+    await assert.rejects(
+        editorView.handleSaveApply(null, '0'),
+        /save failed/
+    );
+    assert.strictEqual(reloadCalls, 0, 'save failure must not reload the service');
+    assert.strictEqual(restartCalls, 0, 'save failure must not restart the service');
+
+    editorView.handleSave = () => Promise.resolve();
+    await editorView.handleSaveApply(null, '0');
+    await editorView.handleSaveApply(null, '1');
+    assert.strictEqual(reloadCalls, 1);
+    assert.strictEqual(restartCalls, 1);
 
     console.log('LuCI default editor tests passed');
 }

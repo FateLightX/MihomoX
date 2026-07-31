@@ -211,10 +211,12 @@ return view.extend({
         o = s.taboption('misc', form.Value, 'tun_timeout', _('TUN Timeout'));
         o.datatype = 'uinteger';
         o.rmempty = false;
+        o.description = _('Seconds.');
 
         o = s.taboption('misc', form.Value, 'tun_interval', _('TUN Interval'));
         o.datatype = 'uinteger';
         o.rmempty = false;
+        o.description = _('Seconds.');
 
         return m.render();
     }
