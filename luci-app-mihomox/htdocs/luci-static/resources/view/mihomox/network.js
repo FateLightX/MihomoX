@@ -76,15 +76,19 @@ function updateRow(row, state, value) {
 function runTests(button, rows) {
     button.disabled = true;
     for (const test of tests)
-        updateRow(rows[test.id], 'loading', _('Testing'));
+        updateRow(rows[test.id], 'idle', _('Not Tested'));
 
-    const requests = tests.map(function (test) {
-        return L.resolveDefault(mihomox.networkTest(test.id), { success: false }).then(function (result) {
-            updateRow(rows[test.id], result?.success ? 'success' : 'failed', resultText(test, result));
+    let sequence = Promise.resolve();
+    for (const test of tests) {
+        sequence = sequence.then(function () {
+            updateRow(rows[test.id], 'loading', _('Testing'));
+            return L.resolveDefault(mihomox.networkTest(test.id), { success: false }).then(function (result) {
+                updateRow(rows[test.id], result?.success ? 'success' : 'failed', resultText(test, result));
+            });
         });
-    });
+    }
 
-    return Promise.all(requests).then(function () {
+    return sequence.then(function () {
         button.disabled = false;
     }, function (error) {
         button.disabled = false;

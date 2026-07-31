@@ -150,7 +150,7 @@ function dns_test(nameserver) {
 	try {
 		const options = {
 			type: [ 'A' ],
-			timeout: 4000,
+			timeout: 2500,
 			retries: 1
 		};
 		if (nameserver)
@@ -170,7 +170,7 @@ function dns_test(nameserver) {
 function curl_probe(url, family, proxy, proxy_auth, include_body) {
 	const args = [
 		'curl', '--silent', '--show-error', '--location',
-		'--connect-timeout', '5', '--max-time', '10',
+		'--connect-timeout', '3', '--max-time', '6',
 		family == 6 ? '-6' : '-4'
 	];
 	if (proxy) {

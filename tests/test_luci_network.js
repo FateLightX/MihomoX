@@ -62,6 +62,7 @@ function E(tag, attributes, children) {
 }
 
 const calls = [];
+let releaseCore;
 const results = {
     core: { success: true },
     system_dns: { success: true, latency: 12 },
@@ -75,6 +76,8 @@ const results = {
 const mihomox = {
     networkTest: (test) => {
         calls.push(test);
+        if (test === 'core')
+            return new Promise((resolve) => { releaseCore = () => resolve(results[test]); });
         return Promise.resolve(results[test]);
     }
 };
@@ -92,7 +95,17 @@ networkView.render();
 const button = created.find((node) => node.tag === 'button');
 assert.ok(button?.listeners?.click, 'start test button is missing');
 
-Promise.resolve(button.listeners.click()).then(() => {
+const run = button.listeners.click();
+Promise.resolve().then(() => {
+    assert.deepStrictEqual(calls, ['core'], 'network tests must run one at a time');
+    assert.strictEqual(
+        created.filter((node) => node.attributes?.class === 'mihomox-network-value' && node.textContent === 'Testing').length,
+        1,
+        'only the active network test should show as testing'
+    );
+    releaseCore();
+    return run;
+}).then(() => {
     assert.deepStrictEqual(calls, ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4', 'ipv6', 'nat']);
     assert.strictEqual(button.disabled, false);
     console.log('LuCI network test page tests passed');

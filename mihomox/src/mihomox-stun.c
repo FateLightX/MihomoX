@@ -20,7 +20,7 @@
 #define STUN_ATTR_CHANGED_ADDRESS 0x0005u
 #define STUN_ATTR_XOR_MAPPED_ADDRESS 0x0020u
 #define STUN_ATTR_OTHER_ADDRESS 0x802cu
-#define STUN_TIMEOUT_MS 2500
+#define STUN_TIMEOUT_MS 1500
 
 struct endpoint {
     struct in_addr addr;
@@ -235,13 +235,16 @@ int main(int argc, char **argv) {
 
     if (argc == 2 && strcmp(argv[1], "--self-test") == 0)
         return self_test();
+    alarm(12);
     if (resolve_ipv4("stun.cloudflare.com", "3478", &primary) != 0 ||
         resolve_ipv4("stun.l.google.com", "19302", &secondary) != 0) {
+        alarm(0);
         puts("{\"success\":false,\"type\":\"Unknown\",\"error\":\"resolve_failed\"}");
         return 0;
     }
     socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (socket_fd < 0) {
+        alarm(0);
         puts("{\"success\":false,\"type\":\"Unknown\",\"error\":\"socket_failed\"}");
         return 0;
     }
@@ -249,6 +252,7 @@ int main(int argc, char **argv) {
     if (stun_query(socket_fd, &primary, 0, &first) != 0 ||
         stun_query(socket_fd, &secondary, 0, &second) != 0) {
         close(socket_fd);
+        alarm(0);
         puts("{\"success\":false,\"type\":\"Unknown\",\"error\":\"timeout\"}");
         return 0;
     }
@@ -276,6 +280,7 @@ int main(int argc, char **argv) {
 
     endpoint_string(&first.mapped, mapped, sizeof(mapped));
     close(socket_fd);
+    alarm(0);
     printf("{\"success\":true,\"type\":\"%s\",\"mapped\":\"%s\",\"latency\":%d}\n",
            type, mapped, first.latency_ms);
     return 0;
