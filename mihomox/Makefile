@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 MIHOMO_SOURCE_VERSION:=7198c9dc1eeba39e12cf37176a6ad1ff9cda3732
 MIHOMO_BUILD_VERSION:=alpha-7198c9d-mihomox
@@ -130,6 +130,8 @@ endef
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
+	# Build/Prepare/Default overlays package src/ into the Go module root.
+	$(RM) $(PKG_BUILD_DIR)/mihomox-stun.c
 	$(RM) -r $(PKG_BUILD_DIR)/rules/logic_test
 	$(CURDIR)/scripts/fetch_geodata.sh \
 		--dl-dir "$(DL_DIR)" \
