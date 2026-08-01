@@ -140,8 +140,6 @@ function updateProvider(name) {
 }
 
 function updateAll() {
-    if (!globalExecutionEnabled())
-        return Promise.resolve();
     const names = Object.keys(controls).filter((name) => controls[name].supported && controls[name].enabled.checked);
     pageMessage(_('Starting Update'));
     return saveAll().then(function () {
@@ -187,7 +185,7 @@ function refreshRenderedStatuses() {
     }
 }
 
-function providerRow(name, provider, concurrency, executionEnabled) {
+function providerRow(name, provider, concurrency) {
     const policy = savedPolicy(currentData, name, provider);
     const status = provider.discardStatus || {};
     const expanded = expandedProvider === name;
@@ -219,7 +217,7 @@ function providerRow(name, provider, concurrency, executionEnabled) {
         settingRow(_('Failed Retries'), retries),
         E('div', { 'class': 'mihomox-provider-detail-actions' }, [
             E('button', { 'class': 'cbi-button cbi-button-neutral', type: 'button', disabled: supported ? null : '', click: () => saveProvider(name).then(() => pageMessage(_('Saved'))) }, _('Save')),
-            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', disabled: supported && executionEnabled ? null : '', click: () => updateProvider(name) }, _('Update and Test'))
+            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', disabled: supported ? null : '', click: () => updateProvider(name) }, _('Update and Test'))
         ])
     ]);
     const toggleDetails = E('button', {
@@ -262,9 +260,6 @@ function renderContent() {
     const concurrency = Number(currentData?.config?.global?.concurrency || 5);
     const executionEnabled = globalExecutionEnabled();
     const content = pageRoot.querySelector('.mihomox-provider-content');
-    const updateAllButton = pageRoot.querySelector('.mihomox-provider-update-all');
-    if (updateAllButton)
-        updateAllButton.disabled = !executionEnabled;
     content.replaceChildren();
 
     if (!entries.length) {
@@ -276,7 +271,7 @@ function renderContent() {
     executionToggle.checked = executionEnabled;
     executionToggle.addEventListener('change', () => setGlobalExecution(executionToggle.checked));
     content.appendChild(E('div', { 'class': 'mihomox-provider-global' }, [
-        E('label', { 'class': 'mihomox-provider-execution' }, [ executionToggle, E('span', {}, _('Enable Provider Filtering')) ]),
+        E('label', { 'class': 'mihomox-provider-execution' }, [ executionToggle, E('span', {}, _('Enable Automatic Filtering')) ]),
         E('label', {}, [
             E('span', {}, _('Node Concurrency')),
             E('input', { 'class': 'cbi-input-text mihomox-provider-concurrency', type: 'number', min: '1', max: '20', step: '1', value: String(concurrency) })
@@ -290,7 +285,7 @@ function renderContent() {
     ]));
     const list = E('div', { 'class': 'mihomox-provider-list' });
     for (const [name, provider] of entries)
-        list.appendChild(providerRow(name, provider, concurrency, executionEnabled));
+        list.appendChild(providerRow(name, provider, concurrency));
     content.appendChild(list);
 }
 

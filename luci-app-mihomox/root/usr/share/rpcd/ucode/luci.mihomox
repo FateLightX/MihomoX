@@ -191,7 +191,7 @@ function provider_filter_state(key) {
 	}
 }
 
-function provider_filter_enqueue(provider) {
+function provider_filter_enqueue(provider, manual) {
 	if (!access(PROVIDER_FILTER_SCRIPT, 'x'))
 		return { success: false, error: 'manager_missing' };
 	const manifest = provider_filter_manifest();
@@ -200,9 +200,10 @@ function provider_filter_enqueue(provider) {
 		return { success: false, error: 'restart_required' };
 	if (meta.supported == false)
 		return { success: false, error: 'unsupported_provider' };
-	if (provider_discard_config().global.enabled == false)
+	if (!manual && provider_discard_config().global.enabled == false)
 		return { success: false, error: 'execution_disabled' };
-	const process = popen(join(' ', map([PROVIDER_FILTER_SCRIPT, 'enqueue', provider], shell_quote)), 'r');
+	const action = manual ? 'manual' : 'enqueue';
+	const process = popen(join(' ', map([PROVIDER_FILTER_SCRIPT, action, provider], shell_quote)), 'r');
 	if (!process)
 		return { success: false, error: 'start_failed' };
 	process.read('all');
@@ -692,7 +693,7 @@ const methods = {
 			if (!write_provider_discard_config(config))
 				return { success: false, error: 'write_failed' };
 
-			const result = !enabled ? provider_filter_enqueue(provider) : { success: true };
+			const result = !enabled ? provider_filter_enqueue(provider, true) : { success: true };
 			return { success: true, applied: result.success, queued: result.success, policy: policy };
 		}
 	},
@@ -702,7 +703,7 @@ const methods = {
 			const provider = req.args?.provider || '';
 			if (!valid_api_value(provider, 256) || provider == '')
 				return { success: false, error: 'invalid_provider' };
-			const result = provider_filter_enqueue(provider);
+			const result = provider_filter_enqueue(provider, true);
 			return { success: result.success, started: result.success, error: result.error };
 		}
 	},

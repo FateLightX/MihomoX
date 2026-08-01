@@ -381,14 +381,22 @@ prepare_profile() {
 }
 
 enqueue_provider() {
-	local name key request state total tested available discarded
+	local name manual key request suffix state total tested available discarded
 	name="$1"
-	manager_enabled || return 1
+	manual="${2:-false}"
+	manager_enabled || [ "$manual" = true ] || return 1
 	[ -s "$MANIFEST_FILE" ] || return 1
 	key=$(PROVIDER_NAME="$name" "$YQ" -r \
 		'.providers[strenv(PROVIDER_NAME)] | select(.supported == true) | .key // ""' "$MANIFEST_FILE")
 	[ -n "$key" ] || return 1
-	request="$QUEUE_DIR/$key.request"
+	suffix=request
+	if [ "$manual" = true ]; then
+		suffix=manual
+		rm -f "$QUEUE_DIR/$key.request"
+	elif [ -e "$QUEUE_DIR/$key.manual" ]; then
+		return 0
+	fi
+	request="$QUEUE_DIR/$key.$suffix"
 	printf '%s\n' "$name" > "$request.tmp.$$" && mv -f "$request.tmp.$$" "$request" || return 1
 	state=$("$YQ" -r '.state // ""' "$FILTER_DIR/$key/state.json" 2>/dev/null)
 	case "$state" in downloading|testing) return 0 ;; esac
@@ -426,9 +434,8 @@ run_worker() {
 	while :; do
 		if ! manager_enabled; then
 			rm -f "$QUEUE_DIR"/*.request
-			break
 		fi
-		request=$(find "$QUEUE_DIR" -maxdepth 1 -type f -name '*.request' 2>/dev/null | sort | head -n 1)
+		request=$(find "$QUEUE_DIR" -maxdepth 1 -type f \( -name '*.manual' -o -name '*.request' \) 2>/dev/null | sort | head -n 1)
 		[ -n "$request" ] || break
 		name=$(cat "$request")
 		rm -f "$request"
@@ -445,7 +452,7 @@ stop_manager() {
 		kill "$(cat "$WORKER_PID")" 2>/dev/null || true
 	fi
 	stop_probe
-	rm -f "$WORKER_PID" "$QUEUE_DIR"/*.request
+	rm -f "$WORKER_PID" "$QUEUE_DIR"/*.request "$QUEUE_DIR"/*.manual
 	rmdir "$LOCK_DIR" 2>/dev/null || true
 }
 
@@ -456,6 +463,10 @@ case "${1:-}" in
 	enqueue)
 		prepare_dirs
 		enqueue_provider "$2" && start_worker
+		;;
+	manual)
+		prepare_dirs
+		enqueue_provider "$2" true && start_worker
 		;;
 	tick)
 		prepare_dirs
@@ -469,7 +480,7 @@ case "${1:-}" in
 		stop_manager
 		;;
 	*)
-		echo "usage: $0 {prepare PROFILE|enqueue PROVIDER|tick|worker|stop}" >&2
+		echo "usage: $0 {prepare PROFILE|enqueue PROVIDER|manual PROVIDER|tick|worker|stop}" >&2
 		exit 2
 		;;
 esac

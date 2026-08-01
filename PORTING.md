@@ -84,8 +84,8 @@ LuCI 和 `/etc/init.d/mihomox update_core` 最终都调用
 ## 6. Provider 丢弃模式
 
 Provider 策略保存在 `/etc/mihomox/provider-discard.json`，不写入用户 YAML 或 UCI。
-全局 `enabled` 开关关闭时，cron、手动请求和 worker 都停止执行并清空待处理队列，但
-不替换当前发布文件。
+全局 `enabled` 开关关闭时，cron 和自动队列停止执行并清空待处理任务，但不替换当前
+发布文件；用户发起的单次手动任务使用独立队列，仍可启动 worker 并在完成后退出。
 启动时只修改生成的运行配置：支持的 HTTP Provider 保持原名称，但数据源转换为
 `/etc/mihomox/run/provider-filter/<key>/current.yaml`。策略组引用无需改变。
 

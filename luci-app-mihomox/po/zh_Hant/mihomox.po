@@ -1429,8 +1429,8 @@ msgstr "直連隔離"
 msgid "Unsupported"
 msgstr "不支援"
 
-msgid "Enable Provider Filtering"
-msgstr "執行 Provider 過濾"
+msgid "Enable Automatic Filtering"
+msgstr "啟用自動過濾"
 
 msgid "Provider filtering is disabled."
 msgstr "Provider 過濾已關閉。"

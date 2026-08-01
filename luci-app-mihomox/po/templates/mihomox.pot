@@ -1422,7 +1422,7 @@ msgstr ""
 msgid "Unsupported"
 msgstr ""
 
-msgid "Enable Provider Filtering"
+msgid "Enable Automatic Filtering"
 msgstr ""
 
 msgid "Provider filtering is disabled."

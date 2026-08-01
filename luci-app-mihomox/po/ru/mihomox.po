@@ -1375,8 +1375,8 @@ msgstr "Прямая изоляция"
 msgid "Unsupported"
 msgstr "Не поддерживается"
 
-msgid "Enable Provider Filtering"
-msgstr "Выполнять фильтрацию провайдеров"
+msgid "Enable Automatic Filtering"
+msgstr "Включить автоматическую фильтрацию"
 
 msgid "Provider filtering is disabled."
 msgstr "Фильтрация провайдеров отключена."
