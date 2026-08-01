@@ -54,7 +54,7 @@ prepare_dirs() {
 }
 
 provider_key() {
-	printf '%s' "$1" | od -An -tx1 | tr -d ' \n'
+	printf '%s' "$1" | hexdump -ve '1/1 "%02x"'
 }
 
 provider_dir() {
@@ -109,7 +109,7 @@ manager_enabled() {
 
 percent_encode() {
 	local byte
-	for byte in $(printf '%s' "$1" | od -An -tx1); do
+	for byte in $(printf '%s' "$1" | hexdump -ve '1/1 "%02x\n"'); do
 		case "$byte" in
 			2d|2e|3[0-9]|4[1-9a-f]|5[0-9a]|5f|6[1-9a-f]|7[0-9a]|7e)
 				printf '%b' "\\x$byte"
@@ -119,10 +119,21 @@ percent_encode() {
 	done
 }
 
+read_pid() {
+	local file pid
+	file="$1"
+	[ -s "$file" ] || return 1
+	pid=$(cat "$file" 2>/dev/null) || return 1
+	case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$pid" -gt 1 ] || return 1
+	printf '%s\n' "$pid"
+}
+
 stop_probe() {
-	if [ -s "$PROBE_DIR/pid" ]; then
-		kill "$(cat "$PROBE_DIR/pid")" 2>/dev/null || true
-		wait "$(cat "$PROBE_DIR/pid")" 2>/dev/null || true
+	local pid
+	if pid=$(read_pid "$PROBE_DIR/pid"); then
+		kill "$pid" 2>/dev/null || true
+		wait "$pid" 2>/dev/null || true
 	fi
 	rm -f "$PROBE_DIR/pid"
 }
@@ -154,7 +165,7 @@ probe_one() {
 }
 
 start_probe() {
-	local source_file raw_file config_file count
+	local source_file raw_file config_file count pid
 	source_file="$1"
 	raw_file="$2"
 	config_file="$PROBE_DIR/config.yaml"
@@ -162,7 +173,7 @@ start_probe() {
 	probe_mark_available || return 1
 	stop_probe
 	mkdir -p "$PROBE_DIR"
-	PROBE_SECRET=$(od -An -N16 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+	PROBE_SECRET=$(head -c 16 /dev/urandom 2>/dev/null | hexdump -ve '1/1 "%02x"')
 	[ -n "$PROBE_SECRET" ] || return 1
 	cat > "$config_file" <<-EOF
 	external-controller: 127.0.0.1:$PROBE_PORT
@@ -173,6 +184,12 @@ start_probe() {
 	mixed-port: 0
 	mode: rule
 	routing-mark: $PROBE_MARK
+	dns:
+	  enable: true
+	  ipv6: false
+	  nameserver:
+	    - https://223.5.5.5/dns-query
+	    - https://1.1.1.1/dns-query
 	proxy-providers:
 	  candidate: {}
 	proxy-groups:
@@ -202,7 +219,8 @@ start_probe() {
 			-o "$PROBE_DIR/provider.json" 2>/dev/null && [ -s "$raw_file" ]; then
 			return 0
 		fi
-		kill -0 "$(cat "$PROBE_DIR/pid")" 2>/dev/null || return 1
+		pid=$(read_pid "$PROBE_DIR/pid") || return 1
+		kill -0 "$pid" 2>/dev/null || return 1
 		count=$((count + 1))
 		sleep 1
 	done
@@ -211,8 +229,9 @@ start_probe() {
 
 update_one() {
 	local name dir source_file raw_file current_file names_file filtered_file
-	local enabled total tested available discarded concurrency running line pids pid
+	local manual enabled total tested available discarded concurrency running line pids pid
 	name="$1"
+	manual="${2:-false}"
 	dir=$(provider_dir "$name")
 	source_file="$dir/source.yaml"
 	raw_file="$dir/raw.yaml"
@@ -223,7 +242,7 @@ update_one() {
 
 	[ -s "$source_file" ] || return 1
 	enabled=$(policy_field "$name" enabled false)
-	if [ "$enabled" != true ] && [ -s "$raw_file" ]; then
+	if [ "$manual" != true ] && [ "$enabled" != true ] && [ -s "$raw_file" ]; then
 		total=$("$YQ" -r '.proxies | length' "$raw_file" 2>/dev/null)
 		case "$total" in ''|*[!0-9]*) total=0 ;; esac
 		cp -f "$raw_file" "$filtered_file" && mv -f "$filtered_file" "$current_file"
@@ -256,7 +275,7 @@ update_one() {
 		return 1
 	fi
 
-	if [ "$enabled" != true ]; then
+	if [ "$manual" != true ] && [ "$enabled" != true ]; then
 		cp -f "$raw_file" "$filtered_file" && mv -f "$filtered_file" "$current_file"
 		stop_probe
 		write_state "$name" disabled "$total" "$total" "$total" 0 keep_all
@@ -365,7 +384,10 @@ prepare_profile() {
 		mkdir -p "$dir"
 		PROVIDER_NAME="$name" "$YQ" -o=yaml '.["proxy-providers"][strenv(PROVIDER_NAME)]' \
 			"$profile" > "$source_file" || continue
-		unsupported=$("$YQ" -r 'has("proxy") or has("override")' "$source_file")
+		unsupported=$("$YQ" -r '
+			has("override") or
+			((.proxy // "") as $proxy | ($proxy != "" and $proxy != "DIRECT" and $proxy != "direct"))' \
+			"$source_file")
 		interval=$("$YQ" -r '.interval // 3600' "$source_file")
 		case "$interval" in ''|*[!0-9]*) interval=3600 ;; esac
 		test_url=$("$YQ" -r '.["health-check"].url // ""' "$source_file")
@@ -449,7 +471,7 @@ queue_due() {
 }
 
 run_worker() {
-	local request name
+	local request name manual
 	prepare_dirs
 	mkdir "$LOCK_DIR" 2>/dev/null || return 0
 	printf '%s\n' "$$" > "$WORKER_PID"
@@ -461,8 +483,10 @@ run_worker() {
 		request=$(find "$QUEUE_DIR" -maxdepth 1 -type f \( -name '*.manual' -o -name '*.request' \) 2>/dev/null | sort | head -n 1)
 		[ -n "$request" ] || break
 		name=$(cat "$request")
+		manual=false
+		case "$request" in *.manual) manual=true ;; esac
 		rm -f "$request"
-		update_one "$name" || true
+		update_one "$name" "$manual" || true
 	done
 }
 
@@ -471,8 +495,9 @@ start_worker() {
 }
 
 stop_manager() {
-	if [ -s "$WORKER_PID" ]; then
-		kill "$(cat "$WORKER_PID")" 2>/dev/null || true
+	local pid
+	if pid=$(read_pid "$WORKER_PID"); then
+		kill "$pid" 2>/dev/null || true
 	fi
 	stop_probe
 	rm -f "$WORKER_PID" "$QUEUE_DIR"/*.request "$QUEUE_DIR"/*.manual

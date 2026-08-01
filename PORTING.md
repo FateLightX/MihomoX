@@ -85,7 +85,8 @@ LuCI 和 `/etc/init.d/mihomox update_core` 最终都调用
 
 Provider 策略保存在 `/etc/mihomox/provider-discard.json`，不写入用户 YAML 或 UCI。
 全局 `enabled` 开关关闭时，cron 和自动队列停止执行并清空待处理任务，但不替换当前
-发布文件；用户发起的单次手动任务使用独立队列，仍可启动 worker 并在完成后退出。
+发布文件；用户发起的单次手动任务使用独立队列，不受全局及单 Provider 开关限制，仍可
+启动 worker 并在完成后退出。
 启动时只修改生成的运行配置：支持的 HTTP Provider 保持原名称，但数据源转换为
 `/etc/mihomox/run/provider-filter/<key>/current.yaml`。策略组引用无需改变。
 
@@ -105,10 +106,12 @@ Provider 策略保存在 `/etc/mihomox/provider-discard.json`，不写入用户 
 临时核心所有出站 socket 使用独立 `provider_probe_fw_mark`，nftables output 链在透明代理
 处理前直接返回，因此检测不会经过主核心当前代理。检测进程同时清空 HTTP(S)/ALL_PROXY
 环境变量，只监听本机控制端口，并在完成、失败或服务停止时清理进程和队列。检测 mark
-与 TPROXY/TUN mark 冲突时停止本轮检测并保留原 Provider，避免改变主链路路由。
+与 TPROXY/TUN mark 冲突时停止本轮检测并保留原 Provider，避免改变主链路路由。临时
+核心使用 IP 形式的 DoH，避免系统 DNS 的 Fake-IP 结果进入直连检测链路。
 
-不支持依赖其他代理下载的 Provider（`proxy`）及名称重写（`override`）；此类 Provider
-保持原 HTTP 模式并在页面标记为不支持，避免静默改变语义。
+允许 `proxy: DIRECT`；不支持依赖其他代理组下载的 Provider（非 `DIRECT` 的 `proxy`）
+及名称重写（`override`）。此类 Provider 保持原 HTTP 模式并在页面标记为不支持，避免
+静默改变语义。
 
 ## 7. 持久化和迁移
 
