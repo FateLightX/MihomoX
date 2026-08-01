@@ -1429,6 +1429,12 @@ msgstr "Прокси-провайдеры не найдены."
 msgid "Node Concurrency"
 msgstr "Параллельная проверка узлов"
 
+msgid "Unified Delay"
+msgstr "Унифицированная задержка"
+
+msgid "Maximum Delay"
+msgstr "Максимальная задержка"
+
 msgid "Node Management"
 msgstr "Управление узлами"
 

@@ -50,6 +50,7 @@ assert.ok(acl.write.ubus['luci.mihomox'].includes('update_provider_discard'));
 assert.ok(/method:\s*'set_provider_discard'[\s\S]*?nobatch:\s*true/.test(toolSource));
 assert.ok(/method:\s*'set_provider_discard_global'[\s\S]*?nobatch:\s*true/.test(toolSource));
 assert.ok(/method:\s*'update_provider_discard'[\s\S]*?nobatch:\s*true/.test(toolSource));
+assert.ok(toolSource.includes("'unified_delay', 'max_delay'"));
 
 assert.ok(viewSource.includes("_('Node Management')"));
 assert.ok(viewSource.includes('mihomox-provider-details'));
@@ -59,18 +60,27 @@ assert.ok(!viewSource.includes('mihomox.reload'), 'saving discard settings must 
 assert.ok(appSource.includes('Prerelease Alpha changes frequently'));
 assert.ok(viewSource.includes("_('Direct Isolation')"));
 assert.ok(viewSource.includes("_('Enable Automatic Filtering')"));
+assert.ok(viewSource.includes("_('Unified Delay')"));
+assert.ok(viewSource.includes("_('Maximum Delay')"));
+assert.ok(viewSource.includes('mihomox-provider-max-delay'));
 assert.ok(!viewSource.includes('updateAllButton.disabled = !executionEnabled'));
 assert.ok(!viewSource.includes('supported && executionEnabled'));
-assert.ok(viewSource.includes('manualSupported ? null'));
+assert.ok(/cbi-button cbi-button-action', type: 'button', click: \(\) => updateProvider\(name\)/.test(viewSource),
+    'manual provider check button must never be disabled by provider state');
+assert.ok(!viewSource.includes('manualSupported'));
 assert.ok(viewSource.includes("_('Test Completed')"));
 assert.ok(viewSource.includes("_('Waiting Test')"));
 assert.ok(viewSource.includes('mihomox-provider-progress'));
 assert.ok(viewSource.includes('refreshRenderedStatuses()'));
 assert.ok(viewSource.includes('poll.add(() => refreshPage(false), 2)'));
 assert.strictEqual(defaultPolicy.global.enabled, true);
+assert.strictEqual(defaultPolicy.global.unifiedDelay, true);
+assert.strictEqual(defaultPolicy.global.maxDelay, 400);
 
 assert.ok(rpcSource.includes("const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json'"));
 assert.ok(rpcSource.includes("sprintf('%J\\n', config)"));
+assert.ok(rpcSource.includes('maxDelay: 400'));
+assert.ok(rpcSource.includes('config.global.unifiedDelay = config.global.unifiedDelay !== false'));
 assert.ok(rpcSource.includes('provider_filter_enqueue(provider, manual)'));
 assert.ok(rpcSource.includes("const action = manual ? 'manual' : 'enqueue'"));
 assert.ok(rpcSource.includes('provider_filter_enqueue(provider, true)'));
@@ -88,6 +98,10 @@ assert.ok(managerSource.includes('probe_mark_available'));
 assert.ok(managerSource.includes('manager_enabled'));
 assert.ok(managerSource.includes('manager_enabled || return 0'));
 assert.ok(managerSource.includes('write_state "$name" queued'));
+assert.ok(managerSource.includes('unified-delay: $UNIFIED_DELAY'));
+assert.ok(managerSource.includes('global_field maxDelay 400'));
+assert.ok(managerSource.includes("'.delay // 0'"));
+assert.ok(managerSource.includes('"$delay" -le "$MAX_DELAY"'));
 assert.ok(managerSource.includes('enqueue_provider "$2" true'));
 assert.ok(managerSource.includes("-name '*.manual'"));
 assert.ok(managerSource.includes('expected=$EXPECTED_STATUS'));

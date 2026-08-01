@@ -144,19 +144,22 @@ function url_encode_component(value) {
 }
 
 function provider_discard_config() {
-	let config = { global: { enabled: true, concurrency: 5 }, providers: {} };
+	let config = { global: { enabled: true, concurrency: 5, unifiedDelay: true, maxDelay: 400 }, providers: {} };
 	try {
 		const stored = json(readfile(PROVIDER_DISCARD_FILE) || '');
 		if (stored && type(stored) == 'object')
 			config = stored;
 	} catch (e) {}
 	if (!config.global || type(config.global) != 'object')
-		config.global = { enabled: true, concurrency: 5 };
+		config.global = { enabled: true, concurrency: 5, unifiedDelay: true, maxDelay: 400 };
 	if (!config.providers || type(config.providers) != 'object')
 		config.providers = {};
 	let concurrency = int(config.global.concurrency);
+	let max_delay = config.global.maxDelay == null ? 400 : int(config.global.maxDelay);
 	config.global.enabled = config.global.enabled !== false;
 	config.global.concurrency = concurrency >= 1 && concurrency <= 20 ? concurrency : 5;
+	config.global.unifiedDelay = config.global.unifiedDelay !== false;
+	config.global.maxDelay = max_delay >= 0 && max_delay <= 30000 ? max_delay : 400;
 	return config;
 }
 
@@ -691,15 +694,23 @@ const methods = {
 		}
 	},
 	set_provider_discard_global: {
-		args: { enabled: 'enabled', concurrency: 'concurrency' },
+		args: { enabled: 'enabled', concurrency: 'concurrency', unified_delay: 'unified_delay', max_delay: 'max_delay' },
 		call: function(req) {
+			const config = provider_discard_config();
 			const enabled = req.args?.enabled == true || req.args?.enabled == 'true' || req.args?.enabled == '1';
 			const concurrency = int(req.args?.concurrency);
-			if (concurrency < 1 || concurrency > 20)
+			const unified_delay = req.args?.unified_delay == null
+				? config.global.unifiedDelay
+				: req.args.unified_delay == true || req.args.unified_delay == 'true' || req.args.unified_delay == '1';
+			const max_delay = req.args?.max_delay == null || req.args?.max_delay == ''
+				? config.global.maxDelay
+				: int(req.args.max_delay);
+			if (concurrency < 1 || concurrency > 20 || max_delay < 0 || max_delay > 30000)
 				return { success: false, error: 'invalid_policy' };
-			const config = provider_discard_config();
 			config.global.enabled = enabled;
 			config.global.concurrency = concurrency;
+			config.global.unifiedDelay = unified_delay;
+			config.global.maxDelay = max_delay;
 			if (!write_provider_discard_config(config))
 				return { success: false, error: 'write_failed' };
 			if (!enabled)
@@ -708,18 +719,25 @@ const methods = {
 		}
 	},
 	set_provider_discard: {
-		args: { provider: 'provider', enabled: 'enabled', url: 'url', timeout: 'timeout', retries: 'retries', concurrency: 'concurrency' },
+		args: { provider: 'provider', enabled: 'enabled', url: 'url', timeout: 'timeout', retries: 'retries', concurrency: 'concurrency', unified_delay: 'unified_delay', max_delay: 'max_delay' },
 		call: function(req) {
+			const config = provider_discard_config();
 			const provider = req.args?.provider || '';
 			const enabled = req.args?.enabled == true || req.args?.enabled == 'true' || req.args?.enabled == '1';
 			const url = trim(req.args?.url || '');
 			const timeout = int(req.args?.timeout);
 			const retries = int(req.args?.retries);
 			const concurrency = int(req.args?.concurrency);
+			const unified_delay = req.args?.unified_delay == null
+				? config.global.unifiedDelay
+				: req.args.unified_delay == true || req.args.unified_delay == 'true' || req.args.unified_delay == '1';
+			const max_delay = req.args?.max_delay == null || req.args?.max_delay == ''
+				? config.global.maxDelay
+				: int(req.args.max_delay);
 			if (!valid_api_value(provider, 256) || provider == '' ||
 				!valid_api_value(url, 2048) || (url != '' && !match(url, /^https?:\/\//)) ||
 				timeout < 500 || timeout > 30000 || retries < 0 || retries > 5 ||
-				concurrency < 1 || concurrency > 20)
+				concurrency < 1 || concurrency > 20 || max_delay < 0 || max_delay > 30000)
 				return { success: false, error: 'invalid_policy' };
 
 			const policy = {
@@ -729,8 +747,9 @@ const methods = {
 				retries: retries,
 				concurrency: concurrency
 			};
-			const config = provider_discard_config();
 			config.global.concurrency = concurrency;
+			config.global.unifiedDelay = unified_delay;
+			config.global.maxDelay = max_delay;
 			config.providers[provider] = policy;
 			if (!write_provider_discard_config(config))
 				return { success: false, error: 'write_failed' };

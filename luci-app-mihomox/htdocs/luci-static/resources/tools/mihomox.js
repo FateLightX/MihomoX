@@ -88,7 +88,7 @@ const callMihomoXProviderDiscard = rpc.declare({
 const callMihomoXSetProviderDiscard = rpc.declare({
     object: 'luci.mihomox',
     method: 'set_provider_discard',
-    params: ['provider', 'enabled', 'url', 'timeout', 'retries', 'concurrency'],
+    params: ['provider', 'enabled', 'url', 'timeout', 'retries', 'concurrency', 'unified_delay', 'max_delay'],
     expect: { '': {} },
     nobatch: true
 });
@@ -96,7 +96,7 @@ const callMihomoXSetProviderDiscard = rpc.declare({
 const callMihomoXSetProviderDiscardGlobal = rpc.declare({
     object: 'luci.mihomox',
     method: 'set_provider_discard_global',
-    params: ['enabled', 'concurrency'],
+    params: ['enabled', 'concurrency', 'unified_delay', 'max_delay'],
     expect: { '': {} },
     nobatch: true
 });
@@ -301,19 +301,26 @@ return baseclass.extend({
         return callMihomoXProviderDiscard();
     },
 
-    setProviderDiscard: function (provider, policy, concurrency) {
+    setProviderDiscard: function (provider, policy, global) {
         return callMihomoXSetProviderDiscard(
             provider,
             String(!!policy.enabled),
             policy.url || '',
             String(policy.timeout),
             String(policy.retries),
-            String(concurrency)
+            String(global.concurrency),
+            String(!!global.unifiedDelay),
+            String(global.maxDelay)
         );
     },
 
-    setProviderDiscardGlobal: function (enabled, concurrency) {
-        return callMihomoXSetProviderDiscardGlobal(String(!!enabled), String(concurrency));
+    setProviderDiscardGlobal: function (enabled, global) {
+        return callMihomoXSetProviderDiscardGlobal(
+            String(!!enabled),
+            String(global.concurrency),
+            String(!!global.unifiedDelay),
+            String(global.maxDelay)
+        );
     },
 
     updateProviderDiscard: function (provider) {

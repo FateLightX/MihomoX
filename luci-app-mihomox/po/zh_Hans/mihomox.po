@@ -1483,6 +1483,12 @@ msgstr "未发现代理 Provider。"
 msgid "Node Concurrency"
 msgstr "节点检测并发"
 
+msgid "Unified Delay"
+msgstr "统一延迟"
+
+msgid "Maximum Delay"
+msgstr "最大延迟"
+
 msgid "Node Management"
 msgstr "节点管理"
 

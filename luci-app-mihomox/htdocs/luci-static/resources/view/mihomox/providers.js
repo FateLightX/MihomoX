@@ -83,9 +83,15 @@ function collectPolicy(name) {
     };
 }
 
-function globalConcurrency() {
-    const input = pageRoot?.querySelector('.mihomox-provider-concurrency');
-    return input ? numericValue(input, 5, 1, 20) : 5;
+function globalPolicy() {
+    const concurrency = pageRoot?.querySelector('.mihomox-provider-concurrency');
+    const unifiedDelay = pageRoot?.querySelector('.mihomox-provider-unified-delay');
+    const maxDelay = pageRoot?.querySelector('.mihomox-provider-max-delay');
+    return {
+        concurrency: concurrency ? numericValue(concurrency, 5, 1, 20) : 5,
+        unifiedDelay: unifiedDelay ? !!unifiedDelay.checked : true,
+        maxDelay: maxDelay ? numericValue(maxDelay, 400, 0, 30000) : 400
+    };
 }
 
 function globalExecutionEnabled() {
@@ -93,13 +99,14 @@ function globalExecutionEnabled() {
 }
 
 function setGlobalExecution(enabled) {
+    const global = globalPolicy();
     pageMessage(_('Saving'));
-    return mihomox.setProviderDiscardGlobal(enabled, globalConcurrency()).then(function (result) {
+    return mihomox.setProviderDiscardGlobal(enabled, global).then(function (result) {
         if (!result?.success)
             return Promise.reject(new Error(errorLabel(result?.error)));
         currentData.config ||= {};
         currentData.config.global ||= {};
-        currentData.config.global.enabled = enabled;
+        Object.assign(currentData.config.global, global, { enabled: enabled });
         pageMessage(_('Saved'));
         renderContent();
     }).catch(function (error) {
@@ -108,8 +115,8 @@ function setGlobalExecution(enabled) {
     });
 }
 
-function saveProvider(name) {
-    return mihomox.setProviderDiscard(name, collectPolicy(name), globalConcurrency()).then(function (result) {
+function saveProvider(name, global) {
+    return mihomox.setProviderDiscard(name, collectPolicy(name), global || globalPolicy()).then(function (result) {
         if (!result?.success)
             return Promise.reject(new Error(result?.error || 'save_failed'));
         return result;
@@ -118,8 +125,13 @@ function saveProvider(name) {
 
 function saveAll() {
     const names = Object.keys(controls).filter((name) => controls[name].supported);
+    const global = globalPolicy();
     pageMessage(_('Saving'));
-    return Promise.all(names.map(saveProvider)).then(function () {
+    return mihomox.setProviderDiscardGlobal(globalExecutionEnabled(), global).then(function (result) {
+        if (!result?.success)
+            return Promise.reject(new Error(result?.error || 'save_failed'));
+        return names.reduce((promise, name) => promise.then(() => saveProvider(name, global)), Promise.resolve());
+    }).then(function () {
         pageMessage(_('Saved'));
     }).catch(function (error) {
         pageMessage(_('Failed') + ': ' + (error?.message || error), true);
@@ -144,8 +156,8 @@ function updateProvider(name) {
 }
 
 function updateAll() {
-    const names = Object.keys(controls).filter((name) => controls[name].manualSupported &&
-        (!controls[name].supported || controls[name].enabled.checked));
+    const names = Object.keys(controls).filter((name) =>
+        !controls[name].supported || controls[name].enabled.checked);
     pageMessage(_('Starting Update'));
     return saveAll().then(function () {
         return Promise.all(names.map((name) => mihomox.updateProviderDiscard(name)));
@@ -195,7 +207,6 @@ function providerRow(name, provider, concurrency) {
     const status = provider.discardStatus || {};
     const expanded = expandedProvider === name;
     const supported = provider.filterSupported === true && !['unsupported', 'inactive'].includes(status.state);
-    const manualSupported = provider.nativeAvailable !== false || supported;
     const enabled = E('input', { type: 'checkbox', checked: policy.enabled ? '' : null, disabled: supported ? null : '' });
     enabled.checked = !!policy.enabled;
     const url = E('input', {
@@ -214,7 +225,6 @@ function providerRow(name, provider, concurrency) {
     const progressNode = E('progress', { 'class': 'mihomox-provider-progress', max: '1', value: '0', hidden: '' });
     controls[name] = {
         enabled: enabled, url: url, timeout: timeout, retries: retries, supported: supported,
-        manualSupported: manualSupported,
         count: countNode, discarded: discardedNode, state: stateNode, progress: progressNode
     };
 
@@ -224,7 +234,7 @@ function providerRow(name, provider, concurrency) {
         settingRow(_('Failed Retries'), retries),
         E('div', { 'class': 'mihomox-provider-detail-actions' }, [
             E('button', { 'class': 'cbi-button cbi-button-neutral', type: 'button', disabled: supported ? null : '', click: () => saveProvider(name).then(() => pageMessage(_('Saved'))) }, _('Save')),
-            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', disabled: manualSupported ? null : '', click: () => updateProvider(name) }, _('Update and Test'))
+            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', click: () => updateProvider(name) }, _('Update and Test'))
         ])
     ]);
     const toggleDetails = E('button', {
@@ -265,6 +275,8 @@ function renderContent() {
     controls = {};
     const entries = providerEntries(currentData);
     const concurrency = Number(currentData?.config?.global?.concurrency || 5);
+    const unifiedDelay = currentData?.config?.global?.unifiedDelay !== false;
+    const maxDelay = Number(currentData?.config?.global?.maxDelay ?? 400);
     const executionEnabled = globalExecutionEnabled();
     const content = pageRoot.querySelector('.mihomox-provider-content');
     content.replaceChildren();
@@ -277,11 +289,21 @@ function renderContent() {
     const executionToggle = E('input', { type: 'checkbox', checked: executionEnabled ? '' : null });
     executionToggle.checked = executionEnabled;
     executionToggle.addEventListener('change', () => setGlobalExecution(executionToggle.checked));
+    const unifiedDelayToggle = E('input', { 'class': 'mihomox-provider-unified-delay', type: 'checkbox', checked: unifiedDelay ? '' : null });
+    unifiedDelayToggle.checked = unifiedDelay;
     content.appendChild(E('div', { 'class': 'mihomox-provider-global' }, [
         E('label', { 'class': 'mihomox-provider-execution' }, [ executionToggle, E('span', {}, _('Enable Automatic Filtering')) ]),
+        E('label', {}, [ unifiedDelayToggle, E('span', {}, _('Unified Delay')) ]),
         E('label', {}, [
             E('span', {}, _('Node Concurrency')),
             E('input', { 'class': 'cbi-input-text mihomox-provider-concurrency', type: 'number', min: '1', max: '20', step: '1', value: String(concurrency) })
+        ]),
+        E('label', {}, [
+            E('span', {}, _('Maximum Delay')),
+            E('span', { 'class': 'mihomox-provider-number' }, [
+                E('input', { 'class': 'cbi-input-text mihomox-provider-max-delay', type: 'number', min: '0', max: '30000', step: '50', value: String(maxDelay) }),
+                E('span', {}, 'ms')
+            ])
         ]),
         E('span', { 'class': 'mihomox-provider-isolation' }, _('Detection Route') + ': ' + _('Direct Isolation')),
         E('span', { 'class': 'mihomox-provider-message' })
@@ -322,7 +344,7 @@ return view.extend({
             E('style', {}, `
                 .mihomox-provider-header{display:flex;align-items:center;justify-content:space-between;gap:1em;margin-bottom:1em}
                 .mihomox-provider-header h2{margin:0}.mihomox-provider-actions{display:flex;gap:.5em}
-                .mihomox-provider-global{display:flex;align-items:center;justify-content:space-between;gap:1em;padding:.75em 0;border-top:1px solid var(--border-color-medium,#dbe3ed);border-bottom:1px solid var(--border-color-medium,#dbe3ed)}
+                .mihomox-provider-global{display:flex;align-items:center;justify-content:space-between;gap:1em;flex-wrap:wrap;padding:.75em 0;border-top:1px solid var(--border-color-medium,#dbe3ed);border-bottom:1px solid var(--border-color-medium,#dbe3ed)}
                 .mihomox-provider-global label{display:flex;align-items:center;gap:.7em}.mihomox-provider-concurrency{width:5.5em}
                 .mihomox-provider-message{color:#16a34a}.mihomox-provider-message.is-failed{color:#dc2626}
                 .mihomox-provider-columns,.mihomox-provider-row{display:grid;grid-template-columns:2.5em minmax(10em,1fr) 9em 7em 8em 11em;align-items:center;gap:.75em}

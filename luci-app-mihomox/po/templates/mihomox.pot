@@ -1476,6 +1476,12 @@ msgstr ""
 msgid "Node Concurrency"
 msgstr ""
 
+msgid "Unified Delay"
+msgstr ""
+
+msgid "Maximum Delay"
+msgstr ""
+
 msgid "Node Management"
 msgstr ""
 

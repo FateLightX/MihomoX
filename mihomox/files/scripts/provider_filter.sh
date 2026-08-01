@@ -87,6 +87,19 @@ policy_field() {
 	printf '%s\n' "$value"
 }
 
+global_field() {
+	local field fallback value
+	field="$1"
+	fallback="$2"
+	[ -s "$POLICY_FILE" ] || {
+		printf '%s\n' "$fallback"
+		return
+	}
+	value=$(FIELD="$field" "$YQ" -r '.global[strenv(FIELD)] // ""' "$POLICY_FILE" 2>/dev/null)
+	[ -n "$value" ] && [ "$value" != null ] || value="$fallback"
+	printf '%s\n' "$value"
+}
+
 manager_enabled() {
 	local value
 	[ -s "$POLICY_FILE" ] || return 0
@@ -115,21 +128,25 @@ stop_probe() {
 }
 
 probe_one() {
-	local name encoded_name attempt expected_args
+	local name encoded_name attempt expected_args response delay
 	name="$1"
 	encoded_name=$(percent_encode "$name")
 	attempt=0
 	expected_args=
 	[ -z "$EXPECTED_STATUS" ] || expected_args="expected=$EXPECTED_STATUS"
 	while [ "$attempt" -le "$RETRIES" ]; do
-		if "$CURL" --noproxy '*' --silent --show-error --fail --max-time "$CURL_TIMEOUT" \
+		if response=$("$CURL" --noproxy '*' --silent --show-error --fail --max-time "$CURL_TIMEOUT" \
 			--oauth2-bearer "$PROBE_SECRET" \
 			--get --data-urlencode "url=$TEST_URL" --data-urlencode "timeout=$TIMEOUT" \
 			${expected_args:+--data-urlencode "$expected_args"} \
 			"http://127.0.0.1:$PROBE_PORT/providers/proxies/candidate/$encoded_name/healthcheck" \
-			> /dev/null 2>&1; then
-			printf '%s\n' "$name" >> "$ALIVE_FILE"
-			return 0
+			2>/dev/null); then
+			delay=$(printf '%s' "$response" | "$YQ" -p=json -r '.delay // 0' 2>/dev/null)
+			case "$delay" in ''|*[!0-9]*) delay=0 ;; esac
+			if [ "$delay" -gt 0 ] && { [ "$MAX_DELAY" -eq 0 ] || [ "$delay" -le "$MAX_DELAY" ]; }; then
+				printf '%s\n' "$name" >> "$ALIVE_FILE"
+				return 0
+			fi
 		fi
 		attempt=$((attempt + 1))
 	done
@@ -151,6 +168,7 @@ start_probe() {
 	external-controller: 127.0.0.1:$PROBE_PORT
 	secret: $PROBE_SECRET
 	log-level: silent
+	unified-delay: $UNIFIED_DELAY
 	allow-lan: false
 	mixed-port: 0
 	mode: rule
@@ -214,6 +232,11 @@ update_one() {
 		return 0
 	fi
 	write_state "$name" downloading 0 0 0 0 downloading
+	UNIFIED_DELAY=$(global_field unifiedDelay true)
+	[ "$UNIFIED_DELAY" = false ] || UNIFIED_DELAY=true
+	MAX_DELAY=$(global_field maxDelay 400)
+	case "$MAX_DELAY" in ''|*[!0-9]*) MAX_DELAY=400 ;; esac
+	[ "$MAX_DELAY" -ge 0 ] && [ "$MAX_DELAY" -le 30000 ] || MAX_DELAY=400
 	if ! start_probe "$source_file" "$raw_file"; then
 		stop_probe
 		if probe_mark_available; then
