@@ -801,6 +801,10 @@ msgstr ""
 msgid "Rule Set"
 msgstr ""
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js:334
+msgid "Run Log"
+msgstr ""
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:15
 msgid "Running"
 msgstr ""

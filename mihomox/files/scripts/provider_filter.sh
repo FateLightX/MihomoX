@@ -13,6 +13,8 @@ QUEUE_DIR="$FILTER_DIR/queue"
 LOCK_DIR="$FILTER_DIR/worker.lock"
 WORKER_PID="$FILTER_DIR/worker.pid"
 PROBE_DIR="$FILTER_DIR/probe"
+LOG_FILE="${MIHOMOX_PROVIDER_FILTER_LOG_FILE:-$FILTER_DIR/activity.log}"
+LOG_MAX_BYTES="${MIHOMOX_PROVIDER_FILTER_LOG_MAX_BYTES:-65536}"
 PROBE_PORT="${MIHOMOX_PROVIDER_PROBE_PORT:-19091}"
 PROBE_MARK="${MIHOMOX_PROVIDER_PROBE_MARK:-}"
 YQ="${MIHOMOX_YQ:-yq}"
@@ -54,6 +56,18 @@ probe_mark_available() {
 
 prepare_dirs() {
 	mkdir -p "$STORE_DIR" "$FILTER_DIR" "$QUEUE_DIR"
+}
+
+log_event() {
+	local message size temporary
+	prepare_dirs
+	message=$(printf '%s' "$*" | tr '\r\n' '  ')
+	printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$message" >> "$LOG_FILE"
+	size=$(wc -c < "$LOG_FILE" 2>/dev/null)
+	case "$size:$LOG_MAX_BYTES" in *[!0-9:]*) return ;; esac
+	[ "$size" -le "$LOG_MAX_BYTES" ] && return
+	temporary="$LOG_FILE.tmp.$$"
+	tail -n 300 "$LOG_FILE" > "$temporary" && mv -f "$temporary" "$LOG_FILE"
 }
 
 provider_key() {
@@ -252,7 +266,10 @@ update_one() {
 	ALIVE_FILE="$PROBE_DIR/alive.txt"
 	filtered_file="$dir/current.yaml.tmp.$$"
 
-	[ -s "$source_file" ] || return 1
+	if [ ! -s "$source_file" ]; then
+		log_event "[$name] failed: source_missing"
+		return 1
+	fi
 	enabled=$(policy_field "$name" enabled false)
 	if [ "$manual" != true ] && [ "$enabled" != true ] && [ -s "$raw_file" ]; then
 		total=$("$YQ" -r '.proxies | length' "$raw_file" 2>/dev/null)
@@ -260,9 +277,11 @@ update_one() {
 		cp -f "$raw_file" "$filtered_file" && mv -f "$filtered_file" "$current_file"
 		write_state "$name" disabled "$total" "$total" "$total" 0 keep_all
 		date +%s > "$dir/last_update"
+		log_event "[$name] completed: filtering_disabled available=$total total=$total"
 		return 0
 	fi
 	write_state "$name" downloading 0 0 0 0 downloading
+	log_event "[$name] downloading"
 	UNIFIED_DELAY=$(global_field unifiedDelay true)
 	[ "$UNIFIED_DELAY" = false ] || UNIFIED_DELAY=true
 	MAX_DELAY=$(global_field maxDelay 400)
@@ -276,6 +295,7 @@ update_one() {
 			write_state "$name" failed 0 0 0 0 probe_mark_conflict
 		fi
 		date +%s > "$dir/last_update"
+		log_event "[$name] failed: probe_start_failed"
 		return 1
 	fi
 
@@ -284,14 +304,17 @@ update_one() {
 	if [ "$total" -eq 0 ]; then
 		stop_probe
 		write_state "$name" failed 0 0 0 0 no_nodes
+		log_event "[$name] failed: no_nodes"
 		return 1
 	fi
+	log_event "[$name] downloaded: total=$total"
 
 	if [ "$manual" != true ] && [ "$enabled" != true ]; then
 		cp -f "$raw_file" "$filtered_file" && mv -f "$filtered_file" "$current_file"
 		stop_probe
 		write_state "$name" disabled "$total" "$total" "$total" 0 keep_all
 		date +%s > "$dir/last_update"
+		log_event "[$name] completed: filtering_disabled available=$total total=$total"
 		return 0
 	fi
 
@@ -314,6 +337,7 @@ update_one() {
 	[ "$CURL_TIMEOUT" -ge 3 ] || CURL_TIMEOUT=3
 	: > "$ALIVE_FILE"
 	write_state "$name" testing "$total" 0 0 0 testing
+	log_event "[$name] testing: 0/$total"
 
 	tested=0
 	running=0
@@ -328,6 +352,7 @@ update_one() {
 			tested=$((tested + running))
 			available=$(awk 'NF { count++ } END { print count + 0 }' "$ALIVE_FILE")
 			write_state "$name" testing "$total" "$tested" "$available" "$((tested - available))" testing
+			log_event "[$name] testing: $tested/$total available=$available discarded=$((tested - available))"
 			running=0
 			pids=
 		fi
@@ -337,6 +362,7 @@ update_one() {
 		tested=$((tested + running))
 		available=$(awk 'NF { count++ } END { print count + 0 }' "$ALIVE_FILE")
 		write_state "$name" testing "$total" "$tested" "$available" "$((tested - available))" testing
+		log_event "[$name] testing: $tested/$total available=$available discarded=$((tested - available))"
 	fi
 
 	available=$(awk 'NF { count++ } END { print count + 0 }' "$ALIVE_FILE")
@@ -345,8 +371,10 @@ update_one() {
 		if [ ! -s "$current_file" ]; then
 			cp -f "$raw_file" "$filtered_file" && mv -f "$filtered_file" "$current_file"
 			write_state "$name" fallback "$total" "$total" "$total" 0 initial_keep_all
+			log_event "[$name] completed: no_available_nodes keep_all=true"
 		else
 			write_state "$name" retained "$total" "$total" 0 "$total" retained_previous
+			log_event "[$name] completed: no_available_nodes retained_previous=true"
 		fi
 		stop_probe
 		date +%s > "$dir/last_update"
@@ -361,12 +389,14 @@ update_one() {
 		stop_probe
 		rm -f "$filtered_file"
 		write_state "$name" failed "$total" "$total" 0 "$total" filter_failed
+		log_event "[$name] failed: filter_failed"
 		return 1
 	}
 	mv -f "$filtered_file" "$current_file"
 	stop_probe
 	write_state "$name" active "$total" "$total" "$available" "$discarded" direct_isolation
 	date +%s > "$dir/last_update"
+	log_event "[$name] completed: available=$available total=$total discarded=$discarded"
 	return 0
 }
 
@@ -482,6 +512,7 @@ enqueue_provider() {
 	available=$("$YQ" -r '.available // 0' "$FILTER_DIR/$key/state.json" 2>/dev/null)
 	discarded=$("$YQ" -r '.discarded // 0' "$FILTER_DIR/$key/state.json" 2>/dev/null)
 	write_state "$name" queued "$total" "$tested" "$available" "$discarded" queued
+	log_event "[$name] queued: mode=$([ "$manual" = true ] && printf manual || printf automatic)"
 	return 0
 }
 
@@ -519,6 +550,7 @@ run_worker() {
 		manual=false
 		case "$request" in *.manual) manual=true ;; esac
 		rm -f "$request"
+		log_event "[$name] started"
 		update_one "$name" "$manual" || true
 	done
 }
@@ -535,6 +567,7 @@ stop_manager() {
 	stop_probe
 	rm -f "$WORKER_PID" "$QUEUE_DIR"/*.request "$QUEUE_DIR"/*.manual
 	rmdir "$LOCK_DIR" 2>/dev/null || true
+	log_event "manager stopped"
 }
 
 case "${1:-}" in

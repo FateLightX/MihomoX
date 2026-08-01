@@ -808,6 +808,10 @@ msgstr "Провайдер правил:"
 msgid "Rule Set"
 msgstr "Набор правил"
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js:334
+msgid "Run Log"
+msgstr "Журнал выполнения"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:15
 msgid "Running"
 msgstr "Запущен"

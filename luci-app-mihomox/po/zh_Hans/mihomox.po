@@ -808,6 +808,10 @@ msgstr "规则提供者："
 msgid "Rule Set"
 msgstr "规则集"
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js:334
+msgid "Run Log"
+msgstr "运行日志"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:15
 msgid "Running"
 msgstr "运行中"

@@ -88,6 +88,7 @@ const callMihomoXProviderDiscard = rpc.declare({
 const callMihomoXProviderDiscardStatus = rpc.declare({
     object: 'luci.mihomox',
     method: 'provider_discard_status',
+    params: ['log_offset'],
     expect: { '': {} }
 });
 
@@ -307,8 +308,8 @@ return baseclass.extend({
         return callMihomoXProviderDiscard();
     },
 
-    providerDiscardStatus: function () {
-        return callMihomoXProviderDiscardStatus();
+    providerDiscardStatus: function (logOffset) {
+        return callMihomoXProviderDiscardStatus(String(logOffset || 0));
     },
 
     setProviderDiscard: function (provider, policy, global) {

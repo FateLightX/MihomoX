@@ -17,6 +17,7 @@ const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json';
 const PROVIDER_FILTER_SCRIPT = '/etc/mihomox/scripts/provider_filter.sh';
 const PROVIDER_FILTER_DIR = '/etc/mihomox/run/provider-filter';
 const PROVIDER_FILTER_MANIFEST = PROVIDER_FILTER_DIR + '/manifest.json';
+const PROVIDER_FILTER_LOG = PROVIDER_FILTER_DIR + '/activity.log';
 const STUN_TEST_HELPER = '/usr/libexec/mihomox/stun-test';
 const APP_LOG_FILE = '/var/log/mihomox/app.log';
 const CORE_LOG_FILE = '/var/log/mihomox/core.log';
@@ -192,6 +193,33 @@ function provider_filter_state(key) {
 	} catch (e) {
 		return {};
 	}
+}
+
+function provider_filter_log(offset) {
+	let result = readfile(PROVIDER_FILTER_LOG);
+	if (result == null)
+		result = '';
+	result = '' + result;
+	const size = length(result);
+	let start = int(offset);
+	let reset = start < 0 || start > size;
+	if (reset)
+		start = 0;
+	if (size - start > 65536) {
+		start = size - 65536;
+		reset = true;
+	}
+	let chunk = substr(result, start);
+	if (start > 0 && reset) {
+		const newline = index(chunk, '\n');
+		if (newline >= 0)
+			chunk = substr(chunk, newline + 1);
+	}
+	return {
+		log: chunk,
+		log_offset: size,
+		log_reset: reset
+	};
 }
 
 function provider_filter_enqueue(provider, manual) {
@@ -680,23 +708,33 @@ const methods = {
 					: { state: 'inactive', message: 'restart_required' };
 				managed[name] = providers[name];
 			}
+			const log = provider_filter_log(0);
 			return {
 				supported: true,
 				isolation: 'direct',
 				providers: managed,
-				config: config
+				config: config,
+				log: log.log,
+				log_offset: log.log_offset
 			};
 		}
 	},
 	provider_discard_status: {
-		call: function() {
+		args: { log_offset: 'log_offset' },
+		call: function(req) {
 			const manifest = provider_filter_manifest();
 			const statuses = {};
 			for (let name in manifest.providers || {}) {
 				const key = manifest.providers[name]?.key || '';
 				statuses[name] = provider_filter_state(key);
 			}
-			return { statuses: statuses };
+			const log = provider_filter_log(req.args?.log_offset);
+			return {
+				statuses: statuses,
+				log: log.log,
+				log_offset: log.log_offset,
+				log_reset: log.log_reset
+			};
 		}
 	},
 	set_provider_discard_global: {

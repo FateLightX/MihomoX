@@ -8,6 +8,8 @@ let expandedProvider = '';
 let pageRoot = null;
 let controls = {};
 let refreshing = false;
+let runLog = '';
+let runLogOffset = 0;
 
 function providerEntries(data) {
     return Object.entries(data?.providers || {})
@@ -203,6 +205,17 @@ function refreshRenderedStatuses() {
     }
 }
 
+function updateRunLog(log, follow) {
+    const node = pageRoot?.querySelector('.mihomox-provider-log');
+    if (!node)
+        return;
+    const atBottom = follow || node.scrollHeight - node.scrollTop - node.clientHeight < 24;
+    if (node.textContent !== log)
+        node.textContent = log;
+    if (atBottom)
+        node.scrollTop = node.scrollHeight;
+}
+
 function providerRow(name, provider, concurrency) {
     const policy = savedPolicy(currentData, name, provider);
     const status = provider.discardStatus || {};
@@ -317,21 +330,34 @@ function renderContent() {
     for (const [name, provider] of entries)
         list.appendChild(providerRow(name, provider, concurrency));
     content.appendChild(list);
+    content.appendChild(E('section', { 'class': 'mihomox-provider-log-section' }, [
+        E('h3', {}, _('Run Log')),
+        E('pre', { 'class': 'mihomox-provider-log', role: 'log' }, runLog)
+    ]));
+    updateRunLog(runLog, true);
 }
 
 function refreshStatuses(force) {
     if (refreshing)
         return Promise.resolve();
     refreshing = true;
-    return L.resolveDefault(mihomox.providerDiscardStatus(), {}).then(function (data) {
+    return L.resolveDefault(mihomox.providerDiscardStatus(runLogOffset), {}).then(function (data) {
         for (const [name, status] of Object.entries(data?.statuses || {})) {
             if (currentData?.providers?.[name])
                 currentData.providers[name].discardStatus = status || {};
         }
+        if (data?.log_reset)
+            runLog = data.log || '';
+        else if (data?.log)
+            runLog += data.log;
+        runLog = runLog.slice(-65536);
+        runLogOffset = Number(data?.log_offset ?? runLogOffset);
         if (force)
             renderContent();
-        else
+        else {
             refreshRenderedStatuses();
+            updateRunLog(runLog, false);
+        }
     }).finally(function () {
         refreshing = false;
     });
@@ -344,6 +370,8 @@ return view.extend({
 
     render: function (data) {
         currentData = data || {};
+        runLog = currentData.log || '';
+        runLogOffset = Number(currentData.log_offset || 0);
         pageRoot = E('div', { 'class': 'cbi-map mihomox-provider-page' }, [
             E('style', {}, `
                 .mihomox-provider-header{display:flex;align-items:center;justify-content:space-between;gap:1em;margin-bottom:1em}
@@ -360,6 +388,8 @@ return view.extend({
                 .mihomox-provider-details{display:grid;grid-template-columns:repeat(3,minmax(10em,1fr));gap:.9em;padding:.8em 3.75em 1em;background:var(--background-color-low,#f7f9fc)}
                 .mihomox-provider-details.hidden{display:none}.mihomox-provider-setting{display:grid;gap:.35em}.mihomox-provider-number{display:flex;align-items:center;gap:.4em}.mihomox-provider-number input{width:8em}
                 .mihomox-provider-detail-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:.5em}
+                .mihomox-provider-log-section{margin-top:1.25em;border-top:1px solid var(--border-color-medium,#dbe3ed);padding-top:.75em}.mihomox-provider-log-section h3{margin:.2em 0 .65em;font-size:1rem}
+                .mihomox-provider-log{box-sizing:border-box;width:100%;height:12rem;margin:0;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:.75em;border:1px solid var(--border-color-medium,#dbe3ed);border-radius:4px;background:var(--background-color-low,#f7f9fc);font:12px/1.5 monospace}
                 @media(max-width:800px){.mihomox-provider-columns{display:none}.mihomox-provider-row{grid-template-columns:2.5em minmax(8em,1fr) auto}.mihomox-provider-count,.mihomox-provider-discarded,.mihomox-provider-toggle{grid-column:2}.mihomox-provider-count:before,.mihomox-provider-discarded:before{content:attr(data-label) ': ';color:#526176}.mihomox-provider-status{grid-column:3;grid-row:1;min-width:8em}.mihomox-provider-details{grid-template-columns:1fr;padding:.8em 1em 1em 3.75em}.mihomox-provider-header{align-items:flex-start}.mihomox-provider-global{align-items:flex-start;flex-direction:column}}
             `),
             E('div', { 'class': 'mihomox-provider-header' }, [
