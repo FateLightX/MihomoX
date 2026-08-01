@@ -148,7 +148,7 @@ function updateProvider(name) {
         if (!result?.started && !result?.completed)
             return Promise.reject(new Error(errorLabel(result?.error)));
         pageMessage(result.completed ? _('Test Completed') : _('Update Started'));
-        return refreshPage(true);
+        return refreshStatuses(true);
     }).catch(function (error) {
         pageMessage(_('Failed') + ': ' + (error?.message || error), true);
         return Promise.reject(error);
@@ -166,7 +166,7 @@ function updateAll() {
         if (failed)
             return Promise.reject(new Error(errorLabel(failed.error)));
         pageMessage(results.some((result) => result?.started) ? _('Update Started') : _('Test Completed'));
-        return refreshPage(true);
+        return refreshStatuses(true);
     }).catch(function (error) {
         pageMessage(_('Failed') + ': ' + (error?.message || error), true);
         return Promise.reject(error);
@@ -182,7 +182,8 @@ function settingRow(label, control) {
 
 function applyProviderStatus(row, provider) {
     const status = provider?.discardStatus || {};
-    const active = provider?.proxies?.length || 0;
+    const measured = ['active', 'testing', 'fallback', 'disabled'].includes(status.state) && Number(status.total || 0) > 0;
+    const active = measured ? Number(status.available || 0) : Number(provider?.proxyCount || 0);
     const total = Number(status.total || active);
     const tested = Math.min(Number(status.tested || 0), total);
     row.count.textContent = `${active} / ${total}`;
@@ -318,16 +319,19 @@ function renderContent() {
     content.appendChild(list);
 }
 
-function refreshPage(force) {
+function refreshStatuses(force) {
     if (refreshing)
         return Promise.resolve();
     refreshing = true;
-    return L.resolveDefault(mihomox.providerDiscard(), currentData).then(function (data) {
-        currentData = data || {};
-        if (!force && pageRoot?.contains(document.activeElement))
-            refreshRenderedStatuses();
-        else
+    return L.resolveDefault(mihomox.providerDiscardStatus(), {}).then(function (data) {
+        for (const [name, status] of Object.entries(data?.statuses || {})) {
+            if (currentData?.providers?.[name])
+                currentData.providers[name].discardStatus = status || {};
+        }
+        if (force)
             renderContent();
+        else
+            refreshRenderedStatuses();
     }).finally(function () {
         refreshing = false;
     });
@@ -368,7 +372,7 @@ return view.extend({
             E('div', { 'class': 'mihomox-provider-content' })
         ]);
         renderContent();
-        poll.add(() => refreshPage(false), 2);
+        poll.add(() => refreshStatuses(false), 2);
         return pageRoot;
     },
 

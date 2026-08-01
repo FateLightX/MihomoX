@@ -85,6 +85,12 @@ const callMihomoXProviderDiscard = rpc.declare({
     expect: { '': {} }
 });
 
+const callMihomoXProviderDiscardStatus = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'provider_discard_status',
+    expect: { '': {} }
+});
+
 const callMihomoXSetProviderDiscard = rpc.declare({
     object: 'luci.mihomox',
     method: 'set_provider_discard',
@@ -299,6 +305,10 @@ return baseclass.extend({
 
     providerDiscard: function () {
         return callMihomoXProviderDiscard();
+    },
+
+    providerDiscardStatus: function () {
+        return callMihomoXProviderDiscardStatus();
     },
 
     setProviderDiscard: function (provider, policy, global) {

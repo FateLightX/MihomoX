@@ -88,7 +88,8 @@ Provider 策略保存在 `/etc/mihomox/provider-discard.json`，不写入用户 
 发布文件；用户发起的单次手动任务使用独立队列，不受全局及单 Provider 开关限制，仍可
 启动 worker 并在完成后退出。
 启动时只修改生成的运行配置：支持的 HTTP Provider 保持原名称，但数据源转换为
-`/etc/mihomox/run/provider-filter/<key>/current.yaml`。策略组引用无需改变。
+`/etc/mihomox/provider-filter/<key>/current.yaml`。策略组引用无需改变。过滤结果持久保留，
+重启时直接复用；首次没有结果时只排入后台队列，启动流程和 LuCI RPC 都不等待网络。
 
 更新顺序固定为：
 

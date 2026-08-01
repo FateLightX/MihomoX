@@ -6,6 +6,7 @@ HOME_DIR="${MIHOMOX_HOME_DIR:-/etc/mihomox}"
 RUN_DIR="${MIHOMOX_RUN_DIR:-$HOME_DIR/run}"
 CORE_PATH="${MIHOMOX_CORE_PATH:-$HOME_DIR/bin/mihomo}"
 POLICY_FILE="${MIHOMOX_PROVIDER_POLICY_FILE:-$HOME_DIR/provider-discard.json}"
+STORE_DIR="${MIHOMOX_PROVIDER_FILTER_STORE_DIR:-$HOME_DIR/provider-filter}"
 FILTER_DIR="${MIHOMOX_PROVIDER_FILTER_DIR:-$RUN_DIR/provider-filter}"
 MANIFEST_FILE="$FILTER_DIR/manifest.json"
 QUEUE_DIR="$FILTER_DIR/queue"
@@ -16,6 +17,8 @@ PROBE_PORT="${MIHOMOX_PROVIDER_PROBE_PORT:-19091}"
 PROBE_MARK="${MIHOMOX_PROVIDER_PROBE_MARK:-}"
 YQ="${MIHOMOX_YQ:-yq}"
 CURL="${MIHOMOX_CURL:-curl}"
+
+umask 077
 
 if [ -z "$PROBE_MARK" ] && command -v uci > /dev/null 2>&1; then
 	PROBE_MARK=$(uci -q get mihomox.routing.provider_probe_fw_mark)
@@ -50,7 +53,7 @@ probe_mark_available() {
 }
 
 prepare_dirs() {
-	mkdir -p "$FILTER_DIR" "$QUEUE_DIR"
+	mkdir -p "$STORE_DIR" "$FILTER_DIR" "$QUEUE_DIR"
 }
 
 provider_key() {
@@ -58,12 +61,14 @@ provider_key() {
 }
 
 provider_dir() {
-	printf '%s/%s' "$FILTER_DIR" "$(provider_key "$1")"
+	printf '%s/%s' "$STORE_DIR" "$(provider_key "$1")"
 }
 
 write_state() {
-	local dir temporary now
-	dir=$(provider_dir "$1")
+	local key dir store_dir temporary persistent_tmp now
+	key=$(provider_key "$1")
+	dir="$FILTER_DIR/$key"
+	store_dir="$STORE_DIR/$key"
 	mkdir -p "$dir"
 	temporary="$dir/state.json.tmp.$$"
 	now=$(date '+%Y-%m-%dT%H:%M:%S%z')
@@ -71,6 +76,13 @@ write_state() {
 	{"state":"$2","total":${3:-0},"tested":${4:-0},"available":${5:-0},"discarded":${6:-0},"message":"${7:-}","updatedAt":"$now"}
 	EOF
 	mv -f "$temporary" "$dir/state.json"
+	case "$2" in
+		active|disabled|failed|fallback|retained|unsupported)
+			mkdir -p "$store_dir"
+			persistent_tmp="$store_dir/last-state.json.tmp.$$"
+			cp -f "$dir/state.json" "$persistent_tmp" && mv -f "$persistent_tmp" "$store_dir/last-state.json"
+			;;
+	esac
 }
 
 policy_field() {
@@ -207,7 +219,7 @@ start_probe() {
 		 .["proxy-providers"].candidate["health-check"] = {"enable": false}' \
 		"$config_file" || return 1
 
-	HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY='*' SAFE_PATHS="$FILTER_DIR" \
+	HTTP_PROXY= HTTPS_PROXY= ALL_PROXY= http_proxy= https_proxy= all_proxy= NO_PROXY='*' SAFE_PATHS="$STORE_DIR:$FILTER_DIR" \
 		"$CORE_PATH" -d "$PROBE_DIR" -f "$config_file" > "$PROBE_DIR/core.log" 2>&1 &
 	printf '%s\n' "$!" > "$PROBE_DIR/pid"
 
@@ -360,7 +372,7 @@ update_one() {
 
 prepare_profile() {
 	local profile temporary manifest_tmp names_file name key dir source_file current_file
-	local interval test_url unsupported supported execution_enabled
+	local state_file legacy_dir interval test_url unsupported supported current_total queued_initial
 	profile="$1"
 	[ -s "$profile" ] || return 1
 	prepare_dirs
@@ -369,8 +381,6 @@ prepare_profile() {
 	names_file="$FILTER_DIR/providers.txt.tmp.$$"
 	cp -f "$profile" "$temporary" || return 1
 	printf '%s\n' '{"providers":{}}' > "$manifest_tmp"
-	execution_enabled=true
-	manager_enabled || execution_enabled=false
 	"$YQ" -r '.["proxy-providers"] // {} | to_entries[] | select(.value.type == "http") | .key' \
 		"$profile" > "$names_file" 2>/dev/null
 
@@ -378,10 +388,22 @@ prepare_profile() {
 		[ -n "$name" ] || continue
 		case "$name" in *'\n'*) continue ;; esac
 		key=$(provider_key "$name")
-		dir="$FILTER_DIR/$key"
+		dir="$STORE_DIR/$key"
+		legacy_dir="$FILTER_DIR/$key"
 		source_file="$dir/source.yaml"
 		current_file="$dir/current.yaml"
+		state_file="$FILTER_DIR/$key/state.json"
+		queued_initial=false
 		mkdir -p "$dir"
+		mkdir -p "$FILTER_DIR/$key"
+		if [ "$legacy_dir" != "$dir" ] && [ ! -s "$current_file" ] && [ -s "$legacy_dir/current.yaml" ]; then
+			cp -f "$legacy_dir/current.yaml" "$current_file"
+			[ -s "$legacy_dir/raw.yaml" ] && cp -f "$legacy_dir/raw.yaml" "$dir/raw.yaml"
+			[ -s "$legacy_dir/last_update" ] && cp -f "$legacy_dir/last_update" "$dir/last_update"
+		fi
+		if [ ! -s "$state_file" ] && [ -s "$dir/last-state.json" ]; then
+			cp -f "$dir/last-state.json" "$state_file"
+		fi
 		PROVIDER_NAME="$name" "$YQ" -o=yaml '.["proxy-providers"][strenv(PROVIDER_NAME)]' \
 			"$profile" > "$source_file" || continue
 		unsupported=$("$YQ" -r '
@@ -395,18 +417,28 @@ prepare_profile() {
 		if [ "$unsupported" = true ]; then
 			supported=false
 			write_state "$name" unsupported 0 0 0 0 unsupported_provider_options
-		elif [ "$execution_enabled" = true ] && [ ! -s "$current_file" ]; then
-			update_one "$name" || true
+		elif [ ! -s "$current_file" ]; then
+			write_state "$name" inactive 0 0 0 0 test_required
+			if manager_enabled; then
+				printf '%s\n' "$name" > "$QUEUE_DIR/$key.request.tmp.$$" &&
+					mv -f "$QUEUE_DIR/$key.request.tmp.$$" "$QUEUE_DIR/$key.request" && queued_initial=true
+			fi
+		elif [ -s "$current_file" ] && [ ! -s "$state_file" ]; then
+			current_total=$("$YQ" -r '.proxies | length' "$current_file" 2>/dev/null)
+			case "$current_total" in ''|*[!0-9]*) current_total=0 ;; esac
+			write_state "$name" active "$current_total" "$current_total" "$current_total" 0 restored_previous
 		fi
-		[ -s "$current_file" ] || supported=false
 		PROVIDER_NAME="$name" PROVIDER_KEY="$key" INTERVAL="$interval" TEST_URL_VALUE="$test_url" SUPPORTED="$supported" \
 			"$YQ" -o=json -I=0 -i \
 			'.providers[strenv(PROVIDER_NAME)] = {
 			 "key": strenv(PROVIDER_KEY), "vehicleType": "HTTP",
 			 "interval": (strenv(INTERVAL) | tonumber), "testUrl": strenv(TEST_URL_VALUE),
 			 "supported": (strenv(SUPPORTED) == "true")
-			}' "$manifest_tmp"
-		[ "$supported" = true ] || continue
+				}' "$manifest_tmp"
+		if [ "$queued_initial" = true ]; then
+			write_state "$name" queued 0 0 0 0 queued
+		fi
+		[ "$supported" = true ] && [ -s "$current_file" ] || continue
 		PROVIDER_NAME="$name" SOURCE_FILE="$source_file" ACTIVE_FILE="$current_file" \
 			"$YQ" -i \
 			'.["proxy-providers"][strenv(PROVIDER_NAME)] = load(strenv(SOURCE_FILE)) |
@@ -454,15 +486,16 @@ enqueue_provider() {
 }
 
 queue_due() {
-	local now name key interval last
+	local now name key dir interval last
 	[ -s "$MANIFEST_FILE" ] || return 0
 	manager_enabled || return 0
 	now=$(date +%s)
 	"$YQ" -r '.providers | to_entries[] | select(.value.supported == true) | .key' "$MANIFEST_FILE" | while IFS= read -r name; do
 		key=$(PROVIDER_NAME="$name" "$YQ" -r '.providers[strenv(PROVIDER_NAME)].key' "$MANIFEST_FILE")
+		dir="$STORE_DIR/$key"
 		interval=$(PROVIDER_NAME="$name" "$YQ" -r '.providers[strenv(PROVIDER_NAME)].interval // 3600' "$MANIFEST_FILE")
 		last=0
-		[ -s "$FILTER_DIR/$key/last_update" ] && last=$(cat "$FILTER_DIR/$key/last_update")
+		[ -s "$dir/last_update" ] && last=$(cat "$dir/last_update")
 		case "$interval:$last" in *[!0-9:]*) continue ;; esac
 		if [ "$interval" -gt 0 ] && [ $((last + interval)) -le "$now" ]; then
 			enqueue_provider "$name" || true

@@ -5,7 +5,7 @@
             "uci": [ "mihomox" ],
             "ubus": {
                 "rc": [ "list" ],
-                "luci.mihomox": [ "version", "profile", "core_status", "log", "network_test", "provider_discard", "get_identifiers" ]
+                "luci.mihomox": [ "version", "profile", "core_status", "log", "network_test", "provider_discard", "provider_discard_status", "get_identifiers" ]
             },
             "file": {
                 "/etc/mihomox/profiles/*.yaml": ["read"],

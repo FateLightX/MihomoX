@@ -82,6 +82,9 @@ MihomoX。检测使用临时官方 Mihomo 核心和独立路由标记，绕过�
 TPROXY 与 TUN；临时核心使用独立的 IP DoH 解析订阅域名，完成后自动退出。
 使用 `proxy: DIRECT` 的 Provider 可直接检测；依赖其他代理组下载或使用 `override` 的
 Provider 保持原模式。
+过滤后的节点保存在 `/etc/mihomox/provider-filter/`，系统或服务重启后直接复用上一版；
+没有上一版时才在主服务启动后排入后台队列。页面按钮只启动后台任务，不等待订阅下载或
+全量测速完成。
 
 检测期间继续使用上一版节点。检测完成后，`url-test`、`fallback` 和 `load-balance`
 等引用该 Provider 的策略组只看到本轮发布的有效节点；被丢弃节点仍保留在完整候选列表

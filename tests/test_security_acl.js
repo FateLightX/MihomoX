@@ -18,6 +18,7 @@ assert.ok(acl.write.ubus['luci.mihomox'].includes('update_core'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('write_file'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('api'));
 assert.ok(acl.read.ubus['luci.mihomox'].includes('provider_discard'));
+assert.ok(acl.read.ubus['luci.mihomox'].includes('provider_discard_status'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('set_provider_discard'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('update_provider_discard'));
 

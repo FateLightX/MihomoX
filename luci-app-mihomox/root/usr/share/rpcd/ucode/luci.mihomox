@@ -248,45 +248,36 @@ function core_api_request(method, path, query, body) {
 	return result;
 }
 
-function core_api_action(method, path) {
+function core_api_action_command(method, path) {
 	const profile = load_profile();
 	const api_listen = profile['external-controller'];
 	const api_tls_listen = profile['external-controller-tls'];
 	const api_secret = profile['secret'];
 	if (!api_listen && !api_tls_listen)
-		return { success: false, error: 'controller_unavailable' };
+		return null;
 
 	const protocol = api_tls_listen ? 'https' : 'http';
 	const listen = api_tls_listen || api_listen;
 	const args = [
 		'curl', '--silent', '--show-error', '--output', '/dev/null',
-		'--write-out', '%{http_code}', '--max-time', '60', '--connect-timeout', '10',
+		'--max-time', '60', '--connect-timeout', '10',
 		'--proto-default', protocol, '--insecure', '--request', method
 	];
 	if (api_secret)
 		push(args, '--oauth2-bearer', api_secret);
 	push(args, '--url', controller_url(listen, protocol, path));
-	const process = popen(join(' ', map(args, shell_quote)), 'r');
-	if (!process)
-		return { success: false, error: 'start_failed' };
-	const status = int(trim(process.read('all') || '0'));
-	process.close();
-	return {
-		success: status >= 200 && status < 400,
-		status: status,
-		error: status >= 200 && status < 400 ? '' : 'request_failed'
-	};
+	return join(' ', map(args, shell_quote));
 }
 
 function native_provider_check(provider) {
 	const path = '/providers/proxies/' + url_encode_component(provider);
-	const update = core_api_action('PUT', path);
-	if (!update.success)
-		return { success: false, error: 'native_update_failed' };
-	const check = core_api_action('GET', path + '/healthcheck');
-	return check.success
-		? { success: true, completed: true, mode: 'native' }
-		: { success: false, error: 'native_test_failed' };
+	const update = core_api_action_command('PUT', path);
+	const check = core_api_action_command('GET', path + '/healthcheck');
+	if (!update || !check)
+		return { success: false, error: 'controller_unavailable' };
+	const started = system('nohup sh -c ' + shell_quote(update + ' && ' + check) +
+		' >/dev/null 2>&1 </dev/null &') == 0;
+	return { success: started, started: started, mode: 'native', error: started ? '' : 'start_failed' };
 }
 
 function writable_path(path) {
@@ -662,6 +653,7 @@ const methods = {
 			const manifest = provider_filter_manifest();
 			const config = provider_discard_config();
 			const providers = response.providers || {};
+			const managed = {};
 			for (let name in manifest.providers || {})
 				if (!providers[name])
 					providers[name] = { name: name, vehicleType: 'HTTP', proxies: [], nativeAvailable: false };
@@ -671,6 +663,8 @@ const methods = {
 					continue;
 				const saved = config.providers?.[name] || {};
 				providers[name].vehicleType = meta?.vehicleType || providers[name].vehicleType;
+				providers[name].proxyCount = length(providers[name].proxies || []);
+				providers[name].proxies = [];
 				providers[name].nativeAvailable = providers[name].nativeAvailable !== false;
 				providers[name].filterSupported = !!meta && meta.supported != false;
 				providers[name].testUrl = saved.url || meta?.testUrl || providers[name].testUrl || '';
@@ -684,13 +678,25 @@ const methods = {
 				providers[name].discardStatus = meta
 					? provider_filter_state(meta.key)
 					: { state: 'inactive', message: 'restart_required' };
+				managed[name] = providers[name];
 			}
 			return {
 				supported: true,
 				isolation: 'direct',
-				providers: providers,
+				providers: managed,
 				config: config
 			};
+		}
+	},
+	provider_discard_status: {
+		call: function() {
+			const manifest = provider_filter_manifest();
+			const statuses = {};
+			for (let name in manifest.providers || {}) {
+				const key = manifest.providers[name]?.key || '';
+				statuses[name] = provider_filter_state(key);
+			}
+			return { statuses: statuses };
 		}
 	},
 	set_provider_discard_global: {
