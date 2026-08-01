@@ -188,6 +188,11 @@ proxy_bypass_china_mainland_ip=$(uci -q get mihomox.proxy.bypass_china_mainland_
 proxy_bypass_china_mainland_ip6=$(uci -q get mihomox.proxy.bypass_china_mainland_ip6)
 [ -z "$proxy_bypass_china_mainland_ip6" ] && uci set mihomox.proxy.bypass_china_mainland_ip6=$proxy_bypass_china_mainland_ip
 
+proxy_china_ip_update=$(uci -q get mihomox.proxy.china_ip_update); [ -z "$proxy_china_ip_update" ] && uci set mihomox.proxy.china_ip_update=1
+proxy_china_ip_update_cron=$(uci -q get mihomox.proxy.china_ip_update_cron); [ -z "$proxy_china_ip_update_cron" ] && uci set mihomox.proxy.china_ip_update_cron="0 4 * * 1"
+proxy_china_ip_url=$(uci -q get mihomox.proxy.china_ip_url); [ -z "$proxy_china_ip_url" ] && uci set mihomox.proxy.china_ip_url="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/refs/heads/ip-lists/china.txt"
+proxy_china_ip6_url=$(uci -q get mihomox.proxy.china_ip6_url); [ -z "$proxy_china_ip6_url" ] && uci set mihomox.proxy.china_ip6_url="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/refs/heads/ip-lists/china6.txt"
+
 routing_tproxy_fw_mask=$(uci -q get mihomox.routing.tproxy_fw_mask); [ -z "$routing_tproxy_fw_mask" ] && uci set mihomox.routing.tproxy_fw_mask=0xFF
 routing_tun_fw_mask=$(uci -q get mihomox.routing.tun_fw_mask); [ -z "$routing_tun_fw_mask" ] && uci set mihomox.routing.tun_fw_mask=0xFF
 

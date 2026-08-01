@@ -103,6 +103,14 @@ msgstr "Обход IP материкового Китая"
 msgid "Bypass China Mainland IP6"
 msgstr "Обход IPv6 материкового Китая"
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:179
+msgid "Auto Update China Mainland IP"
+msgstr "Автоматическое обновление IP материкового Китая"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:190
+msgid "China IP Update Cron"
+msgstr "Расписание обновления IP материкового Китая"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:189
 msgid "Bypass DSCP"
 msgstr "Обход DSCP"

@@ -96,6 +96,14 @@ msgstr ""
 msgid "Bypass China Mainland IP6"
 msgstr ""
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:179
+msgid "Auto Update China Mainland IP"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:190
+msgid "China IP Update Cron"
+msgstr ""
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/proxy.js:189
 msgid "Bypass DSCP"
 msgstr ""

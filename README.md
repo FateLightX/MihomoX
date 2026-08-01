@@ -66,6 +66,30 @@ LuCI 页面位于 `服务 → MihomoX`：
 自定义内核地址必须同时填写 64 位 SHA256。运行时更新不会通过 `opkg` 或 `apk` 安装、
 删除或升级软件包。
 
+### 中国大陆 IP 绕过列表更新
+
+启用 `代理配置 → 绕过 → 自动更新中国大陆 IP` 后，MihomoX 会分别更新 IPv4 和 IPv6
+列表：
+
+- IPv4：[`china.txt`](https://raw.githubusercontent.com/gaoyifan/china-operator-ip/refs/heads/ip-lists/china.txt)
+- IPv6：[`china6.txt`](https://raw.githubusercontent.com/gaoyifan/china-operator-ip/refs/heads/ip-lists/china6.txt)
+
+下载失败或内容校验失败时，按以下顺序回退：
+
+1. GitHub Raw
+2. `v4.gh-proxy.org`
+3. `fastly.jsdelivr.net`
+
+默认每周一 `04:00` 更新。可在同一页面的 `China IP Update Cron` 中填写五段式
+cron 表达式自定义时间，也可以手动执行：
+
+```sh
+/etc/init.d/mihomox update_china_ip
+```
+
+更新只替换运行中的 nftables `china_ip` / `china_ip6` 集合，不重载完整 Mihomo 配置，
+不会触发订阅更新或节点测速。单个地址列表更新失败时保留对应的旧列表。
+
 ## 迁移与保留
 
 首次安装时，MihomoX 可复制现有 Nikki 的配置、配置文件、订阅和混入文件。

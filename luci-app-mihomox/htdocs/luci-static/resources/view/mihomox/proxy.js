@@ -6,6 +6,15 @@
 'require tools.widgets as widgets';
 'require tools.mihomox as mihomox';
 
+function validateCron(value) {
+    const fields = String(value || '').trim().split(/\s+/);
+    if (fields.length !== 5 || fields.some(function (field) {
+        return !/^[0-9*/,-]+$/.test(field);
+    }))
+        return _('Invalid cron expression');
+    return true;
+}
+
 return view.extend({
     load: function () {
         // getIdentifiers can be slow; load it with a soft timeout so the page still opens.
@@ -186,6 +195,19 @@ return view.extend({
         o = s.taboption('bypass', form.Flag, 'bypass_china_mainland_ip6', _('Bypass China Mainland IP6'));
         o.rmempty = false;
         o.default = o.enabled;
+
+        o = s.taboption('bypass', form.Flag, 'china_ip_update', _('Auto Update China Mainland IP'));
+        o.rmempty = false;
+        o.default = o.enabled;
+
+        o = s.taboption('bypass', form.Value, 'china_ip_update_cron', _('China IP Update Cron'));
+        o.retain = true;
+        o.rmempty = false;
+        o.placeholder = '0 4 * * 1';
+        o.validate = function (_, value) {
+            return validateCron(value);
+        };
+        o.depends('china_ip_update', '1');
 
         o = s.taboption('bypass', form.Value, 'proxy_tcp_dport', _('Destination TCP Port to Proxy'));
         o.rmempty = false;
