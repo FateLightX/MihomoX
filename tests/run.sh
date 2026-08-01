@@ -23,7 +23,6 @@ node "$ROOT_DIR/tests/test_luci_mixin.js"
 node "$ROOT_DIR/tests/test_luci_profile.js"
 node "$ROOT_DIR/tests/test_luci_logs.js"
 node "$ROOT_DIR/tests/test_luci_network.js"
-node "$ROOT_DIR/tests/test_luci_providers.js"
 node "$ROOT_DIR/tests/test_luci_writefile.js"
 node "$ROOT_DIR/tests/test_security_acl.js"
 

@@ -808,10 +808,6 @@ msgstr "規則提供者:"
 msgid "Rule Set"
 msgstr "規則集"
 
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js:334
-msgid "Run Log"
-msgstr "執行日誌"
-
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:15
 msgid "Running"
 msgstr "執行中"
@@ -1414,90 +1410,23 @@ msgstr "錐形/受限型"
 msgid "Open Internet"
 msgstr "公網直連"
 
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js
-msgid "Available / Total"
-msgstr "可用 / 總數"
-
 msgid "Collapse"
 msgstr "收起"
 
 msgid "Downloading"
 msgstr "正在下載"
 
-msgid "Detection Route"
-msgstr "檢測出口"
-
-msgid "Direct Isolation"
-msgstr "直連隔離"
-
 msgid "Unsupported"
 msgstr "不支援"
 
-msgid "Enable Automatic Filtering"
-msgstr "啟用自動過濾"
-
-msgid "Provider filtering is disabled."
-msgstr "Provider 過濾已關閉。"
-
-msgid "Restart Required"
-msgstr "需要重新啟動"
-
-msgid "Restart MihomoX once to activate provider filtering."
-msgstr "請重新啟動一次 MihomoX 以啟用 Provider 過濾。"
-
-msgid "This provider uses unsupported options."
-msgstr "此 Provider 使用了暫不支援的選項。"
-
-msgid "Provider filter manager is missing."
-msgstr "缺少 Provider 過濾管理器。"
-
-msgid "Failed to start provider filter manager."
-msgstr "Provider 過濾管理器啟動失敗。"
-
-msgid "Failed to add provider to the update queue."
-msgstr "加入 Provider 更新佇列失敗。"
-
-msgid "Invalid provider."
-msgstr "Provider 無效。"
-
 msgid "Disabled"
 msgstr "已關閉"
-
-msgid "Discard Mode"
-msgstr "丟棄模式"
-
-msgid "Discarded"
-msgstr "已丟棄"
 
 msgid "Enabled"
 msgstr "已開啟"
 
 msgid "Expand"
 msgstr "展開"
-
-msgid "Failed Retries"
-msgstr "失敗重試"
-
-msgid "Keep All"
-msgstr "保留全部"
-
-msgid "No proxy providers found."
-msgstr "未發現代理 Provider。"
-
-msgid "Node Concurrency"
-msgstr "節點檢測並行數"
-
-msgid "Unified Delay"
-msgstr "統一延遲"
-
-msgid "Maximum Delay"
-msgstr "最大延遲"
-
-msgid "Node Management"
-msgstr "節點管理"
-
-msgid "Previous Version"
-msgstr "上一版本"
 
 msgid "Provider"
 msgstr "Provider"
@@ -1517,32 +1446,8 @@ msgstr "正在啟動更新"
 msgid "Test Timeout"
 msgstr "測試逾時"
 
-msgid "Test URL"
-msgstr "測試位址"
-
-msgid "Update All"
-msgstr "全部更新"
-
 msgid "Update Started"
 msgstr "更新已啟動"
-
-msgid "Test Completed"
-msgstr "檢測完成"
-
-msgid "Mihomo Provider update failed."
-msgstr "Mihomo Provider 更新失敗。"
-
-msgid "Mihomo Provider test failed."
-msgstr "Mihomo Provider 檢測失敗。"
-
-msgid "Mihomo controller is unavailable."
-msgstr "Mihomo 控制介面不可用。"
-
-msgid "Waiting Test"
-msgstr "等待檢測"
-
-msgid "Update and Test"
-msgstr "更新並檢測"
 
 msgid "No IPv6 Connectivity"
 msgstr "無 IPv6 連線"

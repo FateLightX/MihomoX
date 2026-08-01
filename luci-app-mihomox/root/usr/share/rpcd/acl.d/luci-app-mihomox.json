@@ -5,7 +5,7 @@
             "uci": [ "mihomox" ],
             "ubus": {
                 "rc": [ "list" ],
-                "luci.mihomox": [ "version", "profile", "core_status", "log", "network_test", "provider_discard", "provider_discard_status", "get_identifiers" ]
+                "luci.mihomox": [ "version", "profile", "core_status", "log", "network_test", "get_identifiers" ]
             },
             "file": {
                 "/etc/mihomox/profiles/*.yaml": ["read"],
@@ -23,7 +23,7 @@
             "uci": [ "mihomox" ],
             "ubus": {
                 "rc": [ "init" ],
-                "luci.mihomox": [ "update_subscription", "update_core", "set_provider_discard_global", "set_provider_discard", "update_provider_discard", "write_file", "api", "debug" ]
+                "luci.mihomox": [ "update_subscription", "update_core", "write_file", "api", "debug" ]
             },
             "file": {
                 "/etc/mihomox/profiles/*.yaml": ["write"],

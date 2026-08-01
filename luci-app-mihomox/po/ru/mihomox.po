@@ -808,10 +808,6 @@ msgstr "Провайдер правил:"
 msgid "Rule Set"
 msgstr "Набор правил"
 
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js:334
-msgid "Run Log"
-msgstr "Журнал выполнения"
-
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:15
 msgid "Running"
 msgstr "Запущен"
@@ -1360,90 +1356,23 @@ msgstr "IPv6 за пределами Китая"
 msgid "Test"
 msgstr "Тест"
 
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js
-msgid "Available / Total"
-msgstr "Доступно / Всего"
-
 msgid "Collapse"
 msgstr "Свернуть"
 
 msgid "Downloading"
 msgstr "Загрузка"
 
-msgid "Detection Route"
-msgstr "Маршрут проверки"
-
-msgid "Direct Isolation"
-msgstr "Прямая изоляция"
-
 msgid "Unsupported"
 msgstr "Не поддерживается"
 
-msgid "Enable Automatic Filtering"
-msgstr "Включить автоматическую фильтрацию"
-
-msgid "Provider filtering is disabled."
-msgstr "Фильтрация провайдеров отключена."
-
-msgid "Restart Required"
-msgstr "Требуется перезапуск"
-
-msgid "Restart MihomoX once to activate provider filtering."
-msgstr "Перезапустите MihomoX один раз, чтобы включить фильтрацию провайдеров."
-
-msgid "This provider uses unsupported options."
-msgstr "Этот провайдер использует неподдерживаемые параметры."
-
-msgid "Provider filter manager is missing."
-msgstr "Менеджер фильтрации провайдеров отсутствует."
-
-msgid "Failed to start provider filter manager."
-msgstr "Не удалось запустить менеджер фильтрации провайдеров."
-
-msgid "Failed to add provider to the update queue."
-msgstr "Не удалось добавить провайдер в очередь обновления."
-
-msgid "Invalid provider."
-msgstr "Недопустимый провайдер."
-
 msgid "Disabled"
 msgstr "Отключено"
-
-msgid "Discard Mode"
-msgstr "Режим отбрасывания"
-
-msgid "Discarded"
-msgstr "Отброшено"
 
 msgid "Enabled"
 msgstr "Включено"
 
 msgid "Expand"
 msgstr "Развернуть"
-
-msgid "Failed Retries"
-msgstr "Повторы при ошибке"
-
-msgid "Keep All"
-msgstr "Сохранять все"
-
-msgid "No proxy providers found."
-msgstr "Прокси-провайдеры не найдены."
-
-msgid "Node Concurrency"
-msgstr "Параллельная проверка узлов"
-
-msgid "Unified Delay"
-msgstr "Унифицированная задержка"
-
-msgid "Maximum Delay"
-msgstr "Максимальная задержка"
-
-msgid "Node Management"
-msgstr "Управление узлами"
-
-msgid "Previous Version"
-msgstr "Предыдущая версия"
 
 msgid "Provider"
 msgstr "Провайдер"
@@ -1463,32 +1392,8 @@ msgstr "Запуск обновления"
 msgid "Test Timeout"
 msgstr "Тайм-аут проверки"
 
-msgid "Test URL"
-msgstr "URL проверки"
-
-msgid "Update All"
-msgstr "Обновить все"
-
 msgid "Update Started"
 msgstr "Обновление запущено"
-
-msgid "Test Completed"
-msgstr "Проверка завершена"
-
-msgid "Mihomo Provider update failed."
-msgstr "Не удалось обновить провайдер Mihomo."
-
-msgid "Mihomo Provider test failed."
-msgstr "Не удалось проверить провайдер Mihomo."
-
-msgid "Mihomo controller is unavailable."
-msgstr "Интерфейс управления Mihomo недоступен."
-
-msgid "Waiting Test"
-msgstr "Ожидание проверки"
-
-msgid "Update and Test"
-msgstr "Обновить и проверить"
 
 msgid "No IPv6 Connectivity"
 msgstr "Нет подключения IPv6"

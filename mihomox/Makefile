@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=11
+PKG_RELEASE:=12
 
 MIHOMO_SOURCE_VERSION:=7198c9dc1eeba39e12cf37176a6ad1ff9cda3732
 MIHOMO_BUILD_VERSION:=alpha-7198c9d
@@ -47,7 +47,6 @@ endef
 define Package/mihomox/conffiles
 /etc/config/mihomox
 /etc/mihomox/mixin.yaml
-/etc/mihomox/provider-discard.json
 /etc/mihomox/bin/mihomo
 /etc/mihomox/bin/mihomo.version
 endef
@@ -67,7 +66,6 @@ define Package/mihomox/install
 	$(INSTALL_DIR) $(1)/etc/mihomox/run/ui
 
 	$(INSTALL_DATA) $(CURDIR)/files/mixin.yaml $(1)/etc/mihomox/mixin.yaml
-	$(INSTALL_DATA) $(CURDIR)/files/provider-discard.json $(1)/etc/mihomox/provider-discard.json
 	$(call GoPackage/Package/Install/Bin,$(1))
 	printf '%s\n' \
 		'version=$(MIHOMO_BUILD_VERSION)' \
@@ -88,7 +86,6 @@ define Package/mihomox/install
 	$(INSTALL_BIN) $(CURDIR)/files/scripts/firewall_include.sh $(1)/etc/mihomox/scripts/firewall_include.sh
 	$(INSTALL_BIN) $(CURDIR)/files/scripts/debug.sh $(1)/etc/mihomox/scripts/debug.sh
 	$(INSTALL_BIN) $(CURDIR)/files/scripts/update_core.sh $(1)/etc/mihomox/scripts/update_core.sh
-	$(INSTALL_BIN) $(CURDIR)/files/scripts/provider_filter.sh $(1)/etc/mihomox/scripts/provider_filter.sh
 
 	$(INSTALL_BIN) $(CURDIR)/files/nftables/geoip_cn.nft $(1)/etc/mihomox/nftables/geoip_cn.nft
 	$(INSTALL_BIN) $(CURDIR)/files/nftables/geoip6_cn.nft $(1)/etc/mihomox/nftables/geoip6_cn.nft

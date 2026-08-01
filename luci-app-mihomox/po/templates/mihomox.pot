@@ -801,10 +801,6 @@ msgstr ""
 msgid "Rule Set"
 msgstr ""
 
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js:334
-msgid "Run Log"
-msgstr ""
-
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/app.js:15
 msgid "Running"
 msgstr ""
@@ -1407,89 +1403,22 @@ msgstr ""
 msgid "Open Internet"
 msgstr ""
 
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/providers.js
-msgid "Available / Total"
-msgstr ""
-
 msgid "Collapse"
 msgstr ""
 
 msgid "Downloading"
 msgstr ""
 
-msgid "Detection Route"
-msgstr ""
-
-msgid "Direct Isolation"
-msgstr ""
-
 msgid "Unsupported"
 msgstr ""
 
-msgid "Enable Automatic Filtering"
-msgstr ""
-
-msgid "Provider filtering is disabled."
-msgstr ""
-
-msgid "Restart Required"
-msgstr ""
-
-msgid "Restart MihomoX once to activate provider filtering."
-msgstr ""
-
-msgid "This provider uses unsupported options."
-msgstr ""
-
-msgid "Provider filter manager is missing."
-msgstr ""
-
-msgid "Failed to start provider filter manager."
-msgstr ""
-
-msgid "Failed to add provider to the update queue."
-msgstr ""
-
-msgid "Invalid provider."
-msgstr ""
-
 msgid "Disabled"
-msgstr ""
-
-msgid "Discard Mode"
-msgstr ""
-
-msgid "Discarded"
 msgstr ""
 
 msgid "Enabled"
 msgstr ""
 
 msgid "Expand"
-msgstr ""
-
-msgid "Failed Retries"
-msgstr ""
-
-msgid "Keep All"
-msgstr ""
-
-msgid "No proxy providers found."
-msgstr ""
-
-msgid "Node Concurrency"
-msgstr ""
-
-msgid "Unified Delay"
-msgstr ""
-
-msgid "Maximum Delay"
-msgstr ""
-
-msgid "Node Management"
-msgstr ""
-
-msgid "Previous Version"
 msgstr ""
 
 msgid "Provider"
@@ -1510,31 +1439,7 @@ msgstr ""
 msgid "Test Timeout"
 msgstr ""
 
-msgid "Test URL"
-msgstr ""
-
-msgid "Update All"
-msgstr ""
-
 msgid "Update Started"
-msgstr ""
-
-msgid "Test Completed"
-msgstr ""
-
-msgid "Mihomo Provider update failed."
-msgstr ""
-
-msgid "Mihomo Provider test failed."
-msgstr ""
-
-msgid "Mihomo controller is unavailable."
-msgstr ""
-
-msgid "Waiting Test"
-msgstr ""
-
-msgid "Update and Test"
 msgstr ""
 
 msgid "No IPv6 Connectivity"

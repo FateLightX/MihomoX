@@ -81,40 +81,7 @@ LuCI 和 `/etc/init.d/mihomox update_core` 最终都调用
 
 自定义 URL 必须是 HTTP(S)，且必须同时提供 64 位 SHA256。
 
-## 6. Provider 丢弃模式
-
-Provider 策略保存在 `/etc/mihomox/provider-discard.json`，不写入用户 YAML 或 UCI。
-全局 `enabled` 开关关闭时，cron 和自动队列停止执行并清空待处理任务，但不替换当前
-发布文件；用户发起的单次手动任务使用独立队列，不受全局及单 Provider 开关限制，仍可
-启动 worker 并在完成后退出。
-启动时只修改生成的运行配置：支持的 HTTP Provider 保持原名称，但数据源转换为
-`/etc/mihomox/provider-filter/<key>/current.yaml`。策略组引用无需改变。过滤结果持久保留，
-重启时直接复用；首次没有结果时只排入后台队列，启动流程和 LuCI RPC 都不等待网络。
-
-更新顺序固定为：
-
-1. MihomoX 按原 `interval` 将 Provider 原定义交给临时官方核心，只下载一次上游内容。
-2. 主核心继续使用 `current.yaml` 的上一版列表承载流量。
-3. 临时核心按有限并发检测完整候选列表；默认启用统一延迟，并在所有重试均超过默认
-   400 ms 最大延迟或检测失败时丢弃候选节点。
-4. 至少一个候选通过时原子替换 `current.yaml`，由 File Provider 原生监听器局部更新。
-5. 全部失败且已有上一版时保留上一版；首次无上一版时使用完整原始列表避免空组。
-
-内容未变化的订阅也必须重新检测，使上个周期丢弃的节点可以恢复。关闭丢弃模式时立即
-发布当前完整候选列表。更新和发布过程禁止发送 HUP、重载完整配置、重启核心或调用连接
-关闭 API；已有连接保持原出站链，新连接使用新发布列表。
-
-临时核心所有出站 socket 使用独立 `provider_probe_fw_mark`，nftables output 链在透明代理
-处理前直接返回，因此检测不会经过主核心当前代理。检测进程同时清空 HTTP(S)/ALL_PROXY
-环境变量，只监听本机控制端口，并在完成、失败或服务停止时清理进程和队列。检测 mark
-与 TPROXY/TUN mark 冲突时停止本轮检测并保留原 Provider，避免改变主链路路由。临时
-核心使用 IP 形式的 DoH，避免系统 DNS 的 Fake-IP 结果进入直连检测链路。
-
-允许 `proxy: DIRECT`；不支持依赖其他代理组下载的 Provider（非 `DIRECT` 的 `proxy`）
-及名称重写（`override`）。此类 Provider 保持原 HTTP 模式并在页面标记为不支持，避免
-静默改变语义。
-
-## 7. 持久化和迁移
+## 6. 持久化和迁移
 
 首次安装可复制 Nikki 的 UCI、profiles、subscriptions 和 mixin，但不得修改或启用
 Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
@@ -126,7 +93,6 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 /etc/mihomox/profiles/
 /etc/mihomox/subscriptions/
 /etc/mihomox/mixin.yaml
-/etc/mihomox/provider-discard.json
 /etc/mihomox/bin/
 /etc/mihomox/run/providers/rule/
 /etc/mihomox/run/providers/proxy/
@@ -134,7 +100,7 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 
 二进制 conffile 在 `opkg` 和 `apk` 下的升级行为必须分别真机验证。
 
-## 8. 兼容与安全约束
+## 7. 兼容与安全约束
 
 - OpenWrt 23.05 是 API 和依赖兼容下限。
 - rpcd ucode 外部命令参数必须引用；兼容字符串形式的布尔值和数字。
@@ -144,7 +110,7 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 - 分块文本使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - ACL 只开放页面实际需要的方法和文件范围。
 
-## 9. 验收
+## 8. 验收
 
 基础检查：
 
@@ -159,9 +125,6 @@ git diff --check
 - 首次启动、Redirect/TPROXY/TUN、IPv4/IPv6 和防火墙规则正常。
 - LuCI 菜单、RPC、编辑器、日志和网络测试在真机工作。
 - 网络失败或 RPC 缺失时页面会超时恢复，不永久显示加载状态。
-- Provider 首次全失败不会发布空组，已有版本后全失败会保留上一版。
-- Provider 更新过程中长连接 ID 保持不变，传输内容完整且不调用完整配置 reload。
-- 检测连接带独立 mark，不出现在主核心代理链中，异常退出后无残留检测进程。
 - 内核更新失败会回滚，停止状态更新后仍保持停止。
 - 包升级和 sysupgrade 后配置、订阅、规则及用户内核按预期保留。
 - Nikki 与 MihomoX 同时安装时不会默认同时启用。

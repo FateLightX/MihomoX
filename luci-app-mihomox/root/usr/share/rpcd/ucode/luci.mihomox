@@ -13,11 +13,6 @@ const CORE_UPDATE_SCRIPT = '/etc/mihomox/scripts/update_core.sh';
 const CORE_STATUS_FILE = '/var/run/mihomox/core-update.status';
 const CORE_LOCK_DIR = '/var/run/mihomox/core-update.lock';
 const CORE_PENDING_FILE = '/var/run/mihomox/core-update.pending';
-const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json';
-const PROVIDER_FILTER_SCRIPT = '/etc/mihomox/scripts/provider_filter.sh';
-const PROVIDER_FILTER_DIR = '/etc/mihomox/run/provider-filter';
-const PROVIDER_FILTER_MANIFEST = PROVIDER_FILTER_DIR + '/manifest.json';
-const PROVIDER_FILTER_LOG = PROVIDER_FILTER_DIR + '/activity.log';
 const STUN_TEST_HELPER = '/usr/libexec/mihomox/stun-test';
 const APP_LOG_FILE = '/var/log/mihomox/app.log';
 const CORE_LOG_FILE = '/var/log/mihomox/core.log';
@@ -144,105 +139,6 @@ function url_encode_component(value) {
 	return encoded;
 }
 
-function provider_discard_config() {
-	let config = { global: { enabled: true, concurrency: 5, unifiedDelay: true, maxDelay: 400 }, providers: {} };
-	try {
-		const stored = json(readfile(PROVIDER_DISCARD_FILE) || '');
-		if (stored && type(stored) == 'object')
-			config = stored;
-	} catch (e) {}
-	if (!config.global || type(config.global) != 'object')
-		config.global = { enabled: true, concurrency: 5, unifiedDelay: true, maxDelay: 400 };
-	if (!config.providers || type(config.providers) != 'object')
-		config.providers = {};
-	let concurrency = int(config.global.concurrency);
-	let max_delay = config.global.maxDelay == null ? 400 : int(config.global.maxDelay);
-	config.global.enabled = config.global.enabled !== false;
-	config.global.concurrency = concurrency >= 1 && concurrency <= 20 ? concurrency : 5;
-	config.global.unifiedDelay = config.global.unifiedDelay !== false;
-	config.global.maxDelay = max_delay >= 0 && max_delay <= 30000 ? max_delay : 400;
-	return config;
-}
-
-function write_provider_discard_config(config) {
-	const temporary = PROVIDER_DISCARD_FILE + '.tmp';
-	if (writefile(temporary, sprintf('%J\n', config)) == null)
-		return false;
-	chmod(temporary, 384);
-	if (!rename(temporary, PROVIDER_DISCARD_FILE)) {
-		unlink(temporary);
-		return false;
-	}
-	return true;
-}
-
-function provider_filter_manifest() {
-	try {
-		const manifest = json(readfile(PROVIDER_FILTER_MANIFEST) || '');
-		return manifest && type(manifest) == 'object' ? manifest : { providers: {} };
-	} catch (e) {
-		return { providers: {} };
-	}
-}
-
-function provider_filter_state(key) {
-	if (!match(key || '', /^[0-9a-f]+$/))
-		return {};
-	try {
-		return json(readfile(PROVIDER_FILTER_DIR + '/' + key + '/state.json') || '') || {};
-	} catch (e) {
-		return {};
-	}
-}
-
-function provider_filter_log(offset) {
-	let result = readfile(PROVIDER_FILTER_LOG);
-	if (result == null)
-		result = '';
-	result = '' + result;
-	const size = length(result);
-	let start = int(offset);
-	let reset = start < 0 || start > size;
-	if (reset)
-		start = 0;
-	if (size - start > 65536) {
-		start = size - 65536;
-		reset = true;
-	}
-	let chunk = substr(result, start);
-	if (start > 0 && reset) {
-		const newline = index(chunk, '\n');
-		if (newline >= 0)
-			chunk = substr(chunk, newline + 1);
-	}
-	return {
-		log: chunk,
-		log_offset: size,
-		log_reset: reset
-	};
-}
-
-function provider_filter_enqueue(provider, manual) {
-	if (!access(PROVIDER_FILTER_SCRIPT, 'x'))
-		return { success: false, error: 'manager_missing' };
-	const manifest = provider_filter_manifest();
-	const meta = manifest.providers?.[provider];
-	if (!meta)
-		return { success: false, error: 'restart_required' };
-	if (meta.supported == false)
-		return { success: false, error: 'unsupported_provider' };
-	if (!manual && provider_discard_config().global.enabled == false)
-		return { success: false, error: 'execution_disabled' };
-	const action = manual ? 'manual' : 'enqueue';
-	const process = popen(join(' ', map([PROVIDER_FILTER_SCRIPT, action, provider], shell_quote)), 'r');
-	if (!process)
-		return { success: false, error: 'start_failed' };
-	process.read('all');
-	return process.close() == 0
-		? { success: true }
-		: { success: false, error: 'queue_failed' };
-}
-
 function core_api_request(method, path, query, body) {
 	let result = {};
 	const profile = load_profile();
@@ -274,38 +170,6 @@ function core_api_request(method, path, query, body) {
 		try { result = json(output) || {}; } catch (e) { result = {}; }
 	}
 	return result;
-}
-
-function core_api_action_command(method, path) {
-	const profile = load_profile();
-	const api_listen = profile['external-controller'];
-	const api_tls_listen = profile['external-controller-tls'];
-	const api_secret = profile['secret'];
-	if (!api_listen && !api_tls_listen)
-		return null;
-
-	const protocol = api_tls_listen ? 'https' : 'http';
-	const listen = api_tls_listen || api_listen;
-	const args = [
-		'curl', '--silent', '--show-error', '--output', '/dev/null',
-		'--max-time', '60', '--connect-timeout', '10',
-		'--proto-default', protocol, '--insecure', '--request', method
-	];
-	if (api_secret)
-		push(args, '--oauth2-bearer', api_secret);
-	push(args, '--url', controller_url(listen, protocol, path));
-	return join(' ', map(args, shell_quote));
-}
-
-function native_provider_check(provider) {
-	const path = '/providers/proxies/' + url_encode_component(provider);
-	const update = core_api_action_command('PUT', path);
-	const check = core_api_action_command('GET', path + '/healthcheck');
-	if (!update || !check)
-		return { success: false, error: 'controller_unavailable' };
-	const started = system('nohup sh -c ' + shell_quote(update + ' && ' + check) +
-		' >/dev/null 2>&1 </dev/null &') == 0;
-	return { success: started, started: started, mode: 'native', error: started ? '' : 'start_failed' };
 }
 
 function writable_path(path) {
@@ -460,6 +324,39 @@ function ipv6_probe(urls) {
 	return last;
 }
 
+function trace_field(content, field) {
+	const prefix = field + '=';
+	for (let line in split(content || '', '\n'))
+		if (substr(line, 0, length(prefix)) == prefix)
+			return trim(substr(line, length(prefix)));
+	return '';
+}
+
+function overseas_ip_probe(family) {
+	const proxy = local_proxy();
+	if (!proxy)
+		return { success: false, address: '', country: '', error: 'not_configured' };
+	const url = family == 6
+		? 'https://[2606:4700:4700::1111]/cdn-cgi/trace'
+		: 'https://1.1.1.1/cdn-cgi/trace';
+	const result = curl_probe(url, family, proxy.url, proxy.auth, true, false);
+	if (!result.success)
+		return result;
+	const address = trace_field(result.address, 'ip');
+	const country = trace_field(result.address, 'loc');
+	const valid_address = family == 6
+		? index(address, ':') >= 0
+		: match(address, /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
+	const valid_country = match(country, /^[A-Z]{2}$/);
+	result.address = valid_address ? address : '';
+	result.country = valid_country ? country : '';
+	result.success = !!valid_address && !!valid_country && country != 'CN';
+	result.error = !valid_address || !valid_country
+		? 'invalid_result'
+		: country == 'CN' ? 'domestic_exit' : '';
+	return result;
+}
+
 function resolve_public_ipv4(host) {
 	const result = curl_probe(
 		'https://dns.alidns.com/resolve?name=' + url_encode_component(host) + '&type=A',
@@ -510,7 +407,7 @@ function nat_test() {
 		return { success: false, type: 'Unknown', error: 'resolve_failed' };
 	const uci = cursor();
 	uci.load('mihomox');
-	const mark = uci.get('mihomox', 'routing', 'provider_probe_fw_mark') || '0x82';
+	const mark = uci.get('mihomox', 'routing', 'network_test_fw_mark') || '0x82';
 	const command = direct_network_command([STUN_TEST_HELPER, primary, '3478', secondary, '19302', mark]);
 	if (!command)
 		return { success: false, type: 'Unknown', error: 'isolation_unavailable' };
@@ -663,157 +560,16 @@ const methods = {
 			case 'ipv4_domestic':
 				return plain_ip_probe('https://v4.ipgg.cn', 4);
 			case 'ipv4_overseas':
-				return plain_ip_probe('https://4.wsmdn.dpdns.org/', 4);
+				return overseas_ip_probe(4);
 			case 'ipv6_domestic':
 				return ipv6_probe([ 'https://v6.ipgg.cn' ]);
 			case 'ipv6_overseas':
-				return ipv6_probe([ 'https://6.wsmdn.dpdns.org/', 'https://ifconfig.co/ip' ]);
+				return overseas_ip_probe(6);
 			case 'nat':
 				return nat_test();
 			default:
 				return { success: false, error: 'invalid_test' };
 			}
-		}
-	},
-	provider_discard: {
-		call: function() {
-			const response = core_api_request('GET', '/providers/proxies', '', '');
-			const manifest = provider_filter_manifest();
-			const config = provider_discard_config();
-			const providers = response.providers || {};
-			const managed = {};
-			for (let name in manifest.providers || {})
-				if (!providers[name])
-					providers[name] = { name: name, vehicleType: 'HTTP', proxies: [], nativeAvailable: false };
-			for (let name in providers) {
-				const meta = manifest.providers?.[name];
-				if (!meta && providers[name]?.vehicleType != 'HTTP')
-					continue;
-				const saved = config.providers?.[name] || {};
-				providers[name].vehicleType = meta?.vehicleType || providers[name].vehicleType;
-				providers[name].proxyCount = length(providers[name].proxies || []);
-				providers[name].proxies = [];
-				providers[name].nativeAvailable = providers[name].nativeAvailable !== false;
-				providers[name].filterSupported = !!meta && meta.supported != false;
-				providers[name].testUrl = saved.url || meta?.testUrl || providers[name].testUrl || '';
-				providers[name].discardPolicy = {
-					enabled: saved.enabled == true,
-					url: saved.url || '',
-					timeout: int(saved.timeout) || 3000,
-					retries: int(saved.retries) || 0,
-					concurrency: int(saved.concurrency) || config.global.concurrency
-				};
-				providers[name].discardStatus = meta
-					? provider_filter_state(meta.key)
-					: { state: 'inactive', message: 'restart_required' };
-				managed[name] = providers[name];
-			}
-			const log = provider_filter_log(0);
-			return {
-				supported: true,
-				isolation: 'direct',
-				providers: managed,
-				config: config,
-				log: log.log,
-				log_offset: log.log_offset
-			};
-		}
-	},
-	provider_discard_status: {
-		args: { log_offset: 'log_offset' },
-		call: function(req) {
-			const manifest = provider_filter_manifest();
-			const statuses = {};
-			for (let name in manifest.providers || {}) {
-				const key = manifest.providers[name]?.key || '';
-				statuses[name] = provider_filter_state(key);
-			}
-			const log = provider_filter_log(req.args?.log_offset);
-			return {
-				statuses: statuses,
-				log: log.log,
-				log_offset: log.log_offset,
-				log_reset: log.log_reset
-			};
-		}
-	},
-	set_provider_discard_global: {
-		args: { enabled: 'enabled', concurrency: 'concurrency', unified_delay: 'unified_delay', max_delay: 'max_delay' },
-		call: function(req) {
-			const config = provider_discard_config();
-			const enabled = req.args?.enabled == true || req.args?.enabled == 'true' || req.args?.enabled == '1';
-			const concurrency = int(req.args?.concurrency);
-			const unified_delay = req.args?.unified_delay == null
-				? config.global.unifiedDelay
-				: req.args.unified_delay == true || req.args.unified_delay == 'true' || req.args.unified_delay == '1';
-			const max_delay = req.args?.max_delay == null || req.args?.max_delay == ''
-				? config.global.maxDelay
-				: int(req.args.max_delay);
-			if (concurrency < 1 || concurrency > 20 || max_delay < 0 || max_delay > 30000)
-				return { success: false, error: 'invalid_policy' };
-			config.global.enabled = enabled;
-			config.global.concurrency = concurrency;
-			config.global.unifiedDelay = unified_delay;
-			config.global.maxDelay = max_delay;
-			if (!write_provider_discard_config(config))
-				return { success: false, error: 'write_failed' };
-			if (!enabled)
-				system(join(' ', map([PROVIDER_FILTER_SCRIPT, 'stop'], shell_quote)) + ' >/dev/null 2>&1');
-			return { success: true, enabled: enabled };
-		}
-	},
-	set_provider_discard: {
-		args: { provider: 'provider', enabled: 'enabled', url: 'url', timeout: 'timeout', retries: 'retries', concurrency: 'concurrency', unified_delay: 'unified_delay', max_delay: 'max_delay' },
-		call: function(req) {
-			const config = provider_discard_config();
-			const provider = req.args?.provider || '';
-			const enabled = req.args?.enabled == true || req.args?.enabled == 'true' || req.args?.enabled == '1';
-			const url = trim(req.args?.url || '');
-			const timeout = int(req.args?.timeout);
-			const retries = int(req.args?.retries);
-			const concurrency = int(req.args?.concurrency);
-			const unified_delay = req.args?.unified_delay == null
-				? config.global.unifiedDelay
-				: req.args.unified_delay == true || req.args.unified_delay == 'true' || req.args.unified_delay == '1';
-			const max_delay = req.args?.max_delay == null || req.args?.max_delay == ''
-				? config.global.maxDelay
-				: int(req.args.max_delay);
-			if (!valid_api_value(provider, 256) || provider == '' ||
-				!valid_api_value(url, 2048) || (url != '' && !match(url, /^https?:\/\//)) ||
-				timeout < 500 || timeout > 30000 || retries < 0 || retries > 5 ||
-				concurrency < 1 || concurrency > 20 || max_delay < 0 || max_delay > 30000)
-				return { success: false, error: 'invalid_policy' };
-
-			const policy = {
-				enabled: enabled,
-				url: url,
-				timeout: timeout,
-				retries: retries,
-				concurrency: concurrency
-			};
-			config.global.concurrency = concurrency;
-			config.global.unifiedDelay = unified_delay;
-			config.global.maxDelay = max_delay;
-			config.providers[provider] = policy;
-			if (!write_provider_discard_config(config))
-				return { success: false, error: 'write_failed' };
-
-			const result = !enabled ? provider_filter_enqueue(provider, true) : { success: true };
-			return { success: true, applied: result.success, queued: result.success, policy: policy };
-		}
-	},
-	update_provider_discard: {
-		args: { provider: 'provider' },
-		call: function(req) {
-			const provider = req.args?.provider || '';
-			if (!valid_api_value(provider, 256) || provider == '')
-				return { success: false, error: 'invalid_provider' };
-			const manifest = provider_filter_manifest();
-			const meta = manifest.providers?.[provider];
-			if (!meta || meta.supported == false)
-				return native_provider_check(provider);
-			const result = provider_filter_enqueue(provider, true);
-			return { success: result.success, started: result.success, mode: 'isolated', error: result.error };
 		}
 	},
 	write_file: {

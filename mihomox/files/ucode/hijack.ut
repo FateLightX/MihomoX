@@ -136,7 +136,7 @@
 	const reserved_ip6 = safe_list(uci.get('mihomox', 'proxy', 'reserved_ip6'), /^[0-9A-Fa-f:.\/-]+$/);
 	const bypass_dscp = safe_list(uci.get('mihomox', 'proxy', 'bypass_dscp'), /^[0-9A-Za-z]+$/);
 	const bypass_fwmark = [];
-	const provider_probe_fw_mark = safe_mark(uci.get('mihomox', 'routing', 'provider_probe_fw_mark'), '0x82');
+	const network_test_fw_mark = safe_mark(uci.get('mihomox', 'routing', 'network_test_fw_mark'), '0x82');
 	for (let fwmark in uci_array(uci.get('mihomox', 'proxy', 'bypass_fwmark'))) {
 		if (!match(fwmark, /^(0[xX][0-9A-Fa-f]+|[0-9]+)(\/(0[xX][0-9A-Fa-f]+|[0-9]+))?$/))
 			continue;
@@ -164,9 +164,9 @@
 	const tun_fw_mark = safe_mark(uci.get('mihomox', 'routing', 'tun_fw_mark'), '0x81');
 	const tun_fw_mask = safe_mark(uci.get('mihomox', 'routing', 'tun_fw_mask'), '0xFF');
 	const tun_fw_umask = fw4.hex(~tun_fw_mask & 0xFFFFFFFF);
-	if ((int(provider_probe_fw_mark, 0) & int(tproxy_fw_mask, 0)) != (int(tproxy_fw_mark, 0) & int(tproxy_fw_mask, 0)) &&
-		(int(provider_probe_fw_mark, 0) & int(tun_fw_mask, 0)) != (int(tun_fw_mark, 0) & int(tun_fw_mask, 0)))
-		push(bypass_fwmark, { mark: provider_probe_fw_mark, mask: '0xFFFFFFFF' });
+	if ((int(network_test_fw_mark, 0) & int(tproxy_fw_mask, 0)) != (int(tproxy_fw_mark, 0) & int(tproxy_fw_mask, 0)) &&
+		(int(network_test_fw_mark, 0) & int(tun_fw_mask, 0)) != (int(tun_fw_mark, 0) & int(tun_fw_mask, 0)))
+		push(bypass_fwmark, { mark: network_test_fw_mark, mask: '0xFFFFFFFF' });
 
 	const dns_hijack_nfproto = [];
 	if (ipv4_dns_hijack) {

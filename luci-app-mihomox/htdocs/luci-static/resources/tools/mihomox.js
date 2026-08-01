@@ -79,43 +79,6 @@ const callMihomoXNetworkTest = rpc.declare({
     nobatch: true
 });
 
-const callMihomoXProviderDiscard = rpc.declare({
-    object: 'luci.mihomox',
-    method: 'provider_discard',
-    expect: { '': {} }
-});
-
-const callMihomoXProviderDiscardStatus = rpc.declare({
-    object: 'luci.mihomox',
-    method: 'provider_discard_status',
-    params: ['log_offset'],
-    expect: { '': {} }
-});
-
-const callMihomoXSetProviderDiscard = rpc.declare({
-    object: 'luci.mihomox',
-    method: 'set_provider_discard',
-    params: ['provider', 'enabled', 'url', 'timeout', 'retries', 'concurrency', 'unified_delay', 'max_delay'],
-    expect: { '': {} },
-    nobatch: true
-});
-
-const callMihomoXSetProviderDiscardGlobal = rpc.declare({
-    object: 'luci.mihomox',
-    method: 'set_provider_discard_global',
-    params: ['enabled', 'concurrency', 'unified_delay', 'max_delay'],
-    expect: { '': {} },
-    nobatch: true
-});
-
-const callMihomoXUpdateProviderDiscard = rpc.declare({
-    object: 'luci.mihomox',
-    method: 'update_provider_discard',
-    params: ['provider'],
-    expect: { '': {} },
-    nobatch: true
-});
-
 const callMihomoXWriteFile = rpc.declare({
     object: 'luci.mihomox',
     method: 'write_file',
@@ -302,40 +265,6 @@ return baseclass.extend({
 
     networkTest: function (test) {
         return callMihomoXNetworkTest(test);
-    },
-
-    providerDiscard: function () {
-        return callMihomoXProviderDiscard();
-    },
-
-    providerDiscardStatus: function (logOffset) {
-        return callMihomoXProviderDiscardStatus(String(logOffset || 0));
-    },
-
-    setProviderDiscard: function (provider, policy, global) {
-        return callMihomoXSetProviderDiscard(
-            provider,
-            String(!!policy.enabled),
-            policy.url || '',
-            String(policy.timeout),
-            String(policy.retries),
-            String(global.concurrency),
-            String(!!global.unifiedDelay),
-            String(global.maxDelay)
-        );
-    },
-
-    setProviderDiscardGlobal: function (enabled, global) {
-        return callMihomoXSetProviderDiscardGlobal(
-            String(!!enabled),
-            String(global.concurrency),
-            String(!!global.unifiedDelay),
-            String(global.maxDelay)
-        );
-    },
-
-    updateProviderDiscard: function (provider) {
-        return callMihomoXUpdateProviderDiscard(provider);
     },
 
     inlineDescriptions: function (node) {

@@ -43,12 +43,16 @@ assert.ok(source.includes("timeout: 30000"), 'NAT must allow DNS isolation and S
 assert.ok(rpcSource.includes("readfile('/etc/resolv.conf')"), 'system DNS servers must be read from resolv.conf');
 assert.ok(rpcSource.includes('version: installed_core_version()'), 'core version must be returned by the network RPC');
 assert.ok(rpcSource.includes("plain_ip_probe('https://v4.ipgg.cn', 4)"), 'domestic IPv4 must use ipgg');
-assert.ok(rpcSource.includes("plain_ip_probe('https://4.wsmdn.dpdns.org/', 4)"), 'overseas IPv4 must use wsmdn');
+assert.ok(rpcSource.includes('return overseas_ip_probe(4)'), 'overseas IPv4 must use the proxy geo probe');
 assert.ok(rpcSource.includes("ipv6_probe([ 'https://v6.ipgg.cn' ])"), 'domestic IPv6 must use ipgg');
-assert.ok(rpcSource.includes("'https://6.wsmdn.dpdns.org/', 'https://ifconfig.co/ip'"), 'overseas IPv6 must have a fallback');
+assert.ok(rpcSource.includes('return overseas_ip_probe(6)'), 'overseas IPv6 must use the proxy geo probe');
+assert.ok(rpcSource.includes("'https://1.1.1.1/cdn-cgi/trace'"), 'overseas IPv4 must force a fixed IPv4 target');
+assert.ok(rpcSource.includes("'https://[2606:4700:4700::1111]/cdn-cgi/trace'"), 'overseas IPv6 must force a fixed IPv6 target');
+assert.ok(rpcSource.includes("const proxy = local_proxy()"), 'overseas probes must use the local Mihomo proxy');
+assert.ok(rpcSource.includes("country != 'CN'"), 'overseas probes must reject mainland China exits');
 assert.ok(rpcSource.includes("'--doh-url', 'https://dns.alidns.com/dns-query'"), 'IPv6 probes must bypass fake-IP DNS');
 assert.ok(rpcSource.includes("resolve_public_ipv4('stun.cloudflare.com')"), 'STUN must bypass fake-IP DNS');
-assert.ok(rpcSource.includes("provider_probe_fw_mark"), 'STUN must bypass transparent proxy interception');
+assert.ok(rpcSource.includes("network_test_fw_mark"), 'STUN must bypass transparent proxy interception');
 assert.ok(rpcSource.includes('direct_network_command(args)'), 'direct probes must use the MihomoX bypass cgroup');
 assert.ok(rpcSource.includes("push(args, '--noproxy', '*')"), 'IP protocol probes must bypass environment proxies');
 assert.ok(source.includes("no_ipv6: _('No IPv6 Connectivity')"), 'network errors must be visible');
@@ -90,9 +94,9 @@ const results = {
     domestic: { success: true, latency: 35 },
     international: { success: true, latency: 86 },
     ipv4_domestic: { success: true, address: '198.51.100.10' },
-    ipv4_overseas: { success: true, address: '203.0.113.1' },
+    ipv4_overseas: { success: true, address: '203.0.113.1', country: 'KR' },
     ipv6_domestic: { success: true, address: '2001:db8::10' },
-    ipv6_overseas: { success: false },
+    ipv6_overseas: { success: false, address: '2001:db8::20', country: 'CN' },
     nat: { success: true, type: 'Full Cone' }
 };
 const mihomox = {
@@ -145,9 +149,9 @@ Promise.resolve().then(() => {
     ]);
     assert.deepStrictEqual(values.slice(5, 9), [
         '198.51.100.10',
-        '203.0.113.1',
+        '203.0.113.1 · KR',
         '2001:db8::10',
-        'Unavailable'
+        '2001:db8::20 · CN · Unavailable'
     ]);
     const ipv4Button = singleButtons.find((node) => node.attributes['data-test-id'] === 'ipv4_domestic');
     return ipv4Button.listeners.click().then(() => {

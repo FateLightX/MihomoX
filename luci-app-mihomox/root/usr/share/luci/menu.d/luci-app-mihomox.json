@@ -33,14 +33,6 @@
             "path": "mihomox/mixin"
         }
     },
-    "admin/services/mihomox/providers": {
-        "title": "Node Management",
-        "order": 25,
-        "action": {
-            "type": "view",
-            "path": "mihomox/providers"
-        }
-    },
     "admin/services/mihomox/proxy": {
         "title": "Proxy Config",
         "order": 40,

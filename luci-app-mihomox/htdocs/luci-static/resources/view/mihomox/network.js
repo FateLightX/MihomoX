@@ -55,6 +55,10 @@ function resultText(test, result) {
         const status = result?.success ? `${result.latency ?? 0} ms` : state;
         return `${test.target} · ${status}`;
     }
+    if (/^ipv[46]_overseas$/.test(test.id) && result?.address) {
+        const exit = result.country ? `${result.address} · ${result.country}` : result.address;
+        return result.success ? exit : `${exit} · ${state}`;
+    }
     if (!result?.success) {
         const errors = {
             no_ipv6: _('No IPv6 Connectivity'),
