@@ -245,6 +245,47 @@ function core_api_request(method, path, query, body) {
 	return result;
 }
 
+function core_api_action(method, path) {
+	const profile = load_profile();
+	const api_listen = profile['external-controller'];
+	const api_tls_listen = profile['external-controller-tls'];
+	const api_secret = profile['secret'];
+	if (!api_listen && !api_tls_listen)
+		return { success: false, error: 'controller_unavailable' };
+
+	const protocol = api_tls_listen ? 'https' : 'http';
+	const listen = api_tls_listen || api_listen;
+	const args = [
+		'curl', '--silent', '--show-error', '--output', '/dev/null',
+		'--write-out', '%{http_code}', '--max-time', '60', '--connect-timeout', '10',
+		'--proto-default', protocol, '--insecure', '--request', method
+	];
+	if (api_secret)
+		push(args, '--oauth2-bearer', api_secret);
+	push(args, '--url', controller_url(listen, protocol, path));
+	const process = popen(join(' ', map(args, shell_quote)), 'r');
+	if (!process)
+		return { success: false, error: 'start_failed' };
+	const status = int(trim(process.read('all') || '0'));
+	process.close();
+	return {
+		success: status >= 200 && status < 400,
+		status: status,
+		error: status >= 200 && status < 400 ? '' : 'request_failed'
+	};
+}
+
+function native_provider_check(provider) {
+	const path = '/providers/proxies/' + url_encode_component(provider);
+	const update = core_api_action('PUT', path);
+	if (!update.success)
+		return { success: false, error: 'native_update_failed' };
+	const check = core_api_action('GET', path + '/healthcheck');
+	return check.success
+		? { success: true, completed: true, mode: 'native' }
+		: { success: false, error: 'native_test_failed' };
+}
+
 function writable_path(path) {
 	if (!valid_api_value(path, 4096) || match(path, /(^|\/)\.\.(\/|$)/))
 		return false;
@@ -620,13 +661,14 @@ const methods = {
 			const providers = response.providers || {};
 			for (let name in manifest.providers || {})
 				if (!providers[name])
-					providers[name] = { name: name, vehicleType: 'HTTP', proxies: [] };
+					providers[name] = { name: name, vehicleType: 'HTTP', proxies: [], nativeAvailable: false };
 			for (let name in providers) {
 				const meta = manifest.providers?.[name];
 				if (!meta && providers[name]?.vehicleType != 'HTTP')
 					continue;
 				const saved = config.providers?.[name] || {};
 				providers[name].vehicleType = meta?.vehicleType || providers[name].vehicleType;
+				providers[name].nativeAvailable = providers[name].nativeAvailable !== false;
 				providers[name].filterSupported = !!meta && meta.supported != false;
 				providers[name].testUrl = saved.url || meta?.testUrl || providers[name].testUrl || '';
 				providers[name].discardPolicy = {
@@ -703,8 +745,12 @@ const methods = {
 			const provider = req.args?.provider || '';
 			if (!valid_api_value(provider, 256) || provider == '')
 				return { success: false, error: 'invalid_provider' };
+			const manifest = provider_filter_manifest();
+			const meta = manifest.providers?.[provider];
+			if (!meta || meta.supported == false)
+				return native_provider_check(provider);
 			const result = provider_filter_enqueue(provider, true);
-			return { success: result.success, started: result.success, error: result.error };
+			return { success: result.success, started: result.success, mode: 'isolated', error: result.error };
 		}
 	},
 	write_file: {

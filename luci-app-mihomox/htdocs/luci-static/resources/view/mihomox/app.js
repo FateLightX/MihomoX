@@ -160,17 +160,24 @@ return view.extend({
 
         const titleIconUrl = L.resource('icons/mihomox.svg');
         const title = E('span', {
-            style: 'display:inline-flex;align-items:center;gap:0.45em;'
+            'class': 'mihomox-title',
+            style: 'display:inline-flex;align-items:baseline;gap:0.75em;flex-wrap:wrap;letter-spacing:0;'
         }, [
+            E('span', { 'class': 'mihomox-title-brand', style: 'display:inline-flex;align-items:center;gap:0.45em;' }, [
+                E('span', {
+                    'aria-hidden': 'true',
+                    style: 'display:inline-block;width:1.2em;height:1.2em;flex:none;background:currentColor;' +
+                        `-webkit-mask:url("${titleIconUrl}") center/contain no-repeat;mask:url("${titleIconUrl}") center/contain no-repeat;`
+                }),
+                E('span', {}, _('MihomoX'))
+            ]),
             E('span', {
-                'aria-hidden': 'true',
-                style: 'display:inline-block;width:1.2em;height:1.2em;flex:none;background:currentColor;' +
-                    `-webkit-mask:url("${titleIconUrl}") center/contain no-repeat;mask:url("${titleIconUrl}") center/contain no-repeat;`
-            }),
-            E('span', {}, _('MihomoX'))
+                'class': 'mihomox-title-description',
+                style: 'font-size:0.62em;font-weight:400;line-height:1.4;letter-spacing:0;color:var(--text-color-medium,#667085);'
+            }, _('Transparent Proxy with Mihomo on OpenWrt.'))
         ]);
 
-        m = new form.Map('mihomox', title, _('Transparent Proxy with Mihomo on OpenWrt.'));
+        m = new form.Map('mihomox', title);
 
         s = m.section(form.TableSection, 'status', _('Status'));
         s.anonymous = true;

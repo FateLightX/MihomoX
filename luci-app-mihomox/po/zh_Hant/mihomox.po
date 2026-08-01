@@ -1516,6 +1516,18 @@ msgstr "全部更新"
 msgid "Update Started"
 msgstr "更新已啟動"
 
+msgid "Test Completed"
+msgstr "檢測完成"
+
+msgid "Mihomo Provider update failed."
+msgstr "Mihomo Provider 更新失敗。"
+
+msgid "Mihomo Provider test failed."
+msgstr "Mihomo Provider 檢測失敗。"
+
+msgid "Mihomo controller is unavailable."
+msgstr "Mihomo 控制介面不可用。"
+
 msgid "Waiting Test"
 msgstr "等待檢測"
 

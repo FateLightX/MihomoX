@@ -1509,6 +1509,18 @@ msgstr ""
 msgid "Update Started"
 msgstr ""
 
+msgid "Test Completed"
+msgstr ""
+
+msgid "Mihomo Provider update failed."
+msgstr ""
+
+msgid "Mihomo Provider test failed."
+msgstr ""
+
+msgid "Mihomo controller is unavailable."
+msgstr ""
+
 msgid "Waiting Test"
 msgstr ""
 

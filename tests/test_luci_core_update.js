@@ -23,6 +23,8 @@ assert.ok(
     'installed architecture should fall back to the detected architecture'
 );
 assert.ok(source.includes("L.resource('icons/mihomox.svg')"), 'MihomoX title icon is missing');
+assert.ok(source.includes("'class': 'mihomox-title-description'"), 'MihomoX description must be in the title row');
+assert.ok(source.includes("new form.Map('mihomox', title)"), 'MihomoX description must not render below the title');
 assert.ok(fs.existsSync(iconPath), 'MihomoX SVG icon is missing');
 const iconSource = fs.readFileSync(iconPath, 'utf8');
 assert.ok(/<svg\b[^>]*viewBox="0 0 512 512"/.test(iconSource), 'MihomoX SVG viewBox is invalid');

@@ -1462,6 +1462,18 @@ msgstr "Обновить все"
 msgid "Update Started"
 msgstr "Обновление запущено"
 
+msgid "Test Completed"
+msgstr "Проверка завершена"
+
+msgid "Mihomo Provider update failed."
+msgstr "Не удалось обновить провайдер Mihomo."
+
+msgid "Mihomo Provider test failed."
+msgstr "Не удалось проверить провайдер Mihomo."
+
+msgid "Mihomo controller is unavailable."
+msgstr "Интерфейс управления Mihomo недоступен."
+
 msgid "Waiting Test"
 msgstr "Ожидание проверки"
 

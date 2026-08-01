@@ -51,6 +51,9 @@ function errorLabel(error) {
         manager_missing: _('Provider filter manager is missing.'),
         start_failed: _('Failed to start provider filter manager.'),
         queue_failed: _('Failed to add provider to the update queue.'),
+        native_update_failed: _('Mihomo Provider update failed.'),
+        native_test_failed: _('Mihomo Provider test failed.'),
+        controller_unavailable: _('Mihomo controller is unavailable.'),
         execution_disabled: _('Provider filtering is disabled.'),
         invalid_provider: _('Invalid provider.')
     };
@@ -126,12 +129,13 @@ function saveAll() {
 
 function updateProvider(name) {
     pageMessage(_('Starting Update'));
-    return saveProvider(name).then(function () {
+    const save = controls[name]?.supported ? saveProvider(name) : Promise.resolve();
+    return save.then(function () {
         return mihomox.updateProviderDiscard(name);
     }).then(function (result) {
-        if (!result?.started)
+        if (!result?.started && !result?.completed)
             return Promise.reject(new Error(errorLabel(result?.error)));
-        pageMessage(_('Update Started'));
+        pageMessage(result.completed ? _('Test Completed') : _('Update Started'));
         return refreshPage(true);
     }).catch(function (error) {
         pageMessage(_('Failed') + ': ' + (error?.message || error), true);
@@ -140,15 +144,16 @@ function updateProvider(name) {
 }
 
 function updateAll() {
-    const names = Object.keys(controls).filter((name) => controls[name].supported && controls[name].enabled.checked);
+    const names = Object.keys(controls).filter((name) => controls[name].manualSupported &&
+        (!controls[name].supported || controls[name].enabled.checked));
     pageMessage(_('Starting Update'));
     return saveAll().then(function () {
         return Promise.all(names.map((name) => mihomox.updateProviderDiscard(name)));
     }).then(function (results) {
-        const failed = results.find((result) => !result?.started);
+        const failed = results.find((result) => !result?.started && !result?.completed);
         if (failed)
             return Promise.reject(new Error(errorLabel(failed.error)));
-        pageMessage(_('Update Started'));
+        pageMessage(results.some((result) => result?.started) ? _('Update Started') : _('Test Completed'));
         return refreshPage(true);
     }).catch(function (error) {
         pageMessage(_('Failed') + ': ' + (error?.message || error), true);
@@ -190,6 +195,7 @@ function providerRow(name, provider, concurrency) {
     const status = provider.discardStatus || {};
     const expanded = expandedProvider === name;
     const supported = provider.filterSupported === true && !['unsupported', 'inactive'].includes(status.state);
+    const manualSupported = provider.nativeAvailable !== false || supported;
     const enabled = E('input', { type: 'checkbox', checked: policy.enabled ? '' : null, disabled: supported ? null : '' });
     enabled.checked = !!policy.enabled;
     const url = E('input', {
@@ -208,6 +214,7 @@ function providerRow(name, provider, concurrency) {
     const progressNode = E('progress', { 'class': 'mihomox-provider-progress', max: '1', value: '0', hidden: '' });
     controls[name] = {
         enabled: enabled, url: url, timeout: timeout, retries: retries, supported: supported,
+        manualSupported: manualSupported,
         count: countNode, discarded: discardedNode, state: stateNode, progress: progressNode
     };
 
@@ -217,7 +224,7 @@ function providerRow(name, provider, concurrency) {
         settingRow(_('Failed Retries'), retries),
         E('div', { 'class': 'mihomox-provider-detail-actions' }, [
             E('button', { 'class': 'cbi-button cbi-button-neutral', type: 'button', disabled: supported ? null : '', click: () => saveProvider(name).then(() => pageMessage(_('Saved'))) }, _('Save')),
-            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', disabled: supported ? null : '', click: () => updateProvider(name) }, _('Update and Test'))
+            E('button', { 'class': 'cbi-button cbi-button-action', type: 'button', disabled: manualSupported ? null : '', click: () => updateProvider(name) }, _('Update and Test'))
         ])
     ]);
     const toggleDetails = E('button', {
