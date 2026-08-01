@@ -38,13 +38,20 @@ for (const test of ['core', 'system_dns', 'mihomo_dns', 'domestic', 'internation
     assert.ok(rpcSource.includes(`case '${test}':`), `network RPC is missing ${test}`);
 assert.ok(/method:\s*'network_test'[\s\S]*?nobatch:\s*true/.test(toolSource), 'network tests must bypass RPC batching');
 assert.ok(source.includes('Promise.race(['), 'network tests must enforce a browser-side timeout');
+assert.ok(!source.includes('stopped = true'), 'one network timeout must not skip later tests');
+assert.ok(source.includes("timeout: 30000"), 'NAT must allow DNS isolation and STUN timeouts');
 assert.ok(rpcSource.includes("readfile('/etc/resolv.conf')"), 'system DNS servers must be read from resolv.conf');
 assert.ok(rpcSource.includes('version: installed_core_version()'), 'core version must be returned by the network RPC');
 assert.ok(rpcSource.includes("plain_ip_probe('https://v4.ipgg.cn', 4)"), 'domestic IPv4 must use ipgg');
 assert.ok(rpcSource.includes("plain_ip_probe('https://4.wsmdn.dpdns.org/', 4)"), 'overseas IPv4 must use wsmdn');
-assert.ok(rpcSource.includes("plain_ip_probe('https://v6.ipgg.cn', 6)"), 'domestic IPv6 must use ipgg');
-assert.ok(rpcSource.includes("plain_ip_probe('https://6.wsmdn.dpdns.org/', 6)"), 'overseas IPv6 must use wsmdn');
+assert.ok(rpcSource.includes("ipv6_probe([ 'https://v6.ipgg.cn' ])"), 'domestic IPv6 must use ipgg');
+assert.ok(rpcSource.includes("'https://6.wsmdn.dpdns.org/', 'https://ifconfig.co/ip'"), 'overseas IPv6 must have a fallback');
+assert.ok(rpcSource.includes("'--doh-url', 'https://dns.alidns.com/dns-query'"), 'IPv6 probes must bypass fake-IP DNS');
+assert.ok(rpcSource.includes("resolve_public_ipv4('stun.cloudflare.com')"), 'STUN must bypass fake-IP DNS');
+assert.ok(rpcSource.includes("provider_probe_fw_mark"), 'STUN must bypass transparent proxy interception');
+assert.ok(rpcSource.includes('direct_network_command(args)'), 'direct probes must use the MihomoX bypass cgroup');
 assert.ok(rpcSource.includes("push(args, '--noproxy', '*')"), 'IP protocol probes must bypass environment proxies');
+assert.ok(source.includes("no_ipv6: _('No IPv6 Connectivity')"), 'network errors must be visible');
 
 for (const icon of ['core', 'dns', 'shield', 'home', 'globe', 'ipv4', 'ipv6', 'nat', 'check', 'warning', 'close', 'loading']) {
     const iconPath = path.join(

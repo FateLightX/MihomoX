@@ -1422,6 +1422,33 @@ msgstr ""
 msgid "Unsupported"
 msgstr ""
 
+msgid "Enable Provider Filtering"
+msgstr ""
+
+msgid "Provider filtering is disabled."
+msgstr ""
+
+msgid "Restart Required"
+msgstr ""
+
+msgid "Restart MihomoX once to activate provider filtering."
+msgstr ""
+
+msgid "This provider uses unsupported options."
+msgstr ""
+
+msgid "Provider filter manager is missing."
+msgstr ""
+
+msgid "Failed to start provider filter manager."
+msgstr ""
+
+msgid "Failed to add provider to the update queue."
+msgstr ""
+
+msgid "Invalid provider."
+msgstr ""
+
 msgid "Disabled"
 msgstr ""
 
@@ -1483,4 +1510,28 @@ msgid "Update Started"
 msgstr ""
 
 msgid "Update and Test"
+msgstr ""
+
+msgid "No IPv6 Connectivity"
+msgstr ""
+
+msgid "UDP Timeout"
+msgstr ""
+
+msgid "DNS Resolution Failed"
+msgstr ""
+
+msgid "NAT Helper Missing"
+msgstr ""
+
+msgid "Test Start Failed"
+msgstr ""
+
+msgid "Invalid Test Result"
+msgstr ""
+
+msgid "Direct Test Isolation Unavailable"
+msgstr ""
+
+msgid "Direct Test Mark Failed"
 msgstr ""

@@ -87,6 +87,13 @@ policy_field() {
 	printf '%s\n' "$value"
 }
 
+manager_enabled() {
+	local value
+	[ -s "$POLICY_FILE" ] || return 0
+	value=$("$YQ" -r '.global.enabled // true' "$POLICY_FILE" 2>/dev/null)
+	[ "$value" = true ]
+}
+
 percent_encode() {
 	local byte
 	for byte in $(printf '%s' "$1" | od -An -tx1); do
@@ -311,7 +318,7 @@ update_one() {
 
 prepare_profile() {
 	local profile temporary manifest_tmp names_file name key dir source_file current_file
-	local interval test_url unsupported supported
+	local interval test_url unsupported supported execution_enabled
 	profile="$1"
 	[ -s "$profile" ] || return 1
 	prepare_dirs
@@ -320,6 +327,8 @@ prepare_profile() {
 	names_file="$FILTER_DIR/providers.txt.tmp.$$"
 	cp -f "$profile" "$temporary" || return 1
 	printf '%s\n' '{"providers":{}}' > "$manifest_tmp"
+	execution_enabled=true
+	manager_enabled || execution_enabled=false
 	"$YQ" -r '.["proxy-providers"] // {} | to_entries[] | select(.value.type == "http") | .key' \
 		"$profile" > "$names_file" 2>/dev/null
 
@@ -341,7 +350,7 @@ prepare_profile() {
 		if [ "$unsupported" = true ]; then
 			supported=false
 			write_state "$name" unsupported 0 0 0 0 unsupported_provider_options
-		elif [ ! -s "$current_file" ]; then
+		elif [ "$execution_enabled" = true ] && [ ! -s "$current_file" ]; then
 			update_one "$name" || true
 		fi
 		[ -s "$current_file" ] || supported=false
@@ -374,6 +383,7 @@ prepare_profile() {
 enqueue_provider() {
 	local name key request
 	name="$1"
+	manager_enabled || return 1
 	[ -s "$MANIFEST_FILE" ] || return 1
 	key=$(PROVIDER_NAME="$name" "$YQ" -r \
 		'.providers[strenv(PROVIDER_NAME)] | select(.supported == true) | .key // ""' "$MANIFEST_FILE")
@@ -386,6 +396,7 @@ enqueue_provider() {
 queue_due() {
 	local now name key interval last
 	[ -s "$MANIFEST_FILE" ] || return 0
+	manager_enabled || return 0
 	now=$(date +%s)
 	"$YQ" -r '.providers | to_entries[] | select(.value.supported == true) | .key' "$MANIFEST_FILE" | while IFS= read -r name; do
 		key=$(PROVIDER_NAME="$name" "$YQ" -r '.providers[strenv(PROVIDER_NAME)].key' "$MANIFEST_FILE")
@@ -406,6 +417,10 @@ run_worker() {
 	printf '%s\n' "$$" > "$WORKER_PID"
 	trap 'stop_probe; rm -f "$WORKER_PID"; rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT HUP INT TERM
 	while :; do
+		if ! manager_enabled; then
+			rm -f "$QUEUE_DIR"/*.request
+			break
+		fi
 		request=$(find "$QUEUE_DIR" -maxdepth 1 -type f -name '*.request' 2>/dev/null | sort | head -n 1)
 		[ -n "$request" ] || break
 		name=$(cat "$request")

@@ -232,12 +232,30 @@ int main(int argc, char **argv) {
     const char *type = "Unknown";
     char mapped[64];
     int socket_fd;
+#ifdef SO_MARK
+    unsigned long socket_mark = 0;
+#endif
 
     if (argc == 2 && strcmp(argv[1], "--self-test") == 0)
         return self_test();
     alarm(12);
-    if (resolve_ipv4("stun.cloudflare.com", "3478", &primary) != 0 ||
-        resolve_ipv4("stun.l.google.com", "19302", &secondary) != 0) {
+    if (argc == 5 || argc == 6) {
+        if (resolve_ipv4(argv[1], argv[2], &primary) != 0 ||
+            resolve_ipv4(argv[3], argv[4], &secondary) != 0) {
+            alarm(0);
+            puts("{\"success\":false,\"type\":\"Unknown\",\"error\":\"resolve_failed\"}");
+            return 0;
+        }
+        if (argc == 6) {
+#ifdef SO_MARK
+            socket_mark = strtoul(argv[5], NULL, 0);
+#else
+            (void)argv[5];
+#endif
+        }
+    } else if (argc != 1 ||
+               resolve_ipv4("stun.cloudflare.com", "3478", &primary) != 0 ||
+               resolve_ipv4("stun.l.google.com", "19302", &secondary) != 0) {
         alarm(0);
         puts("{\"success\":false,\"type\":\"Unknown\",\"error\":\"resolve_failed\"}");
         return 0;
@@ -249,6 +267,17 @@ int main(int argc, char **argv) {
         return 0;
     }
     fcntl(socket_fd, F_SETFD, FD_CLOEXEC);
+#ifdef SO_MARK
+    if (socket_mark > 0) {
+        uint32_t mark = (uint32_t)socket_mark;
+        if (setsockopt(socket_fd, SOL_SOCKET, SO_MARK, &mark, sizeof(mark)) != 0) {
+            close(socket_fd);
+            alarm(0);
+            puts("{\"success\":false,\"type\":\"Unknown\",\"error\":\"mark_failed\"}");
+            return 0;
+        }
+    }
+#endif
     if (stun_query(socket_fd, &primary, 0, &first) != 0 ||
         stun_query(socket_fd, &secondary, 0, &second) != 0) {
         close(socket_fd);

@@ -9,6 +9,8 @@ MAKEFILE="$ROOT_DIR/mihomox/Makefile"
 [ -f "$SOURCE" ]
 grep -q 'mihomox-stun' "$MAKEFILE"
 grep -q '/usr/libexec/mihomox/stun-test' "$MAKEFILE"
+grep -q 'argc == 5 || argc == 6' "$SOURCE"
+grep -q 'SO_MARK' "$SOURCE"
 
 if command -v cc >/dev/null 2>&1; then
     binary=$(mktemp "${TMPDIR:-/tmp}/mihomox-stun.XXXXXX")

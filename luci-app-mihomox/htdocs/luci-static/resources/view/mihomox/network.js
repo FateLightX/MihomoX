@@ -13,7 +13,7 @@ const tests = [
     { id: 'ipv4_overseas', label: _('IPv4 Overseas'), icon: 'ipv4' },
     { id: 'ipv6_domestic', label: _('IPv6 Domestic'), icon: 'ipv6' },
     { id: 'ipv6_overseas', label: _('IPv6 Overseas'), icon: 'ipv6' },
-    { id: 'nat', label: _('NAT Type'), icon: 'nat', timeout: 14000 }
+    { id: 'nat', label: _('NAT Type'), icon: 'nat', timeout: 30000 }
 ];
 const TEST_TIMEOUT_MS = 8000;
 
@@ -55,8 +55,19 @@ function resultText(test, result) {
         const status = result?.success ? `${result.latency ?? 0} ms` : state;
         return `${test.target} · ${status}`;
     }
-    if (!result?.success)
-        return state;
+    if (!result?.success) {
+        const errors = {
+            no_ipv6: _('No IPv6 Connectivity'),
+            timeout: _('UDP Timeout'),
+            resolve_failed: _('DNS Resolution Failed'),
+            missing_helper: _('NAT Helper Missing'),
+            start_failed: _('Test Start Failed'),
+            isolation_unavailable: _('Direct Test Isolation Unavailable'),
+            mark_failed: _('Direct Test Mark Failed'),
+            invalid_result: _('Invalid Test Result')
+        };
+        return errors[result?.error] || state;
+    }
     if (test.id === 'nat')
         return natType(result.type);
     if (/^ipv[46]_/.test(test.id))
@@ -127,18 +138,11 @@ function runTests(button, rows) {
         updateRow(rows[test.id], 'idle', _('Not Tested'));
 
     let sequence = Promise.resolve();
-    let stopped = false;
     for (const test of tests) {
         sequence = sequence.then(function () {
-            if (stopped) {
-                updateRow(rows[test.id], 'failed', _('Unavailable'));
-                return;
-            }
             updateRow(rows[test.id], 'loading', _('Testing'));
             return requestTest(test).then(function (result) {
                 updateRow(rows[test.id], result?.success ? 'success' : 'failed', resultText(test, result));
-                if (result?.timedOut)
-                    stopped = true;
             });
         });
     }

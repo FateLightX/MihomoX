@@ -1429,6 +1429,33 @@ msgstr "直连隔离"
 msgid "Unsupported"
 msgstr "不支持"
 
+msgid "Enable Provider Filtering"
+msgstr "执行 Provider 过滤"
+
+msgid "Provider filtering is disabled."
+msgstr "Provider 过滤已关闭。"
+
+msgid "Restart Required"
+msgstr "需要重启"
+
+msgid "Restart MihomoX once to activate provider filtering."
+msgstr "请重启一次 MihomoX 以启用 Provider 过滤。"
+
+msgid "This provider uses unsupported options."
+msgstr "此 Provider 使用了暂不支持的选项。"
+
+msgid "Provider filter manager is missing."
+msgstr "缺少 Provider 过滤管理器。"
+
+msgid "Failed to start provider filter manager."
+msgstr "Provider 过滤管理器启动失败。"
+
+msgid "Failed to add provider to the update queue."
+msgstr "加入 Provider 更新队列失败。"
+
+msgid "Invalid provider."
+msgstr "Provider 无效。"
+
 msgid "Disabled"
 msgstr "已关闭"
 
@@ -1491,3 +1518,27 @@ msgstr "更新已启动"
 
 msgid "Update and Test"
 msgstr "更新并检测"
+
+msgid "No IPv6 Connectivity"
+msgstr "无 IPv6 连接"
+
+msgid "UDP Timeout"
+msgstr "UDP 超时"
+
+msgid "DNS Resolution Failed"
+msgstr "DNS 解析失败"
+
+msgid "NAT Helper Missing"
+msgstr "缺少 NAT 检测程序"
+
+msgid "Test Start Failed"
+msgstr "测试启动失败"
+
+msgid "Invalid Test Result"
+msgstr "测试结果无效"
+
+msgid "Direct Test Isolation Unavailable"
+msgstr "直连测试隔离不可用"
+
+msgid "Direct Test Mark Failed"
+msgstr "直连测试标记失败"

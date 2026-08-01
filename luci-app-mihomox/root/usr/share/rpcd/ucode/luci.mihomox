@@ -144,17 +144,18 @@ function url_encode_component(value) {
 }
 
 function provider_discard_config() {
-	let config = { global: { concurrency: 5 }, providers: {} };
+	let config = { global: { enabled: true, concurrency: 5 }, providers: {} };
 	try {
 		const stored = json(readfile(PROVIDER_DISCARD_FILE) || '');
 		if (stored && type(stored) == 'object')
 			config = stored;
 	} catch (e) {}
 	if (!config.global || type(config.global) != 'object')
-		config.global = { concurrency: 5 };
+		config.global = { enabled: true, concurrency: 5 };
 	if (!config.providers || type(config.providers) != 'object')
 		config.providers = {};
 	let concurrency = int(config.global.concurrency);
+	config.global.enabled = config.global.enabled !== false;
 	config.global.concurrency = concurrency >= 1 && concurrency <= 20 ? concurrency : 5;
 	return config;
 }
@@ -191,11 +192,23 @@ function provider_filter_state(key) {
 }
 
 function provider_filter_enqueue(provider) {
+	if (!access(PROVIDER_FILTER_SCRIPT, 'x'))
+		return { success: false, error: 'manager_missing' };
+	const manifest = provider_filter_manifest();
+	const meta = manifest.providers?.[provider];
+	if (!meta)
+		return { success: false, error: 'restart_required' };
+	if (meta.supported == false)
+		return { success: false, error: 'unsupported_provider' };
+	if (provider_discard_config().global.enabled == false)
+		return { success: false, error: 'execution_disabled' };
 	const process = popen(join(' ', map([PROVIDER_FILTER_SCRIPT, 'enqueue', provider], shell_quote)), 'r');
 	if (!process)
-		return false;
+		return { success: false, error: 'start_failed' };
 	process.read('all');
-	return process.close() == 0;
+	return process.close() == 0
+		? { success: true }
+		: { success: false, error: 'queue_failed' };
 }
 
 function core_api_request(method, path, query, body) {
@@ -287,7 +300,30 @@ function dns_test(nameserver, server) {
 	};
 }
 
-function curl_probe(url, family, proxy, proxy_auth, include_body, direct) {
+function direct_network_command(args) {
+	const uci = cursor();
+	uci.load('mihomox');
+	const command = join(' ', map(args, shell_quote));
+	const router_proxy = uci.get('mihomox', 'proxy', 'router_proxy');
+	if (router_proxy != '1' && router_proxy != true)
+		return command;
+	let name = uci.get('mihomox', 'routing', 'cgroup_name') || 'mihomox';
+	if (!match(name, /^[A-Za-z0-9_.-]{1,64}$/))
+		name = 'mihomox';
+	const paths = [
+		'/sys/fs/cgroup/services/' + name + '/cgroup.procs',
+		'/sys/fs/cgroup/net_cls/' + name + '/cgroup.procs'
+	];
+	for (let path in paths)
+		if (access(path, 'w'))
+			return 'sh -c ' + shell_quote(
+				'echo $$ > ' + shell_quote(path) + ' || exit 125; exec ' +
+				command
+			);
+	return null;
+}
+
+function curl_probe(url, family, proxy, proxy_auth, include_body, direct, doh) {
 	const args = [
 		'curl', '--silent', '--show-error', '--location',
 		'--connect-timeout', '3', '--max-time', '6',
@@ -295,6 +331,9 @@ function curl_probe(url, family, proxy, proxy_auth, include_body, direct) {
 	];
 	if (direct)
 		push(args, '--noproxy', '*');
+	if (doh)
+		push(args, '--doh-url', 'https://dns.alidns.com/dns-query',
+			'--resolve', 'dns.alidns.com:443:223.5.5.5');
 	if (proxy) {
 		push(args, '--proxy', proxy);
 		if (proxy_auth)
@@ -304,7 +343,12 @@ function curl_probe(url, family, proxy, proxy_auth, include_body, direct) {
 		push(args, '--output', '/dev/null');
 	push(args, '--write-out', '\n__MIHOMOX__%{http_code}|%{time_total}|%{remote_ip}', url);
 
-	const process = popen(join(' ', map(args, shell_quote)) + ' 2>/dev/null', 'r');
+	const command = direct
+		? direct_network_command(args)
+		: join(' ', map(args, shell_quote));
+	if (!command)
+		return { success: false, latency: 0, error: 'isolation_unavailable' };
+	const process = popen(command + ' 2>/dev/null', 'r');
 	if (!process)
 		return { success: false, latency: 0, error: 'start_failed' };
 	const output = process.read('all') || '';
@@ -326,8 +370,8 @@ function curl_probe(url, family, proxy, proxy_auth, include_body, direct) {
 	};
 }
 
-function plain_ip_probe(url, family) {
-	const result = curl_probe(url, family, null, null, true, true);
+function plain_ip_probe(url, family, doh) {
+	const result = curl_probe(url, family, null, null, true, true, doh);
 	if (!result.success)
 		return result;
 	const address = trim(result.address || '');
@@ -338,6 +382,34 @@ function plain_ip_probe(url, family) {
 	result.address = valid_address ? address : '';
 	result.error = valid_address ? '' : 'invalid_result';
 	return result;
+}
+
+function ipv6_probe(urls) {
+	let last = { success: false, latency: 0, error: 'no_ipv6' };
+	for (let url in urls) {
+		const result = plain_ip_probe(url, 6, true);
+		if (result.success)
+			return result;
+		last = result;
+	}
+	last.error = last.error == 'invalid_result' ? 'invalid_result' : 'no_ipv6';
+	return last;
+}
+
+function resolve_public_ipv4(host) {
+	const result = curl_probe(
+		'https://dns.alidns.com/resolve?name=' + url_encode_component(host) + '&type=A',
+		4, null, null, true, true, true
+	);
+	if (!result.success)
+		return '';
+	try {
+		const response = json(result.address || '');
+		for (let answer in response?.Answer || [])
+			if (answer?.type == 1 && match(answer?.data || '', /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/))
+				return answer.data;
+	} catch (e) {}
+	return '';
 }
 
 function local_dns_nameserver() {
@@ -368,7 +440,17 @@ function local_proxy() {
 function nat_test() {
 	if (!access(STUN_TEST_HELPER, 'x'))
 		return { success: false, type: 'Unknown', error: 'missing_helper' };
-	const process = popen(STUN_TEST_HELPER, 'r');
+	const primary = resolve_public_ipv4('stun.cloudflare.com');
+	const secondary = resolve_public_ipv4('stun.l.google.com');
+	if (!primary || !secondary)
+		return { success: false, type: 'Unknown', error: 'resolve_failed' };
+	const uci = cursor();
+	uci.load('mihomox');
+	const mark = uci.get('mihomox', 'routing', 'provider_probe_fw_mark') || '0x82';
+	const command = direct_network_command([STUN_TEST_HELPER, primary, '3478', secondary, '19302', mark]);
+	if (!command)
+		return { success: false, type: 'Unknown', error: 'isolation_unavailable' };
+	const process = popen(command, 'r');
 	if (!process)
 		return { success: false, type: 'Unknown', error: 'start_failed' };
 	const output = process.read('all') || '';
@@ -519,9 +601,9 @@ const methods = {
 			case 'ipv4_overseas':
 				return plain_ip_probe('https://4.wsmdn.dpdns.org/', 4);
 			case 'ipv6_domestic':
-				return plain_ip_probe('https://v6.ipgg.cn', 6);
+				return ipv6_probe([ 'https://v6.ipgg.cn' ]);
 			case 'ipv6_overseas':
-				return plain_ip_probe('https://6.wsmdn.dpdns.org/', 6);
+				return ipv6_probe([ 'https://6.wsmdn.dpdns.org/', 'https://ifconfig.co/ip' ]);
 			case 'nat':
 				return nat_test();
 			default:
@@ -544,7 +626,7 @@ const methods = {
 					continue;
 				const saved = config.providers?.[name] || {};
 				providers[name].vehicleType = meta?.vehicleType || providers[name].vehicleType;
-				providers[name].filterSupported = meta?.supported != false;
+				providers[name].filterSupported = !!meta && meta.supported != false;
 				providers[name].testUrl = saved.url || meta?.testUrl || providers[name].testUrl || '';
 				providers[name].discardPolicy = {
 					enabled: saved.enabled == true,
@@ -553,7 +635,9 @@ const methods = {
 					retries: int(saved.retries) || 0,
 					concurrency: int(saved.concurrency) || config.global.concurrency
 				};
-				providers[name].discardStatus = provider_filter_state(meta?.key);
+				providers[name].discardStatus = meta
+					? provider_filter_state(meta.key)
+					: { state: 'inactive', message: 'restart_required' };
 			}
 			return {
 				supported: true,
@@ -561,6 +645,23 @@ const methods = {
 				providers: providers,
 				config: config
 			};
+		}
+	},
+	set_provider_discard_global: {
+		args: { enabled: 'enabled', concurrency: 'concurrency' },
+		call: function(req) {
+			const enabled = req.args?.enabled == true || req.args?.enabled == 'true' || req.args?.enabled == '1';
+			const concurrency = int(req.args?.concurrency);
+			if (concurrency < 1 || concurrency > 20)
+				return { success: false, error: 'invalid_policy' };
+			const config = provider_discard_config();
+			config.global.enabled = enabled;
+			config.global.concurrency = concurrency;
+			if (!write_provider_discard_config(config))
+				return { success: false, error: 'write_failed' };
+			if (!enabled)
+				system(join(' ', map([PROVIDER_FILTER_SCRIPT, 'stop'], shell_quote)) + ' >/dev/null 2>&1');
+			return { success: true, enabled: enabled };
 		}
 	},
 	set_provider_discard: {
@@ -591,8 +692,8 @@ const methods = {
 			if (!write_provider_discard_config(config))
 				return { success: false, error: 'write_failed' };
 
-			const queued = !enabled && provider_filter_enqueue(provider);
-			return { success: true, applied: queued, queued: queued, policy: policy };
+			const result = !enabled ? provider_filter_enqueue(provider) : { success: true };
+			return { success: true, applied: result.success, queued: result.success, policy: policy };
 		}
 	},
 	update_provider_discard: {
@@ -601,8 +702,8 @@ const methods = {
 			const provider = req.args?.provider || '';
 			if (!valid_api_value(provider, 256) || provider == '')
 				return { success: false, error: 'invalid_provider' };
-			const started = provider_filter_enqueue(provider);
-			return { success: started, started: started };
+			const result = provider_filter_enqueue(provider);
+			return { success: result.success, started: result.success, error: result.error };
 		}
 	},
 	write_file: {

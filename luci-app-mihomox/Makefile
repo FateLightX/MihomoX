@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 LUCI_TITLE:=LuCI Support for MihomoX
 LUCI_DEPENDS:=+luci-base +mihomox +ucode-mod-resolv

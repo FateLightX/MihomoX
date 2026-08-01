@@ -93,6 +93,14 @@ const callMihomoXSetProviderDiscard = rpc.declare({
     nobatch: true
 });
 
+const callMihomoXSetProviderDiscardGlobal = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'set_provider_discard_global',
+    params: ['enabled', 'concurrency'],
+    expect: { '': {} },
+    nobatch: true
+});
+
 const callMihomoXUpdateProviderDiscard = rpc.declare({
     object: 'luci.mihomox',
     method: 'update_provider_discard',
@@ -302,6 +310,10 @@ return baseclass.extend({
             String(policy.retries),
             String(concurrency)
         );
+    },
+
+    setProviderDiscardGlobal: function (enabled, concurrency) {
+        return callMihomoXSetProviderDiscardGlobal(String(!!enabled), String(concurrency));
     },
 
     updateProviderDiscard: function (provider) {

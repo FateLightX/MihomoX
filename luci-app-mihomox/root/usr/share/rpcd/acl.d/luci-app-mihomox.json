@@ -23,7 +23,7 @@
             "uci": [ "mihomox" ],
             "ubus": {
                 "rc": [ "init" ],
-                "luci.mihomox": [ "update_subscription", "update_core", "set_provider_discard", "update_provider_discard", "write_file", "api", "debug" ]
+                "luci.mihomox": [ "update_subscription", "update_core", "set_provider_discard_global", "set_provider_discard", "update_provider_discard", "write_file", "api", "debug" ]
             },
             "file": {
                 "/etc/mihomox/profiles/*.yaml": ["write"],

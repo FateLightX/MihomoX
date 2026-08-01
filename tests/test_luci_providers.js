@@ -28,6 +28,7 @@ const managerSource = fs.readFileSync(path.join(
 const initSource = fs.readFileSync(path.join(root, 'mihomox/files/mihomox.init'), 'utf8');
 const includeSource = fs.readFileSync(path.join(root, 'mihomox/files/scripts/include.sh'), 'utf8');
 const hijackSource = fs.readFileSync(path.join(root, 'mihomox/files/ucode/hijack.ut'), 'utf8');
+const defaultPolicy = JSON.parse(fs.readFileSync(path.join(root, 'mihomox/files/provider-discard.json'), 'utf8'));
 const menu = JSON.parse(fs.readFileSync(path.join(
     root,
     'luci-app-mihomox/root/usr/share/luci/menu.d/luci-app-mihomox.json'
@@ -44,8 +45,10 @@ assert.strictEqual(entry.action.path, 'mihomox/providers');
 
 assert.ok(acl.read.ubus['luci.mihomox'].includes('provider_discard'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('set_provider_discard'));
+assert.ok(acl.write.ubus['luci.mihomox'].includes('set_provider_discard_global'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('update_provider_discard'));
 assert.ok(/method:\s*'set_provider_discard'[\s\S]*?nobatch:\s*true/.test(toolSource));
+assert.ok(/method:\s*'set_provider_discard_global'[\s\S]*?nobatch:\s*true/.test(toolSource));
 assert.ok(/method:\s*'update_provider_discard'[\s\S]*?nobatch:\s*true/.test(toolSource));
 
 assert.ok(viewSource.includes("_('Node Management')"));
@@ -55,14 +58,22 @@ assert.ok(!viewSource.includes('mihomox.restart'), 'saving discard settings must
 assert.ok(!viewSource.includes('mihomox.reload'), 'saving discard settings must not reload MihomoX');
 assert.ok(appSource.includes('Prerelease Alpha changes frequently'));
 assert.ok(viewSource.includes("_('Direct Isolation')"));
+assert.ok(viewSource.includes("_('Enable Provider Filtering')"));
+assert.strictEqual(defaultPolicy.global.enabled, true);
 
 assert.ok(rpcSource.includes("const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json'"));
 assert.ok(rpcSource.includes("sprintf('%J\\n', config)"));
 assert.ok(rpcSource.includes('provider_filter_enqueue(provider)'));
+assert.ok(rpcSource.includes("error: 'restart_required'"));
+assert.ok(rpcSource.includes("error: 'queue_failed'"));
+assert.ok(viewSource.includes("_('Restart Required')"));
+assert.ok(viewSource.includes('errorLabel(result?.error)'));
 assert.ok(managerSource.includes("--noproxy '*'"));
 assert.ok(managerSource.includes('routing-mark: $PROBE_MARK'));
 assert.ok(managerSource.includes('HTTP_PROXY= HTTPS_PROXY= ALL_PROXY='));
 assert.ok(managerSource.includes('probe_mark_available'));
+assert.ok(managerSource.includes('manager_enabled'));
+assert.ok(managerSource.includes('manager_enabled || return 0'));
 assert.ok(managerSource.includes('expected=$EXPECTED_STATUS'));
 assert.ok(managerSource.includes('select(.supported == true)'));
 assert.ok(managerSource.includes('.type = "file"'));

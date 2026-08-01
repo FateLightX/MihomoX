@@ -1,1 +1,1 @@
-{"global":{"concurrency":5},"providers":{}}
+{"global":{"enabled":true,"concurrency":5},"providers":{}}
