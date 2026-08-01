@@ -29,6 +29,7 @@ function savedPolicy(data, name, provider) {
 function statusLabel(status) {
     const labels = {
         active: _('Normal'),
+        queued: _('Waiting Test'),
         downloading: _('Downloading'),
         testing: _('Testing'),
         retained: _('Previous Version'),
@@ -164,12 +165,31 @@ function settingRow(label, control) {
     ]);
 }
 
+function applyProviderStatus(row, provider) {
+    const status = provider?.discardStatus || {};
+    const active = provider?.proxies?.length || 0;
+    const total = Number(status.total || active);
+    const tested = Math.min(Number(status.tested || 0), total);
+    row.count.textContent = `${active} / ${total}`;
+    row.discarded.textContent = String(status.discarded || 0);
+    row.state.textContent = statusLabel(status);
+    row.state.className = `mihomox-provider-state state-${status.state || 'idle'}`;
+    row.progress.max = Math.max(total, 1);
+    row.progress.value = tested;
+    row.progress.hidden = status.state !== 'testing';
+}
+
+function refreshRenderedStatuses() {
+    for (const [name, provider] of providerEntries(currentData)) {
+        const row = controls[name];
+        if (row)
+            applyProviderStatus(row, provider);
+    }
+}
+
 function providerRow(name, provider, concurrency, executionEnabled) {
     const policy = savedPolicy(currentData, name, provider);
     const status = provider.discardStatus || {};
-    const active = provider.proxies?.length || 0;
-    const total = status.total || active;
-    const discarded = status.discarded || 0;
     const expanded = expandedProvider === name;
     const supported = provider.filterSupported === true && !['unsupported', 'inactive'].includes(status.state);
     const enabled = E('input', { type: 'checkbox', checked: policy.enabled ? '' : null, disabled: supported ? null : '' });
@@ -184,7 +204,14 @@ function providerRow(name, provider, concurrency, executionEnabled) {
     const retries = E('input', { 'class': 'cbi-input-text', type: 'number', min: '0', max: '5', step: '1', value: String(policy.retries) });
     for (const input of [url, timeout, retries])
         input.disabled = !supported;
-    controls[name] = { enabled: enabled, url: url, timeout: timeout, retries: retries, supported: supported };
+    const countNode = E('span', { 'class': 'mihomox-provider-count', 'data-label': _('Available / Total') });
+    const discardedNode = E('span', { 'class': 'mihomox-provider-discarded', 'data-label': _('Discarded') });
+    const stateNode = E('span', { 'class': 'mihomox-provider-state' });
+    const progressNode = E('progress', { 'class': 'mihomox-provider-progress', max: '1', value: '0', hidden: '' });
+    controls[name] = {
+        enabled: enabled, url: url, timeout: timeout, retries: retries, supported: supported,
+        count: countNode, discarded: discardedNode, state: stateNode, progress: progressNode
+    };
 
     const details = E('div', { 'class': 'mihomox-provider-details' + (expanded ? '' : ' hidden') }, [
         settingRow(_('Test URL'), url),
@@ -212,17 +239,19 @@ function providerRow(name, provider, concurrency, executionEnabled) {
         enabledLabel.textContent = enabled.checked ? _('Enabled') : _('Disabled');
     });
 
-    return E('div', { 'class': 'mihomox-provider-item' }, [
+    const item = E('div', { 'class': 'mihomox-provider-item' }, [
         E('div', { 'class': 'mihomox-provider-row' }, [
             toggleDetails,
             E('strong', { 'class': 'mihomox-provider-name' }, name),
-            E('span', { 'class': 'mihomox-provider-count', 'data-label': _('Available / Total') }, `${active} / ${total}`),
-            E('span', { 'class': 'mihomox-provider-discarded', 'data-label': _('Discarded') }, String(discarded)),
+            countNode,
+            discardedNode,
             E('label', { 'class': 'mihomox-provider-toggle' }, [ enabled, enabledLabel ]),
-            E('span', { 'class': `mihomox-provider-state state-${status.state || 'idle'}` }, statusLabel(status))
+            E('span', { 'class': 'mihomox-provider-status' }, [ stateNode, progressNode ])
         ]),
         details
     ]);
+    applyProviderStatus(controls[name], provider);
+    return item;
 }
 
 function renderContent() {
@@ -266,12 +295,15 @@ function renderContent() {
 }
 
 function refreshPage(force) {
-    if (refreshing || (!force && pageRoot?.contains(document.activeElement)))
+    if (refreshing)
         return Promise.resolve();
     refreshing = true;
     return L.resolveDefault(mihomox.providerDiscard(), currentData).then(function (data) {
         currentData = data || {};
-        renderContent();
+        if (!force && pageRoot?.contains(document.activeElement))
+            refreshRenderedStatuses();
+        else
+            renderContent();
     }).finally(function () {
         refreshing = false;
     });
@@ -296,11 +328,11 @@ return view.extend({
                 .mihomox-provider-item{border-top:1px solid var(--border-color-medium,#dbe3ed)}.mihomox-provider-item:last-child{border-bottom:1px solid var(--border-color-medium,#dbe3ed)}
                 .mihomox-provider-row{min-height:3.4em;padding:.35em .5em}.mihomox-provider-expand{width:2.2em;min-width:2.2em;padding:.3em}
                 .mihomox-provider-name{overflow-wrap:anywhere}.mihomox-provider-toggle{display:flex;align-items:center;gap:.45em}
-                .mihomox-provider-state{font-weight:600}.state-active{color:#16a34a}.state-downloading,.state-testing{color:#2563eb}.state-fallback{color:#b45309}.state-retained,.state-failed,.state-unsupported,.state-inactive{color:#dc2626}
+                .mihomox-provider-status{display:grid;gap:.35em}.mihomox-provider-state{font-weight:600}.mihomox-provider-progress{width:100%;height:.55em;accent-color:#2563eb}.state-active{color:#16a34a}.state-queued,.state-downloading,.state-testing{color:#2563eb}.state-fallback{color:#b45309}.state-retained,.state-failed,.state-unsupported,.state-inactive{color:#dc2626}
                 .mihomox-provider-details{display:grid;grid-template-columns:repeat(3,minmax(10em,1fr));gap:.9em;padding:.8em 3.75em 1em;background:var(--background-color-low,#f7f9fc)}
                 .mihomox-provider-details.hidden{display:none}.mihomox-provider-setting{display:grid;gap:.35em}.mihomox-provider-number{display:flex;align-items:center;gap:.4em}.mihomox-provider-number input{width:8em}
                 .mihomox-provider-detail-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:.5em}
-                @media(max-width:800px){.mihomox-provider-columns{display:none}.mihomox-provider-row{grid-template-columns:2.5em minmax(8em,1fr) auto}.mihomox-provider-count,.mihomox-provider-discarded,.mihomox-provider-toggle{grid-column:2}.mihomox-provider-count:before,.mihomox-provider-discarded:before{content:attr(data-label) ': ';color:#526176}.mihomox-provider-state{grid-column:3;grid-row:1}.mihomox-provider-details{grid-template-columns:1fr;padding:.8em 1em 1em 3.75em}.mihomox-provider-header{align-items:flex-start}.mihomox-provider-global{align-items:flex-start;flex-direction:column}}
+                @media(max-width:800px){.mihomox-provider-columns{display:none}.mihomox-provider-row{grid-template-columns:2.5em minmax(8em,1fr) auto}.mihomox-provider-count,.mihomox-provider-discarded,.mihomox-provider-toggle{grid-column:2}.mihomox-provider-count:before,.mihomox-provider-discarded:before{content:attr(data-label) ': ';color:#526176}.mihomox-provider-status{grid-column:3;grid-row:1;min-width:8em}.mihomox-provider-details{grid-template-columns:1fr;padding:.8em 1em 1em 3.75em}.mihomox-provider-header{align-items:flex-start}.mihomox-provider-global{align-items:flex-start;flex-direction:column}}
             `),
             E('div', { 'class': 'mihomox-provider-header' }, [
                 E('h2', {}, _('Node Management')),
@@ -312,7 +344,7 @@ return view.extend({
             E('div', { 'class': 'mihomox-provider-content' })
         ]);
         renderContent();
-        poll.add(() => refreshPage(false), 5);
+        poll.add(() => refreshPage(false), 2);
         return pageRoot;
     },
 

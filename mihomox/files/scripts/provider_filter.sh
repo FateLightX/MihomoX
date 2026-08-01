@@ -381,7 +381,7 @@ prepare_profile() {
 }
 
 enqueue_provider() {
-	local name key request
+	local name key request state total tested available discarded
 	name="$1"
 	manager_enabled || return 1
 	[ -s "$MANIFEST_FILE" ] || return 1
@@ -389,7 +389,14 @@ enqueue_provider() {
 		'.providers[strenv(PROVIDER_NAME)] | select(.supported == true) | .key // ""' "$MANIFEST_FILE")
 	[ -n "$key" ] || return 1
 	request="$QUEUE_DIR/$key.request"
-	printf '%s\n' "$name" > "$request.tmp.$$" && mv -f "$request.tmp.$$" "$request"
+	printf '%s\n' "$name" > "$request.tmp.$$" && mv -f "$request.tmp.$$" "$request" || return 1
+	state=$("$YQ" -r '.state // ""' "$FILTER_DIR/$key/state.json" 2>/dev/null)
+	case "$state" in downloading|testing) return 0 ;; esac
+	total=$("$YQ" -r '.total // 0' "$FILTER_DIR/$key/state.json" 2>/dev/null)
+	tested=$("$YQ" -r '.tested // 0' "$FILTER_DIR/$key/state.json" 2>/dev/null)
+	available=$("$YQ" -r '.available // 0' "$FILTER_DIR/$key/state.json" 2>/dev/null)
+	discarded=$("$YQ" -r '.discarded // 0' "$FILTER_DIR/$key/state.json" 2>/dev/null)
+	write_state "$name" queued "$total" "$tested" "$available" "$discarded" queued
 	return 0
 }
 

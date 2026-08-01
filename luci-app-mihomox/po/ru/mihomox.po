@@ -1462,6 +1462,9 @@ msgstr "Обновить все"
 msgid "Update Started"
 msgstr "Обновление запущено"
 
+msgid "Waiting Test"
+msgstr "Ожидание проверки"
+
 msgid "Update and Test"
 msgstr "Обновить и проверить"
 

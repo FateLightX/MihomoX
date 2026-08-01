@@ -1516,6 +1516,9 @@ msgstr "全部更新"
 msgid "Update Started"
 msgstr "更新已启动"
 
+msgid "Waiting Test"
+msgstr "等待检测"
+
 msgid "Update and Test"
 msgstr "更新并检测"
 

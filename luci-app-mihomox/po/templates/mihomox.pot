@@ -1509,6 +1509,9 @@ msgstr ""
 msgid "Update Started"
 msgstr ""
 
+msgid "Waiting Test"
+msgstr ""
+
 msgid "Update and Test"
 msgstr ""
 

@@ -59,6 +59,10 @@ assert.ok(!viewSource.includes('mihomox.reload'), 'saving discard settings must 
 assert.ok(appSource.includes('Prerelease Alpha changes frequently'));
 assert.ok(viewSource.includes("_('Direct Isolation')"));
 assert.ok(viewSource.includes("_('Enable Provider Filtering')"));
+assert.ok(viewSource.includes("_('Waiting Test')"));
+assert.ok(viewSource.includes('mihomox-provider-progress'));
+assert.ok(viewSource.includes('refreshRenderedStatuses()'));
+assert.ok(viewSource.includes('poll.add(() => refreshPage(false), 2)'));
 assert.strictEqual(defaultPolicy.global.enabled, true);
 
 assert.ok(rpcSource.includes("const PROVIDER_DISCARD_FILE = '/etc/mihomox/provider-discard.json'"));
@@ -74,6 +78,7 @@ assert.ok(managerSource.includes('HTTP_PROXY= HTTPS_PROXY= ALL_PROXY='));
 assert.ok(managerSource.includes('probe_mark_available'));
 assert.ok(managerSource.includes('manager_enabled'));
 assert.ok(managerSource.includes('manager_enabled || return 0'));
+assert.ok(managerSource.includes('write_state "$name" queued'));
 assert.ok(managerSource.includes('expected=$EXPECTED_STATUS'));
 assert.ok(managerSource.includes('select(.supported == true)'));
 assert.ok(managerSource.includes('.type = "file"'));
