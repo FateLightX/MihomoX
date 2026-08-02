@@ -1493,3 +1493,44 @@ msgstr "直連測試隔離不可用"
 
 msgid "Direct Test Mark Failed"
 msgstr "直連測試標記失敗"
+
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Check the current network path"
+msgstr "檢查目前網路路徑"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Progress"
+msgstr "進度"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Core and DNS"
+msgstr "核心與 DNS"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "IPv4 Public Exit"
+msgstr "IPv4 公網出口"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "IPv6 Public Exit"
+msgstr "IPv6 公網出口"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Detailed Site Tests"
+msgstr "詳細網站檢測"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Domestic Sites"
+msgstr "國內網站"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "International Sites"
+msgstr "國外網站"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "All Tests Normal"
+msgstr "全部測試正常"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Some Tests Unavailable"
+msgstr "部分測試不可用"

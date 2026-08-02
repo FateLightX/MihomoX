@@ -324,6 +324,21 @@ function ipv6_probe(urls) {
 	return last;
 }
 
+function local_proxy() {
+	const profile = load_profile();
+	const port = int(profile?.['mixed-port']);
+	if (port <= 0 || port > 65535)
+		return null;
+	let auth = '';
+	const uci = cursor();
+	uci.load('mihomox');
+	uci.foreach('mihomox', 'authentication', (section) => {
+		if (!auth && (section.enabled == '1' || section.enabled == true) && section.username && section.password)
+			auth = `${section.username}:${section.password}`;
+	});
+	return { url: `http://127.0.0.1:${port}`, auth: auth };
+}
+
 function overseas_ipv4_probe() {
 	const proxy = local_proxy();
 	if (!proxy)
@@ -372,21 +387,6 @@ function local_dns_nameserver() {
 	if (port <= 0 || port > 65535)
 		return null;
 	return `127.0.0.1#${port}`;
-}
-
-function local_proxy() {
-	const profile = load_profile();
-	const port = int(profile?.['mixed-port']);
-	if (port <= 0 || port > 65535)
-		return null;
-	let auth = '';
-	const uci = cursor();
-	uci.load('mihomox');
-	uci.foreach('mihomox', 'authentication', (section) => {
-		if (!auth && (section.enabled == '1' || section.enabled == true) && section.username && section.password)
-			auth = `${section.username}:${section.password}`;
-	});
-	return { url: `http://127.0.0.1:${port}`, auth: auth };
 }
 
 function nat_test() {

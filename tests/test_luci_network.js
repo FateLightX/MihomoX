@@ -42,6 +42,7 @@ assert.ok(/method:\s*'network_test'[\s\S]*?nobatch:\s*true/.test(toolSource), 'n
 assert.ok(source.includes('Promise.race(['), 'network tests must enforce a browser-side timeout');
 assert.ok(!source.includes('stopped = true'), 'one network timeout must not skip later tests');
 assert.ok(source.includes("timeout: 30000"), 'NAT must allow DNS isolation and STUN timeouts');
+assert.ok(/id: 'ipv4_overseas',[^\n]+timeout: 15000/.test(source), 'overseas IPv4 must allow both curl probes to finish');
 assert.ok(rpcSource.includes("readfile('/etc/resolv.conf')"), 'system DNS servers must be read from resolv.conf');
 assert.ok(rpcSource.includes('version: installed_core_version()'), 'core version must be returned by the network RPC');
 assert.ok(rpcSource.includes("plain_ip_probe('https://v4.ipgg.cn', 4)"), 'domestic IPv4 must use ipgg');
@@ -53,6 +54,7 @@ assert.ok(rpcSource.includes("curl_probe('https://ifconfig.co', 4, proxy.url, pr
 assert.ok(rpcSource.includes("curl_probe('https://ifconfig.co/country', 4, proxy.url, proxy.auth, true, false)"), 'overseas IPv4 must query the country through the proxy');
 assert.ok(rpcSource.includes("ipv6_probe([ 'https://v6.ipgg.cn' ])"), 'domestic IPv6 must use ipgg');
 assert.ok(rpcSource.includes("const proxy = local_proxy()"), 'overseas probes must use the local Mihomo proxy');
+assert.ok(rpcSource.indexOf('function local_proxy()') < rpcSource.indexOf('function overseas_ipv4_probe()'), 'local proxy helper must be declared before use for ucode compatibility');
 assert.ok(rpcSource.includes('!!valid_address && !!valid_country'), 'overseas IPv4 must validate the returned IP and country');
 assert.ok(rpcSource.includes("'--doh-url', 'https://dns.alidns.com/dns-query'"), 'IPv6 probes must bypass fake-IP DNS');
 assert.ok(rpcSource.includes("resolve_public_ipv4('stun.cloudflare.com')"), 'STUN must bypass fake-IP DNS');
@@ -60,6 +62,12 @@ assert.ok(rpcSource.includes("network_test_fw_mark"), 'STUN must bypass transpar
 assert.ok(rpcSource.includes('direct_network_command(args)'), 'direct probes must use the MihomoX bypass cgroup');
 assert.ok(rpcSource.includes("push(args, '--noproxy', '*')"), 'IP protocol probes must bypass environment proxies');
 assert.ok(source.includes("no_ipv6: _('No IPv6 Connectivity')"), 'network errors must be visible');
+assert.ok(source.includes('mihomox-network-progress'), 'network page must expose overall progress');
+assert.ok(source.includes('var(--background-color-high'), 'network cards must use LuCI theme variables');
+assert.ok(source.includes('var(--text-color-high'), 'network text must use LuCI theme variables');
+assert.ok(source.includes('var(--success-color'), 'network status colors must use semantic theme variables');
+assert.ok(source.includes("E('details'"), 'detailed site tests must be collapsible');
+assert.ok(!source.includes('background:#fff') && !source.includes('background: #fff'), 'cards must not use a fixed white background');
 
 for (const icon of ['core', 'dns', 'shield', 'home', 'globe', 'ipv4', 'ipv6', 'nat', 'check', 'warning', 'close', 'loading']) {
     const iconPath = path.join(
@@ -80,17 +88,23 @@ function E(tag, attributes, children) {
         children: Array.isArray(children) ? children : children == null ? [] : [children],
         textContent: typeof children === 'string' ? children : '',
         disabled: false,
+        dataset: {},
         addEventListener: function (name, callback) {
             this.listeners ||= {};
             this.listeners[name] = callback;
+        },
+        setAttribute: function (name, value) {
+            this.attributes[name] = value;
         }
     };
+    node.className = node.attributes.class || '';
     created.push(node);
     return node;
 }
 
 const calls = [];
 let releaseCore;
+let rejectNext = false;
 const results = {
     core: { success: true, version: 'v1.19.12' },
     system_dns: { success: true, latency: 12, server: '192.0.2.53' },
@@ -109,6 +123,10 @@ const results = {
 const mihomox = {
     networkTest: (test) => {
         calls.push(test);
+        if (rejectNext) {
+            rejectNext = false;
+            return Promise.reject(new Error('fixture failure'));
+        }
         if (test === 'core')
             return new Promise((resolve) => { releaseCore = () => resolve(results[test]); });
         return Promise.resolve(results[test]);
@@ -127,9 +145,9 @@ const networkView = new Function('view', 'ui', 'mihomox', 'L', 'E', '_', source)
 networkView.render();
 const button = created.find((node) => node.tag === 'button');
 assert.ok(button?.listeners?.click, 'start test button is missing');
-const singleButtons = created.filter((node) => node.attributes?.['data-test-id']);
-assert.strictEqual(singleButtons.length, 13, 'each network row must have a test button');
-assert.ok(singleButtons.every((node) => node.listeners?.click), 'a network row test button is missing its handler');
+const singleButtons = created.filter((node) => node.tag === 'button' && node.attributes?.['data-test-id']);
+assert.strictEqual(singleButtons.length, 13, 'each network test must have a single-test button');
+assert.ok(singleButtons.every((node) => node.listeners?.click), 'a network test button is missing its handler');
 
 const run = button.listeners.click();
 Promise.resolve().then(() => {
@@ -144,30 +162,39 @@ Promise.resolve().then(() => {
 }).then(() => {
     assert.deepStrictEqual(calls, ['core', 'system_dns', 'mihomo_dns', 'domestic', 'domestic_baidu', 'domestic_netease', 'international', 'international_google', 'international_youtube', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'nat']);
     assert.strictEqual(button.disabled, false);
-    const values = created
-        .filter((node) => node.attributes?.class === 'mihomox-network-value')
-        .map((node) => node.textContent);
-    assert.deepStrictEqual(values.slice(0, 9), [
-        'v1.19.12 · Normal',
-        '192.0.2.53 · 12 ms',
-        '127.0.0.1#1053 · 8 ms',
-        'connect.rom.miui.com · 35 ms',
-        'www.baidu.com · 35 ms',
-        'music.163.com · 35 ms',
-        'cp.cloudflare.com · 86 ms',
-        'www.google.com · 86 ms',
-        'www.youtube.com · 86 ms'
+    assert.strictEqual(created.find((node) => node.attributes?.class === 'mihomox-network-progress').textContent, '13 / 13');
+    const valueFor = (id) => created.find((node) => node.tag === 'div' && node.attributes?.['data-test-id'] === id && node.attributes?.class === 'mihomox-network-metric').children[1].children[1].textContent;
+    const testsForAssertion = ['core', 'system_dns', 'mihomo_dns', 'domestic', 'domestic_baidu', 'domestic_netease', 'international', 'international_google', 'international_youtube', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'nat'];
+    const values = testsForAssertion.map(valueFor);
+    assert.deepStrictEqual(values, [
+        'v1.19.12 · Normal', '12 ms', '8 ms', '35 ms', '35 ms', '35 ms',
+        '86 ms', '86 ms', '86 ms', '198.51.100.10',
+        '203.0.113.1 · Singapore', '2001:db8::10', 'Full Cone'
     ]);
-    assert.deepStrictEqual(values.slice(9, 12), [
-        '198.51.100.10',
-        '203.0.113.1 · Singapore',
-        '2001:db8::10'
-    ]);
+    const nonIpValues = values.filter((value) => !['198.51.100.10', '203.0.113.1 · Singapore', '2001:db8::10'].includes(value));
+    for (const forbidden of ['192.0.2.53', '127.0.0.1#1053', 'connect.rom.miui.com', 'www.baidu.com', 'music.163.com', 'cp.cloudflare.com', 'www.google.com', 'www.youtube.com'])
+        assert.ok(!nonIpValues.some((value) => value.includes(forbidden)), `non-IP result must not render ${forbidden}`);
     const ipv4Button = singleButtons.find((node) => node.attributes['data-test-id'] === 'ipv4_domestic');
+    rejectNext = true;
     return ipv4Button.listeners.click().then(() => {
         assert.strictEqual(calls.at(-1), 'ipv4_domestic');
         assert.strictEqual(button.disabled, false);
         assert.ok(singleButtons.every((node) => node.disabled === false));
+        assert.strictEqual(
+            created.find((node) => node.attributes?.['data-test-id'] === 'ipv4_domestic' && node.attributes?.class === 'mihomox-network-metric')
+                .children[1].children[1].textContent,
+            'Test Start Failed',
+            'single-test failure must render a reason and restore buttons'
+        );
+        assert.strictEqual(
+            created.find((node) => node.attributes?.class === 'mihomox-network-summary-title').textContent,
+            'Some Tests Unavailable',
+            'single-test completion must leave the summary in a terminal state'
+        );
+        assert.ok(
+            created.find((node) => node.textContent === '!')?.className.includes('mihomox-network-summary-mark-failed'),
+            'failed summary must use the failed semantic state'
+        );
         console.log('LuCI network test page tests passed');
     });
 }).catch((error) => {
