@@ -44,6 +44,47 @@ git rev-list --left-right --count HEAD...@{upstream}
 - 用户可见字符串使用 `_()`，并同步 POT、简体中文、繁体中文和俄语 PO。
 - UCI 字段、Mihomo YAML 字段和 UI 名称不要凭语义猜测；先查生成链和上游格式。
 
+### 默认透明代理
+
+新安装默认值位于 `mihomox/files/mihomox.conf`：
+
+```text
+proxy.enabled=1
+proxy.tcp_mode=tproxy
+proxy.udp_mode=tproxy
+proxy.router_proxy=1
+proxy.lan_proxy=1
+mixin.tun_enabled=0
+```
+
+这是包源码默认值，不是运行中路由器的最终状态。修改默认值只影响新安装；迁移脚本不得
+覆盖已有用户选择。TPROXY 的 mark、rule preference 和 route table 同时检查
+`mihomox.conf`、`mihomox.init` 与 `ucode/hijack.ut`。
+
+### 网络测试契约
+
+涉及文件：
+
+- UI 与测试顺序：`luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js`
+- RPC 与探测实现：`luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox`
+- 前端 RPC 声明：`luci-app-mihomox/htdocs/luci-static/resources/tools/mihomox.js`
+- 回归测试：`tests/test_luci_network.js`
+
+当前固定语义：
+
+| 项目 | 访问路径 | 目标/结果 |
+| --- | --- | --- |
+| 国内连接、百度、网易云 | 不显式指定代理 | 固定站点 HTTP(S) 可达性和延迟 |
+| 国际代理、Google、YouTube | Mihomo 本地 Mixed/HTTP 代理 | 固定站点可达性和延迟 |
+| IPv4 国内 | 绕过 cgroup 直连 | `v4.ipgg.cn` 返回路由器公网 IPv4 |
+| IPv6 国内 | 绕过 cgroup 直连并使用固定 DoH | `v6.ipgg.cn` 返回路由器公网 IPv6 |
+| IPv4 国外 | Mihomo 本地代理 | `ifconfig.co` 返回出口 IPv4，`ifconfig.co/country` 返回国家 |
+| NAT | 绕过透明代理的 STUN 辅助程序 | NAT 类型 |
+
+没有“IPv6 国外”项目。不要仅靠 `curl -6` 加回：经过 HTTP 代理时，它不能证明代理
+节点到目标使用 IPv6。新增或替换目标必须是代码内固定 URL，不接受 RPC 调用者输入。
+IPv4 国外的 IP 或国家任一请求失败时，整项失败，避免展示不完整结果。
+
 ## 4. 验证
 
 最小检查：
@@ -64,6 +105,7 @@ make package/luci-app-mihomox/compile V=s
 
 本地测试不能替代 OpenWrt SDK 交叉编译、真机 rpcd/LuCI、网络条件和浏览器缓存验证。
 网络测试页改动至少检查：正常返回、DNS/HTTP/STUN 超时、RPC 不存在及按钮恢复。
+测试行增删还必须同步 RPC `case`、UI 顺序、四份 PO/POT、模拟结果数量与调用顺序断言。
 
 ## 5. 提交 GitHub
 
@@ -81,4 +123,3 @@ make package/luci-app-mihomox/compile V=s
 - 内核、GeoData 和 Zashboard 在编译期打包；运行时内核更新不经过包管理器。
 - Nikki 是主要功能基础；Clashoo 和 Momo 只能在 `PORTING.md` 定义的范围内逐项参考。
 - 参考仓库不得整目录覆盖，审计结果记录到 `docs/upstream.md`。
-

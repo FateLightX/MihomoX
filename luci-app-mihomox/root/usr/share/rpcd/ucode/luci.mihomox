@@ -324,37 +324,28 @@ function ipv6_probe(urls) {
 	return last;
 }
 
-function trace_field(content, field) {
-	const prefix = field + '=';
-	for (let line in split(content || '', '\n'))
-		if (substr(line, 0, length(prefix)) == prefix)
-			return trim(substr(line, length(prefix)));
-	return '';
-}
-
-function overseas_ip_probe(family) {
+function overseas_ipv4_probe() {
 	const proxy = local_proxy();
 	if (!proxy)
 		return { success: false, address: '', country: '', error: 'not_configured' };
-	const url = family == 6
-		? 'https://[2606:4700:4700::1111]/cdn-cgi/trace'
-		: 'https://1.1.1.1/cdn-cgi/trace';
-	const result = curl_probe(url, family, proxy.url, proxy.auth, true, false);
-	if (!result.success)
-		return result;
-	const address = trace_field(result.address, 'ip');
-	const country = trace_field(result.address, 'loc');
-	const valid_address = family == 6
-		? index(address, ':') >= 0
-		: match(address, /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
-	const valid_country = match(country, /^[A-Z]{2}$/);
-	result.address = valid_address ? address : '';
-	result.country = valid_country ? country : '';
-	result.success = !!valid_address && !!valid_country && country != 'CN';
-	result.error = !valid_address || !valid_country
-		? 'invalid_result'
-		: country == 'CN' ? 'domestic_exit' : '';
-	return result;
+	const address_result = curl_probe('https://ifconfig.co', 4, proxy.url, proxy.auth, true, false);
+	if (!address_result.success)
+		return { success: false, address: '', country: '', latency: address_result.latency, error: address_result.error };
+	const country_result = curl_probe('https://ifconfig.co/country', 4, proxy.url, proxy.auth, true, false);
+	if (!country_result.success)
+		return { success: false, address: '', country: '', latency: address_result.latency + country_result.latency, error: country_result.error };
+
+	const address = trim(address_result.address || '');
+	const country = trim(country_result.address || '');
+	const valid_address = match(address, /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/);
+	const valid_country = country && valid_api_value(country, 80);
+	return {
+		success: !!valid_address && !!valid_country,
+		latency: address_result.latency + country_result.latency,
+		address: valid_address ? address : '',
+		country: valid_country ? country : '',
+		error: valid_address && valid_country ? '' : 'invalid_result'
+	};
 }
 
 function resolve_public_ipv4(host) {
@@ -551,20 +542,34 @@ const methods = {
 			}
 			case 'domestic':
 				return curl_probe('https://connect.rom.miui.com/generate_204', 4, null, null, false);
+			case 'domestic_baidu':
+				return curl_probe('https://www.baidu.com', 4, null, null, false);
+			case 'domestic_netease':
+				return curl_probe('https://music.163.com', 4, null, null, false);
 			case 'international': {
 				const proxy = local_proxy();
 				return proxy
 					? curl_probe('https://cp.cloudflare.com/generate_204', 4, proxy.url, proxy.auth, false)
 					: { success: false, latency: 0, error: 'not_configured' };
 			}
+			case 'international_google': {
+				const proxy = local_proxy();
+				return proxy
+					? curl_probe('https://www.google.com/generate_204', 4, proxy.url, proxy.auth, false)
+					: { success: false, latency: 0, error: 'not_configured' };
+			}
+			case 'international_youtube': {
+				const proxy = local_proxy();
+				return proxy
+					? curl_probe('https://www.youtube.com/generate_204', 4, proxy.url, proxy.auth, false)
+					: { success: false, latency: 0, error: 'not_configured' };
+			}
 			case 'ipv4_domestic':
 				return plain_ip_probe('https://v4.ipgg.cn', 4);
 			case 'ipv4_overseas':
-				return overseas_ip_probe(4);
+				return overseas_ipv4_probe();
 			case 'ipv6_domestic':
 				return ipv6_probe([ 'https://v6.ipgg.cn' ]);
-			case 'ipv6_overseas':
-				return overseas_ip_probe(6);
 			case 'nat':
 				return nat_test();
 			default:

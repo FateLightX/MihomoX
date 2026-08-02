@@ -34,8 +34,10 @@ assert.ok(
     acl['luci-app-mihomox'].read.ubus['luci.mihomox'].includes('network_test'),
     'network_test RPC is missing from the read ACL'
 );
-for (const test of ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'ipv6_overseas', 'nat'])
+for (const test of ['core', 'system_dns', 'mihomo_dns', 'domestic', 'domestic_baidu', 'domestic_netease', 'international', 'international_google', 'international_youtube', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'nat'])
     assert.ok(rpcSource.includes(`case '${test}':`), `network RPC is missing ${test}`);
+assert.ok(!rpcSource.includes("case 'ipv6_overseas':"), 'overseas IPv6 test must be removed');
+assert.ok(!source.includes("id: 'ipv6_overseas'"), 'overseas IPv6 row must be removed');
 assert.ok(/method:\s*'network_test'[\s\S]*?nobatch:\s*true/.test(toolSource), 'network tests must bypass RPC batching');
 assert.ok(source.includes('Promise.race(['), 'network tests must enforce a browser-side timeout');
 assert.ok(!source.includes('stopped = true'), 'one network timeout must not skip later tests');
@@ -43,13 +45,15 @@ assert.ok(source.includes("timeout: 30000"), 'NAT must allow DNS isolation and S
 assert.ok(rpcSource.includes("readfile('/etc/resolv.conf')"), 'system DNS servers must be read from resolv.conf');
 assert.ok(rpcSource.includes('version: installed_core_version()'), 'core version must be returned by the network RPC');
 assert.ok(rpcSource.includes("plain_ip_probe('https://v4.ipgg.cn', 4)"), 'domestic IPv4 must use ipgg');
-assert.ok(rpcSource.includes('return overseas_ip_probe(4)'), 'overseas IPv4 must use the proxy geo probe');
+assert.ok(rpcSource.includes("curl_probe('https://www.baidu.com', 4, null, null, false)"), 'domestic tests must include Baidu');
+assert.ok(rpcSource.includes("curl_probe('https://music.163.com', 4, null, null, false)"), 'domestic tests must include NetEase Cloud');
+assert.ok(rpcSource.includes("curl_probe('https://www.google.com/generate_204', 4, proxy.url, proxy.auth, false)"), 'international tests must include Google');
+assert.ok(rpcSource.includes("curl_probe('https://www.youtube.com/generate_204', 4, proxy.url, proxy.auth, false)"), 'international tests must include YouTube');
+assert.ok(rpcSource.includes("curl_probe('https://ifconfig.co', 4, proxy.url, proxy.auth, true, false)"), 'overseas IPv4 must query ifconfig.co through the proxy');
+assert.ok(rpcSource.includes("curl_probe('https://ifconfig.co/country', 4, proxy.url, proxy.auth, true, false)"), 'overseas IPv4 must query the country through the proxy');
 assert.ok(rpcSource.includes("ipv6_probe([ 'https://v6.ipgg.cn' ])"), 'domestic IPv6 must use ipgg');
-assert.ok(rpcSource.includes('return overseas_ip_probe(6)'), 'overseas IPv6 must use the proxy geo probe');
-assert.ok(rpcSource.includes("'https://1.1.1.1/cdn-cgi/trace'"), 'overseas IPv4 must force a fixed IPv4 target');
-assert.ok(rpcSource.includes("'https://[2606:4700:4700::1111]/cdn-cgi/trace'"), 'overseas IPv6 must force a fixed IPv6 target');
 assert.ok(rpcSource.includes("const proxy = local_proxy()"), 'overseas probes must use the local Mihomo proxy');
-assert.ok(rpcSource.includes("country != 'CN'"), 'overseas probes must reject mainland China exits');
+assert.ok(rpcSource.includes('!!valid_address && !!valid_country'), 'overseas IPv4 must validate the returned IP and country');
 assert.ok(rpcSource.includes("'--doh-url', 'https://dns.alidns.com/dns-query'"), 'IPv6 probes must bypass fake-IP DNS');
 assert.ok(rpcSource.includes("resolve_public_ipv4('stun.cloudflare.com')"), 'STUN must bypass fake-IP DNS');
 assert.ok(rpcSource.includes("network_test_fw_mark"), 'STUN must bypass transparent proxy interception');
@@ -92,11 +96,14 @@ const results = {
     system_dns: { success: true, latency: 12, server: '192.0.2.53' },
     mihomo_dns: { success: true, latency: 8, server: '127.0.0.1#1053' },
     domestic: { success: true, latency: 35 },
+    domestic_baidu: { success: true, latency: 35 },
+    domestic_netease: { success: true, latency: 35 },
     international: { success: true, latency: 86 },
+    international_google: { success: true, latency: 86 },
+    international_youtube: { success: true, latency: 86 },
     ipv4_domestic: { success: true, address: '198.51.100.10' },
-    ipv4_overseas: { success: true, address: '203.0.113.1', country: 'KR' },
+    ipv4_overseas: { success: true, address: '203.0.113.1', country: 'Singapore' },
     ipv6_domestic: { success: true, address: '2001:db8::10' },
-    ipv6_overseas: { success: false, address: '2001:db8::20', country: 'CN' },
     nat: { success: true, type: 'Full Cone' }
 };
 const mihomox = {
@@ -121,7 +128,7 @@ networkView.render();
 const button = created.find((node) => node.tag === 'button');
 assert.ok(button?.listeners?.click, 'start test button is missing');
 const singleButtons = created.filter((node) => node.attributes?.['data-test-id']);
-assert.strictEqual(singleButtons.length, 10, 'each network row must have a test button');
+assert.strictEqual(singleButtons.length, 13, 'each network row must have a test button');
 assert.ok(singleButtons.every((node) => node.listeners?.click), 'a network row test button is missing its handler');
 
 const run = button.listeners.click();
@@ -135,23 +142,26 @@ Promise.resolve().then(() => {
     releaseCore();
     return run;
 }).then(() => {
-    assert.deepStrictEqual(calls, ['core', 'system_dns', 'mihomo_dns', 'domestic', 'international', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'ipv6_overseas', 'nat']);
+    assert.deepStrictEqual(calls, ['core', 'system_dns', 'mihomo_dns', 'domestic', 'domestic_baidu', 'domestic_netease', 'international', 'international_google', 'international_youtube', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'nat']);
     assert.strictEqual(button.disabled, false);
     const values = created
         .filter((node) => node.attributes?.class === 'mihomox-network-value')
         .map((node) => node.textContent);
-    assert.deepStrictEqual(values.slice(0, 5), [
+    assert.deepStrictEqual(values.slice(0, 9), [
         'v1.19.12 · Normal',
         '192.0.2.53 · 12 ms',
         '127.0.0.1#1053 · 8 ms',
         'connect.rom.miui.com · 35 ms',
-        'cp.cloudflare.com · 86 ms'
+        'www.baidu.com · 35 ms',
+        'music.163.com · 35 ms',
+        'cp.cloudflare.com · 86 ms',
+        'www.google.com · 86 ms',
+        'www.youtube.com · 86 ms'
     ]);
-    assert.deepStrictEqual(values.slice(5, 9), [
+    assert.deepStrictEqual(values.slice(9, 12), [
         '198.51.100.10',
-        '203.0.113.1 · KR',
-        '2001:db8::10',
-        '2001:db8::20 · CN · Unavailable'
+        '203.0.113.1 · Singapore',
+        '2001:db8::10'
     ]);
     const ipv4Button = singleButtons.find((node) => node.attributes['data-test-id'] === 'ipv4_domestic');
     return ipv4Button.listeners.click().then(() => {

@@ -1188,9 +1188,6 @@ msgstr "IPv4 國外"
 msgid "IPv6 Domestic"
 msgstr "IPv6 國內"
 
-msgid "IPv6 Overseas"
-msgstr "IPv6 國外"
-
 msgid "Test"
 msgstr "測試"
 
@@ -1371,8 +1368,24 @@ msgid "Domestic Connection"
 msgstr "國內連線"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Baidu"
+msgstr "百度"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "NetEase Cloud"
+msgstr "網易雲"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "International Proxy"
 msgstr "國際代理"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Google"
+msgstr "Google"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "YouTube"
+msgstr "YouTube"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "NAT Type"

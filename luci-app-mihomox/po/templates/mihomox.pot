@@ -1181,9 +1181,6 @@ msgstr ""
 msgid "IPv6 Domestic"
 msgstr ""
 
-msgid "IPv6 Overseas"
-msgstr ""
-
 msgid "Test"
 msgstr ""
 
@@ -1364,7 +1361,23 @@ msgid "Domestic Connection"
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Baidu"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "NetEase Cloud"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "International Proxy"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Google"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "YouTube"
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js

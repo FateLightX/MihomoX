@@ -1302,8 +1302,24 @@ msgid "Domestic Connection"
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Baidu"
+msgstr "Baidu"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "NetEase Cloud"
+msgstr "NetEase Cloud"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "International Proxy"
 msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Google"
+msgstr "Google"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "YouTube"
+msgstr "YouTube"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "NAT Type"
@@ -1357,9 +1373,6 @@ msgstr "IPv4 за пределами Китая"
 
 msgid "IPv6 Domestic"
 msgstr "IPv6 внутри Китая"
-
-msgid "IPv6 Overseas"
-msgstr "IPv6 за пределами Китая"
 
 msgid "Test"
 msgstr "Тест"

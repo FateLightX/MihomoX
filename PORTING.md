@@ -55,6 +55,27 @@ MihomoX 是单 Mihomo 内核的 OpenWrt 透明代理服务：
 默认值以 `mihomox/files/mihomox.conf` 为准。LuCI 默认显示、UCI 默认值和生成后的
 Mihomo YAML 必须保持一致；修改字段时应沿完整链路验证。
 
+新安装默认启用透明代理，TCP 和 UDP 均使用 TPROXY，TUN 默认关闭；路由器自身与 LAN
+设备代理默认启用。该文件只定义新安装默认值，升级不得覆盖已有 UCI 选择。
+
+### 网络诊断链
+
+LuCI `network.js` 按行调用 `luci.mihomox.network_test`，rpcd 实现在
+`root/usr/share/rpcd/ucode/luci.mihomox`。请求必须逐项执行并绕过 RPC 批处理，设备端和
+浏览器端都必须有超时。
+
+- 国内站点检测不显式指定代理；国际站点检测显式使用 Mihomo 本地 Mixed/HTTP 代理。
+- IPv4 国内通过绕过 cgroup 直连 `https://v4.ipgg.cn`。
+- IPv6 国内通过绕过 cgroup 和固定 DoH 直连 `https://v6.ipgg.cn`。
+- IPv4 国外经 Mihomo 本地代理访问 `https://ifconfig.co` 和
+  `https://ifconfig.co/country`，分别返回出口 IPv4 和国家。
+- 不提供“IPv6 国外”检测；它只能反映代理节点访问 IPv6-only 目标的能力，不能代表
+  路由器或 LAN 的原生 IPv6 状态。
+- NAT 检测使用独立辅助程序、固定 STUN 目标和 `network_test_fw_mark`，不得落入透明代理。
+
+`curl -4/-6` 在显式 HTTP 代理场景主要约束客户端到本地代理的连接族，不能单独证明
+代理节点到目标使用相同地址族。网络检测的 UI 名称和文档不得扩大其语义。
+
 ## 4. 编译期交付
 
 `mihomox/Makefile` 的准备阶段依次执行：

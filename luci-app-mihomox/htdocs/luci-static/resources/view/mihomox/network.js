@@ -8,11 +8,14 @@ const tests = [
     { id: 'system_dns', label: _('System DNS'), icon: 'dns' },
     { id: 'mihomo_dns', label: _('Mihomo DNS'), icon: 'shield' },
     { id: 'domestic', label: _('Domestic Connection'), icon: 'home', target: 'connect.rom.miui.com' },
+    { id: 'domestic_baidu', label: _('Baidu'), icon: 'home', target: 'www.baidu.com' },
+    { id: 'domestic_netease', label: _('NetEase Cloud'), icon: 'home', target: 'music.163.com' },
     { id: 'international', label: _('International Proxy'), icon: 'globe', target: 'cp.cloudflare.com' },
+    { id: 'international_google', label: _('Google'), icon: 'globe', target: 'www.google.com' },
+    { id: 'international_youtube', label: _('YouTube'), icon: 'globe', target: 'www.youtube.com' },
     { id: 'ipv4_domestic', label: _('IPv4 Domestic'), icon: 'ipv4' },
     { id: 'ipv4_overseas', label: _('IPv4 Overseas'), icon: 'ipv4' },
     { id: 'ipv6_domestic', label: _('IPv6 Domestic'), icon: 'ipv6' },
-    { id: 'ipv6_overseas', label: _('IPv6 Overseas'), icon: 'ipv6' },
     { id: 'nat', label: _('NAT Type'), icon: 'nat', timeout: 30000 }
 ];
 const TEST_TIMEOUT_MS = 8000;
@@ -55,7 +58,7 @@ function resultText(test, result) {
         const status = result?.success ? `${result.latency ?? 0} ms` : state;
         return `${test.target} · ${status}`;
     }
-    if (/^ipv[46]_overseas$/.test(test.id) && result?.address) {
+    if (test.id === 'ipv4_overseas' && result?.address) {
         const exit = result.country ? `${result.address} · ${result.country}` : result.address;
         return result.success ? exit : `${exit} · ${state}`;
     }
