@@ -63,9 +63,9 @@ assert.ok(rpcSource.includes('direct_network_command(args)'), 'direct probes mus
 assert.ok(rpcSource.includes("push(args, '--noproxy', '*')"), 'IP protocol probes must bypass environment proxies');
 assert.ok(source.includes("no_ipv6: _('No IPv6 Connectivity')"), 'network errors must be visible');
 assert.ok(source.includes('mihomox-network-progress'), 'network page must expose overall progress');
-assert.ok(source.includes('var(--background-color-high'), 'network cards must use LuCI theme variables');
-assert.ok(source.includes('var(--text-color-high'), 'network text must use LuCI theme variables');
 assert.ok(source.includes('var(--success-color'), 'network status colors must use semantic theme variables');
+assert.ok(source.includes('color-mix(in srgb,currentColor'), 'network outlines must inherit the active theme color');
+assert.ok(source.includes('background:transparent') && source.includes('box-shadow:none'), 'network cards must use outlines without independent surface colors');
 assert.ok(source.includes("E('details'"), 'detailed site tests must be collapsible');
 assert.ok(!source.includes('background:#fff') && !source.includes('background: #fff'), 'cards must not use a fixed white background');
 
@@ -155,6 +155,21 @@ assert.ok(
     )),
     'LuCI E() children must receive metric DOM nodes instead of wrapper objects'
 );
+assert.ok(
+    metricGrids.some((grid) => {
+        const ids = grid.children.map((child) => child.attributes?.['data-test-id']);
+        return ids.length === 2 && ids.includes('domestic') && ids.includes('international');
+    }),
+    'domestic and international results must share the network status card'
+);
+assert.ok(
+    metricGrids.some((grid) => {
+        const ids = grid.children.map((child) => child.attributes?.['data-test-id']);
+        return ids.length === 3 &&
+            ids.includes('ipv4_domestic') && ids.includes('ipv4_overseas') && ids.includes('ipv6_domestic');
+    }),
+    'IPv4 and IPv6 results must share the network detection card'
+);
 const singleButtons = created.filter((node) => node.tag === 'button' && node.attributes?.['data-test-id']);
 assert.strictEqual(singleButtons.length, 13, 'each network test must have a single-test button');
 assert.ok(singleButtons.every((node) => node.listeners?.click), 'a network test button is missing its handler');
@@ -177,12 +192,14 @@ Promise.resolve().then(() => {
     const testsForAssertion = ['core', 'system_dns', 'mihomo_dns', 'domestic', 'domestic_baidu', 'domestic_netease', 'international', 'international_google', 'international_youtube', 'ipv4_domestic', 'ipv4_overseas', 'ipv6_domestic', 'nat'];
     const values = testsForAssertion.map(valueFor);
     assert.deepStrictEqual(values, [
-        'v1.19.12 · Normal', '12 ms', '8 ms', '35 ms', '35 ms', '35 ms',
+        'v1.19.12 · Normal', '192.0.2.53 · 12 ms', '127.0.0.1#1053 · 8 ms', '35 ms', '35 ms', '35 ms',
         '86 ms', '86 ms', '86 ms', '198.51.100.10',
         '203.0.113.1 · Singapore', '2001:db8::10', 'Full Cone'
     ]);
     const nonIpValues = values.filter((value) => !['198.51.100.10', '203.0.113.1 · Singapore', '2001:db8::10'].includes(value));
-    for (const forbidden of ['192.0.2.53', '127.0.0.1#1053', 'connect.rom.miui.com', 'www.baidu.com', 'music.163.com', 'cp.cloudflare.com', 'www.google.com', 'www.youtube.com'])
+    assert.strictEqual(valueFor('system_dns'), '192.0.2.53 · 12 ms', 'system DNS must display its server');
+    assert.strictEqual(valueFor('mihomo_dns'), '127.0.0.1#1053 · 8 ms', 'Mihomo DNS must display its server');
+    for (const forbidden of ['connect.rom.miui.com', 'www.baidu.com', 'music.163.com', 'cp.cloudflare.com', 'www.google.com', 'www.youtube.com'])
         assert.ok(!nonIpValues.some((value) => value.includes(forbidden)), `non-IP result must not render ${forbidden}`);
     const ipv4Button = singleButtons.find((node) => node.attributes['data-test-id'] === 'ipv4_domestic');
     rejectNext = true;

@@ -1454,12 +1454,8 @@ msgid "Core and DNS"
 msgstr "Ядро и DNS"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "IPv4 Public Exit"
-msgstr "Публичный выход IPv4"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "IPv6 Public Exit"
-msgstr "Публичный выход IPv6"
+msgid "Network Detection"
+msgstr "Диагностика сети"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Detailed Site Tests"
@@ -1480,3 +1476,7 @@ msgstr "Все проверки пройдены"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Some Tests Unavailable"
 msgstr "Некоторые проверки недоступны"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Network Status"
+msgstr "Состояние сети"

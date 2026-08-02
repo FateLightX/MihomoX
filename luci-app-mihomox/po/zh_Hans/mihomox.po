@@ -1508,12 +1508,8 @@ msgid "Core and DNS"
 msgstr "核心与 DNS"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "IPv4 Public Exit"
-msgstr "IPv4 公网出口"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "IPv6 Public Exit"
-msgstr "IPv6 公网出口"
+msgid "Network Detection"
+msgstr "网络检测"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Detailed Site Tests"
@@ -1534,3 +1530,7 @@ msgstr "全部测试正常"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Some Tests Unavailable"
 msgstr "部分测试不可用"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Network Status"
+msgstr "网络状态"

@@ -71,6 +71,10 @@ function resultText(test, result) {
         return result.version ? `${result.version} · ${_('Normal')}` : _('Normal');
     if (test.id === 'nat')
         return natType(result.type);
+    if (test.id === 'system_dns' || test.id === 'mihomo_dns') {
+        const latency = `${result.latency ?? 0} ms`;
+        return result.server ? `${result.server} · ${latency}` : latency;
+    }
     if (isAddressTest(test)) {
         if (test.id === 'ipv4_overseas' && result.country)
             return `${result.address || _('Normal')} · ${result.country}`;
@@ -248,10 +252,10 @@ return view.extend({
         const core = E('div', { 'class': 'mihomox-network-grid mihomox-network-grid-core' }, [
             metric('core'), metric('system_dns'), metric('mihomo_dns')
         ]);
-        const domestic = E('div', { 'class': 'mihomox-network-grid' }, [metric('domestic')]);
-        const international = E('div', { 'class': 'mihomox-network-grid' }, [metric('international')]);
-        const ipv4 = E('div', { 'class': 'mihomox-network-grid' }, [metric('ipv4_domestic'), metric('ipv4_overseas')]);
-        const ipv6 = E('div', { 'class': 'mihomox-network-grid' }, [metric('ipv6_domestic')]);
+        const networkStatus = E('div', { 'class': 'mihomox-network-grid' }, [metric('domestic'), metric('international')]);
+        const networkDetection = E('div', { 'class': 'mihomox-network-grid mihomox-network-grid-detection' }, [
+            metric('ipv4_domestic'), metric('ipv4_overseas'), metric('ipv6_domestic')
+        ]);
         const nat = E('div', { 'class': 'mihomox-network-grid' }, [metric('nat')]);
         const domesticSites = E('div', { 'class': 'mihomox-network-site-grid' }, [metric('domestic_baidu'), metric('domestic_netease')]);
         const internationalSites = E('div', { 'class': 'mihomox-network-site-grid' }, [metric('international_google'), metric('international_youtube')]);
@@ -265,43 +269,44 @@ return view.extend({
 
         return E('div', { 'class': 'cbi-map mihomox-network-page' }, [
             E('style', {}, `
-                .mihomox-network-page{max-width:72rem}
+                .mihomox-network-page{max-width:72rem;color:inherit;--mihomox-line:color-mix(in srgb,currentColor 16%,transparent);--mihomox-track:color-mix(in srgb,currentColor 12%,transparent)}
                 .mihomox-network-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin:0 0 1.25rem}
                 .mihomox-network-header h2{margin:0 0 .25rem;font-size:1.65rem;letter-spacing:-.02em}
-                .mihomox-network-subtitle{color:var(--text-color-medium,#777);font-size:.9rem}
+                .mihomox-network-subtitle{color:inherit;opacity:.68;font-size:.9rem}
                 .mihomox-network-primary{min-height:2.6rem;border-radius:.7rem}
-                .mihomox-network-summary,.mihomox-network-section{border:1px solid var(--border-color-medium,#c9cdd1);border-radius:1rem;background:var(--background-color-high,#f7f7f7);box-shadow:0 .5rem 1.5rem rgba(0,0,0,.06)}
+                .mihomox-network-summary,.mihomox-network-section{border:1px solid rgba(127,127,127,.24);border-color:var(--mihomox-line);border-radius:1rem;background:transparent;box-shadow:none;color:inherit}
                 .mihomox-network-summary{display:grid;grid-template-columns:minmax(0,1fr) minmax(12rem,18rem);gap:1.5rem;align-items:center;padding:1.25rem 1.4rem;margin-bottom:1rem}
                 .mihomox-network-summary-main{display:flex;align-items:center;gap:.85rem;min-width:0}
-                .mihomox-network-summary-mark{display:grid;place-items:center;width:2.8rem;height:2.8rem;flex:none;border-radius:.85rem;color:var(--background-color-high,#fff);font-weight:800;font-size:1.25rem;background:var(--text-color-medium,#64748b)}
+                .mihomox-network-summary-mark{display:grid;place-items:center;width:2.8rem;height:2.8rem;flex:none;border-radius:.85rem;color:#fff;font-weight:800;font-size:1.25rem;background:var(--text-color-medium,#64748b)}
                 .mihomox-network-summary-mark-success{background:var(--success-color,#2f7a57)}
                 .mihomox-network-summary-mark-failed{background:var(--error-color,#dc2626)}
                 .mihomox-network-summary-mark-loading{background:var(--primary-color,#2563eb)}
-                .mihomox-network-summary-title{font-size:1.05rem;font-weight:700}
-                .mihomox-network-active{display:block;min-height:1.25em;color:var(--text-color-medium,#777);font-size:.8rem}
-                .mihomox-network-progress-label{display:flex;justify-content:space-between;gap:.75rem;margin-bottom:.4rem;color:var(--text-color-medium,#777);font-size:.78rem}
-                .mihomox-network-progress-track{height:.35rem;overflow:hidden;border-radius:99px;background:var(--background-color-low,#e8eaec)}
+                .mihomox-network-summary-title{color:inherit;font-size:1.05rem;font-weight:700}
+                .mihomox-network-active{display:block;min-height:1.25em;color:inherit;opacity:.68;font-size:.8rem}
+                .mihomox-network-progress-label{display:flex;justify-content:space-between;gap:.75rem;margin-bottom:.4rem;color:inherit;opacity:.68;font-size:.78rem}
+                .mihomox-network-progress-track{height:.35rem;overflow:hidden;border-radius:99px;background:var(--mihomox-track)}
                 .mihomox-network-progress-bar{display:block;width:0;height:100%;border-radius:inherit;background:var(--success-color,#2f7a57);transition:width .2s ease}
                 .mihomox-network-section{padding:1rem;margin-bottom:1rem}
                 .mihomox-network-section-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.75rem}
-                .mihomox-network-section-head h3{margin:0;color:var(--text-color-high,#333);font-size:1rem}
+                .mihomox-network-section-head h3{margin:0;color:inherit;font-size:1rem}
                 .mihomox-network-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
                 .mihomox-network-grid-core{grid-template-columns:repeat(3,minmax(0,1fr))}
-                .mihomox-network-metric{min-width:0;padding:.9rem 1rem;border:1px solid var(--border-color-medium,#c9cdd1);border-radius:.8rem;background:var(--background-color-low,#f1f2f3)}
+                .mihomox-network-grid-detection{grid-template-columns:repeat(3,minmax(0,1fr))}
+                .mihomox-network-metric{min-width:0;padding:.9rem 1rem;border:1px solid rgba(127,127,127,.24);border-color:var(--mihomox-line);border-radius:.8rem;background:transparent;color:inherit}
                 .mihomox-network-metric-head,.mihomox-network-metric-result{display:flex;align-items:center;gap:.55rem;min-width:0}
                 .mihomox-network-metric-result{margin-top:.65rem}
-                .mihomox-network-metric-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650;color:var(--text-color-high,#333)}
-                .mihomox-network-icon{display:inline-block;width:1.25rem;height:1.25rem;flex:none;background:var(--text-color-medium,#667);-webkit-mask-position:center;mask-position:center;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:contain;mask-size:contain}
-                .mihomox-network-status{display:grid;place-items:center;width:1.35rem;height:1.35rem;flex:none;border-radius:50%;color:var(--background-color-high,#fff);font-size:.8rem;font-weight:800;background:var(--text-color-medium,#64748b)}
+                .mihomox-network-metric-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650;color:inherit}
+                .mihomox-network-icon{display:inline-block;width:1.25rem;height:1.25rem;flex:none;background:currentColor;opacity:.68;-webkit-mask-position:center;mask-position:center;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:contain;mask-size:contain}
+                .mihomox-network-status{display:grid;place-items:center;width:1.35rem;height:1.35rem;flex:none;border-radius:50%;color:#fff;font-size:.8rem;font-weight:800;background:var(--text-color-medium,#64748b)}
                 .mihomox-network-status-success{background:var(--success-color,#16a34a)}
                 .mihomox-network-status-failed{background:var(--error-color,#dc2626)}
                 .mihomox-network-status-loading{background:var(--primary-color,#2563eb)}
-                .mihomox-network-value{min-width:0;flex:1;overflow-wrap:anywhere;color:var(--text-color-medium,#777);font-size:.9rem;font-weight:650}
+                .mihomox-network-value{min-width:0;flex:1;overflow-wrap:anywhere;color:inherit;opacity:.74;font-size:.9rem;font-weight:650}
                 .mihomox-network-rerun{flex:none;margin-left:auto;padding:.15rem .45rem;line-height:1.2;opacity:.7}
-                .mihomox-network-details{margin-top:.25rem;border:1px solid var(--border-color-medium,#c9cdd1);border-radius:1rem;background:var(--background-color-high,#f7f7f7)}
-                .mihomox-network-details summary{padding:1rem 1.1rem;cursor:pointer;color:var(--text-color-high,#333);font-weight:700}
+                .mihomox-network-details{margin-top:.25rem;border:1px solid rgba(127,127,127,.24);border-color:var(--mihomox-line);border-radius:1rem;background:transparent;box-shadow:none;color:inherit}
+                .mihomox-network-details summary{padding:1rem 1.1rem;cursor:pointer;color:inherit;font-weight:700}
                 .mihomox-network-details-body{padding:0 1.1rem 1.1rem}
-                .mihomox-network-details-body h4{margin:1rem 0 .6rem;color:var(--text-color-medium,#777);font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+                .mihomox-network-details-body h4{margin:1rem 0 .6rem;color:inherit;opacity:.68;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
                 .mihomox-network-site-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
                 @media(max-width:700px){.mihomox-network-header{flex-direction:column}.mihomox-network-primary{width:100%}.mihomox-network-summary{grid-template-columns:1fr}.mihomox-network-grid-core,.mihomox-network-grid,.mihomox-network-site-grid{grid-template-columns:1fr}}
             `),
@@ -320,10 +325,8 @@ return view.extend({
                 ])
             ]),
             makeSection(_('Core and DNS'), 'mihomox-network-section-core', core),
-            makeSection(_('Domestic Connection'), 'mihomox-network-section-domestic', domestic),
-            makeSection(_('International Proxy'), 'mihomox-network-section-international', international),
-            makeSection(_('IPv4 Public Exit'), 'mihomox-network-section-ipv4', ipv4),
-            makeSection(_('IPv6 Public Exit'), 'mihomox-network-section-ipv6', ipv6),
+            makeSection(_('Network Status'), 'mihomox-network-section-status', networkStatus),
+            makeSection(_('Network Detection'), 'mihomox-network-section-detection', networkDetection),
             makeSection(_('NAT Type'), 'mihomox-network-section-nat', nat),
             details
         ]);

@@ -1501,11 +1501,7 @@ msgid "Core and DNS"
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "IPv4 Public Exit"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "IPv6 Public Exit"
+msgid "Network Detection"
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
@@ -1526,4 +1522,8 @@ msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Some Tests Unavailable"
+msgstr ""
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
+msgid "Network Status"
 msgstr ""
