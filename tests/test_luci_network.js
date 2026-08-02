@@ -145,6 +145,16 @@ const networkView = new Function('view', 'ui', 'mihomox', 'L', 'E', '_', source)
 networkView.render();
 const button = created.find((node) => node.tag === 'button');
 assert.ok(button?.listeners?.click, 'start test button is missing');
+const metricGrids = created.filter((node) =>
+    node.tag === 'div' && /(^|\s)mihomox-network-(grid|site-grid)(\s|$)/.test(node.attributes?.class || '')
+);
+assert.ok(metricGrids.length > 0, 'network metric grids are missing');
+assert.ok(
+    metricGrids.every((grid) => grid.children.every((child) =>
+        child?.tag === 'div' && child.attributes?.class === 'mihomox-network-metric'
+    )),
+    'LuCI E() children must receive metric DOM nodes instead of wrapper objects'
+);
 const singleButtons = created.filter((node) => node.tag === 'button' && node.attributes?.['data-test-id']);
 assert.strictEqual(singleButtons.length, 13, 'each network test must have a single-test button');
 assert.ok(singleButtons.every((node) => node.listeners?.click), 'a network test button is missing its handler');

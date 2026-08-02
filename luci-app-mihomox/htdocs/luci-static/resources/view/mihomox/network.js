@@ -243,7 +243,7 @@ return view.extend({
         summary.active = E('span', { 'class': 'mihomox-network-active' });
 
         const metric = function (id) {
-            return makeMetric(tests.find((test) => test.id === id), items, button, summary);
+            return makeMetric(tests.find((test) => test.id === id), items, button, summary).card;
         };
         const core = E('div', { 'class': 'mihomox-network-grid mihomox-network-grid-core' }, [
             metric('core'), metric('system_dns'), metric('mihomo_dns')
