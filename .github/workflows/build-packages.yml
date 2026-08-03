@@ -18,58 +18,16 @@ jobs:
 
   build:
     needs: check
-    name: ${{ matrix.arch }}-${{ matrix.branch }} build
+    name: x86_64-${{ matrix.branch }} build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        arch:
-          - arm_cortex-a5_vfpv4
-          - arm_cortex-a7_neon-vfpv4
-          - arm_cortex-a8_vfpv3
-          - arm_cortex-a9
-          - arm_cortex-a9_vfpv3-d16
-          - arm_cortex-a9_neon
-          - arm_cortex-a15_neon-vfpv4
-          - aarch64_cortex-a53
-          - aarch64_cortex-a72
-          - aarch64_cortex-a76
-          - aarch64_generic
-          - mips_24kc
-          - mips_4kec
-          - mips_mips32
-          - mipsel_24kc
-          - mipsel_24kc_24kf
-          - mipsel_74kc
-          - mipsel_mips32
-          - mips64_octeonplus
-          - riscv64_riscv64
-          - riscv64_generic
-          - loongarch64_generic
-          - i386_pentium4
-          - x86_64
         branch:
           - openwrt-23.05
           - openwrt-24.10
           - openwrt-25.12
           - SNAPSHOT
-        exclude:
-          - arch: aarch64_cortex-a76
-            branch: openwrt-23.05
-          - arch: riscv64_generic
-            branch: openwrt-23.05
-          - arch: loongarch64_generic
-            branch: openwrt-23.05
-          - arch: mips_4kec
-            branch: openwrt-25.12
-          - arch: mips_4kec
-            branch: SNAPSHOT
-          - arch: riscv64_riscv64
-            branch: openwrt-25.12
-          - arch: riscv64_riscv64
-            branch: SNAPSHOT
-          - arch: riscv64_generic
-            branch: openwrt-24.10
 
     steps:
       - name: checkout
@@ -78,7 +36,7 @@ jobs:
       - name: build
         uses: openwrt/gh-action-sdk@797d0e3d0eb13b355c3447f60d0179d4b43089e2 # main
         env:
-          ARCH: ${{ matrix.arch }}-${{ matrix.branch == 'openwrt-23.05' && '23.05.5' || matrix.branch }}
+          ARCH: x86_64-${{ matrix.branch == 'openwrt-23.05' && '23.05.5' || matrix.branch }}
           FEEDNAME: mihomox
           PACKAGES: mihomox luci-app-mihomox
           NO_REFRESH_CHECK: true
@@ -86,5 +44,5 @@ jobs:
       - name: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: mihomox_${{ matrix.arch }}-${{ matrix.branch }}
-          path: bin/packages/${{ matrix.arch }}/mihomox
+          name: mihomox_x86_64-${{ matrix.branch }}
+          path: bin/packages/x86_64/mihomox
