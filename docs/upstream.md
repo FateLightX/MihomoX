@@ -9,7 +9,7 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `34a0367` |
+| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `388f34e` |
 | [OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo) | `../OpenWrt-momo` | 同组织辅助参考 | `6fb94df` |
 | [openwrt-clashoo](https://github.com/kenzok8/openwrt-clashoo) | `../openwrt-clashoo` | 内核更新次级参考 | `95de5e2` |
 
@@ -33,6 +33,21 @@ git -C ../openwrt-clashoo merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-08-05：Nikki
+
+- 上游：`nikkinikki-org/OpenWrt-nikki`
+- 旧参考：`34a0367`
+- 已审计至：`388f34e`
+- 范围：`34a0367..388f34e`
+
+审计结果：
+
+- `388f34e fix(rpcd): use TLS listen address for API requests when configured (#884)`
+  - Nikki 修正了启用 TLS API 监听时仍使用普通监听地址的问题。
+  - MihomoX 的 `core_api_request()` 已优先选择 `external-controller-tls`，并根据所选
+    地址构造控制器 URL，现补充回归测试固定该行为。
+  - 决策：等价行为已存在，移植测试与审计记录。
 
 ## 2026-07-29：Nikki
 

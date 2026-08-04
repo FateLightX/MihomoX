@@ -25,6 +25,14 @@ const rpcSource = fs.readFileSync(path.join(
 assert.ok(rpcSource.includes("popen(join(' ', map(curl_args, shell_quote)), 'r')"));
 assert.ok(rpcSource.includes('function shell_quote(value)'));
 assert.ok(!rpcSource.includes('popen(`curl'));
+assert.ok(
+    rpcSource.includes("const listen = api_tls_listen || api_listen;"),
+    'core API requests must prefer the configured TLS listen address'
+);
+assert.ok(
+    rpcSource.includes('const url = controller_url(listen, protocol, path);'),
+    'core API requests must build the URL from the selected listen address'
+);
 assert.ok(rpcSource.includes("match(section_id, /^[A-Za-z0-9_-]{1,64}$/)"));
 
 const installSource = fs.readFileSync(path.join(root, 'install.sh'), 'utf8');
