@@ -25,4 +25,14 @@ for workflow in build-packages.yml release-packages.yml; do
 	fi
 done
 
+release_workflow="$ROOT_DIR/.github/workflows/release-packages.yml"
+grep -Fq 'default: v1.0.0' "$release_workflow"
+grep -Fq 'tag_name: ${{ needs.resolve.outputs.release_version }}' "$release_workflow"
+grep -Fq 'name: ${{ needs.resolve.outputs.release_version }}' "$release_workflow"
+grep -Fq "if: env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_API_TOKEN != ''" "$release_workflow"
+if grep -Fq "github.event_name == 'push'" "$release_workflow"; then
+	echo "manual releases must not skip GitHub Release publishing" >&2
+	exit 1
+fi
+
 echo "release support tests passed"

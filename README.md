@@ -47,6 +47,10 @@ SHA256。直接在本地 SDK 编译时使用 `mihomox/Makefile` 中的基线版�
 脚本刷新。源码、规则数据和面板资源会缓存在 OpenWrt `DL_DIR`，解析、下载或校验失败时
 构建直接停止。
 
+手动运行 `release-packages` 时填写 `v1.0.0` 形式的语义版本号。工作流使用该值作为
+GitHub Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。Cloudflare
+凭据未配置时仅跳过 Feed 部署，不影响 GitHub Release 成功。
+
 ## 使用
 
 LuCI 页面位于 `服务 → MihomoX`：
