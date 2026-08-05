@@ -10,7 +10,7 @@ Mihomo 内核。
 - 通过 LuCI 管理配置文件、订阅、混入配置、访问控制、规则、编辑器、面板和日志
 - 编译时打包目标架构的 Mihomo 内核，不依赖独立的 `mihomo-meta` 或
   `mihomo-alpha` 软件包
-- GitHub Actions 每次构建自动解析最新 Mihomo Alpha 源码，并在同一轮构建中固定提交和校验值
+- 编译时下载官方最新 Mihomo Alpha 二进制，验证 SHA256 和 ELF 架构后直接打包
 - 运行时内核更新包含可信 SHA256、原子替换及失败回滚
 - 编译时打包 GeoSite、GeoIP、ASN 数据和 Zashboard
 - 首次安装时可导入现有 Nikki 配置，但不会修改或启用 Nikki
@@ -42,10 +42,10 @@ make package/luci-app-mihomox/compile V=s
 ```
 
 GitHub Actions 只构建 `x86_64-openwrt-25.12`。构建前会执行
-`mihomox/scripts/refresh_alpha_source.sh`，解析 Alpha 分支最新提交，下载源码归档并计算
-SHA256。直接在本地 SDK 编译时使用 `mihomox/Makefile` 中的基线版本，可在编译前运行该
-脚本刷新。源码、规则数据和面板资源会缓存在 OpenWrt `DL_DIR`，解析、下载或校验失败时
-构建直接停止。
+`mihomox/scripts/fetch_mihomo.sh`，解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、
+gzip 格式和 ELF 架构后直接打包；不会重新编译 Mihomo Go 源码。OpenWrt 工具链只编译
+MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源会缓存在 OpenWrt
+`DL_DIR`，解析、下载或校验失败时构建直接停止。
 
 手动运行 `release-packages` 时填写 `v1.0.0` 形式的语义版本号。工作流使用该值作为
 GitHub Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。Cloudflare

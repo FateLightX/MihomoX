@@ -2,15 +2,9 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=13
+PKG_RELEASE:=14
 
-MIHOMO_SOURCE_VERSION:=d46944f32bfef1e362edb068e10073da9beab509
-MIHOMO_BUILD_VERSION:=alpha-d46944f
-PKG_SOURCE:=mihomo-$(MIHOMO_SOURCE_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/MetaCubeX/mihomo/tar.gz/$(MIHOMO_SOURCE_VERSION)?
-PKG_HASH:=6256c3a82e022eeab035f0391400dfe9f9f188f4090e44badf83bc4333a6bf6b
-PKG_BUILD_DIR:=$(BUILD_DIR)/mihomo-$(MIHOMO_SOURCE_VERSION)
-PKG_BUILD_DEPENDS:=golang/host
+PKG_BUILD_DIR:=$(BUILD_DIR)/mihomox-$(PKG_VERSION)
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 GEOSITE_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/geosite.dat
@@ -27,21 +21,14 @@ ZASHBOARD_SHA256?=
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=MihomoX contributors
 
-GO_PKG:=github.com/metacubex/mihomo
-GO_PKG_BUILD_PKG:=github.com/metacubex/mihomo
-GO_PKG_LDFLAGS_X:=$(GO_PKG)/constant.Version=$(MIHOMO_BUILD_VERSION) $(GO_PKG)/constant.BuildTime=$(SOURCE_DATE_EPOCH)
-GO_PKG_TAGS:=with_gvisor
-GO_PKG_INSTALL_BIN_PATH:=/etc/mihomox/bin
-
 include $(INCLUDE_DIR)/package.mk
-include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
 
 define Package/mihomox
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Transparent Proxy with Mihomo on OpenWrt.
   URL:=https://github.com/nikkinikki-org/OpenWrt-nikki
-  DEPENDS:=$(GO_ARCH_DEPENDS) +ca-bundle +curl +yq +firewall4 +ip-full +jsonfilter +ucode +coreutils-nohup +kmod-inet-diag +kmod-nft-socket +kmod-nft-tproxy +kmod-tun +kmod-dummy
+  DEPENDS:=+ca-bundle +curl +yq +firewall4 +ip-full +jsonfilter +ucode +coreutils-nohup +kmod-inet-diag +kmod-nft-socket +kmod-nft-tproxy +kmod-tun +kmod-dummy
 endef
 
 define Package/mihomox/conffiles
@@ -66,12 +53,8 @@ define Package/mihomox/install
 	$(INSTALL_DIR) $(1)/etc/mihomox/run/ui
 
 	$(INSTALL_DATA) $(CURDIR)/files/mixin.yaml $(1)/etc/mihomox/mixin.yaml
-	$(call GoPackage/Package/Install/Bin,$(1))
-	printf '%s\n' \
-		'version=$(MIHOMO_BUILD_VERSION)' \
-		'channel=Prerelease-Alpha' \
-		'release=$(MIHOMO_SOURCE_VERSION)' \
-		> $(1)/etc/mihomox/bin/mihomo.version
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mihomo $(1)/etc/mihomox/bin/mihomo
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/mihomo.version $(1)/etc/mihomox/bin/mihomo.version
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoSite.dat $(1)/etc/mihomox/run/GeoSite.dat
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/Country.mmdb $(1)/etc/mihomox/run/Country.mmdb
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/GeoIP.dat $(1)/etc/mihomox/run/GeoIP.dat
@@ -121,16 +104,18 @@ fi
 endef
 
 define Build/Compile
-	$(call GoPackage/Build/Compile)
 	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -std=c99 -Wall -Wextra \
 		-o $(PKG_BUILD_DIR)/mihomox-stun $(CURDIR)/src/mihomox-stun.c $(TARGET_LDFLAGS)
 endef
 
 define Build/Prepare
-	$(call Build/Prepare/Default)
-	# Build/Prepare/Default overlays package src/ into the Go module root.
-	$(RM) $(PKG_BUILD_DIR)/mihomox-stun.c
-	$(RM) -r $(PKG_BUILD_DIR)/rules/logic_test
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)
+	$(CURDIR)/scripts/fetch_mihomo.sh \
+		--arch "$(ARCH_PACKAGES)" \
+		--dl-dir "$(DL_DIR)" \
+		--output "$(PKG_BUILD_DIR)/mihomo" \
+		--version-file "$(PKG_BUILD_DIR)/mihomo.version" \
+		--channel Prerelease-Alpha
 	$(CURDIR)/scripts/fetch_geodata.sh \
 		--dl-dir "$(DL_DIR)" \
 		--output-dir "$(PKG_BUILD_DIR)" \

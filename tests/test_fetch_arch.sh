@@ -36,10 +36,15 @@ printf '%s\n' '<a href="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mih
 [ "$($FETCH_SCRIPT --arch x86_64 --alpha-assets-url "file://$ALPHA_TEST_DIR/assets.html" --resolve-alpha-only)" = "mihomo-linux-amd64-v1-alpha-test123.gz" ]
 rm -rf "$ALPHA_TEST_DIR"
 
-grep -q '^MIHOMO_SOURCE_VERSION:=d46944f32bfef1e362edb068e10073da9beab509$' "$ROOT_DIR/mihomox/Makefile"
-grep -q '^MIHOMO_BUILD_VERSION:=alpha-d46944f$' "$ROOT_DIR/mihomox/Makefile"
-grep -q '^PKG_BUILD_DEPENDS:=golang/host$' "$ROOT_DIR/mihomox/Makefile"
-grep -Fq '$(RM) $(PKG_BUILD_DIR)/mihomox-stun.c' "$ROOT_DIR/mihomox/Makefile"
+grep -Fq '$(CURDIR)/scripts/fetch_mihomo.sh' "$ROOT_DIR/mihomox/Makefile"
+grep -Fq -- '--arch "$(ARCH_PACKAGES)"' "$ROOT_DIR/mihomox/Makefile"
+grep -Fq -- '--channel Prerelease-Alpha' "$ROOT_DIR/mihomox/Makefile"
+grep -Fq '$(INSTALL_BIN) $(PKG_BUILD_DIR)/mihomo $(1)/etc/mihomox/bin/mihomo' "$ROOT_DIR/mihomox/Makefile"
+grep -Fq '$(INSTALL_DATA) $(PKG_BUILD_DIR)/mihomo.version $(1)/etc/mihomox/bin/mihomo.version' "$ROOT_DIR/mihomox/Makefile"
+if grep -Eq 'MIHOMO_SOURCE_VERSION|GoPackage|golang-package[.]mk|golang/host' "$ROOT_DIR/mihomox/Makefile"; then
+	echo "Mihomo must be packaged from the official Alpha binary, not compiled from source" >&2
+	exit 1
+fi
 grep -q "option 'channel' 'Prerelease-Alpha'" "$ROOT_DIR/mihomox/files/mihomox.conf"
 
 echo "fetch architecture tests passed"

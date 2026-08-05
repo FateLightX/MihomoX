@@ -78,17 +78,16 @@ LuCI `network.js` 按行调用 `luci.mihomox.network_test`，rpcd 实现在
 
 ## 4. 编译期交付
 
-GitHub Actions 首先执行 `refresh_alpha_source.sh`，读取 Mihomo `Alpha` 分支最新提交，
-下载对应源码归档并计算 SHA256，再将该提交和校验值用于 `x86_64-openwrt-25.12` 构建。随后
-`mihomox/Makefile` 的准备阶段依次执行：
+GitHub Actions 使用 `x86_64-openwrt-25.12` SDK，`mihomox/Makefile` 的准备阶段依次执行：
 
-1. 下载本轮构建已固定 SHA256 的 Mihomo 源码。
+1. `fetch_mihomo.sh`：解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、gzip
+   格式和 ELF 架构。
 2. `fetch_geodata.sh`：准备 GeoSite、Country.mmdb、GeoIP.dat 和 ASN.mmdb。
 3. `fetch_zashboard.sh`：准备离线面板。
 
-源码和资源缓存在 OpenWrt `DL_DIR`。内核由 OpenWrt Go 工具链按目标架构构建；最新
-Alpha 只在构建开始时解析一次，本轮源码版本和归档 SHA256 随后保持固定。解析、下载或
-校验失败必须终止构建；未知架构由 `GO_ARCH_DEPENDS` 拒绝。
+内核和资源缓存在 OpenWrt `DL_DIR`。Mihomo 使用官方预编译二进制，不经过 OpenWrt Go
+工具链；工具链只编译 MihomoX 的 STUN C 辅助程序。解析、下载或校验失败必须终止构建，
+未知架构由 `fetch_mihomo.sh` 拒绝。
 
 ## 5. 运行时内核更新
 
