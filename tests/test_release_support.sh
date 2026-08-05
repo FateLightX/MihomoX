@@ -15,6 +15,10 @@ for workflow in build-packages.yml release-packages.yml; do
 	workflow_path="$ROOT_DIR/.github/workflows/$workflow"
 	grep -Fq -- '- openwrt-23.05' "$workflow_path"
 	grep -Fq "matrix.branch == 'openwrt-23.05' && '23.05.5' || matrix.branch" "$workflow_path"
+	grep -Fq 'resolve latest Mihomo Alpha' "$workflow_path"
+	grep -Fq 'use resolved Mihomo Alpha' "$workflow_path"
+	grep -Fq 'MIHOMO_SOURCE_VERSION:' "$workflow_path"
+	grep -Fq 'MIHOMO_SOURCE_HASH:' "$workflow_path"
 done
 
 for workflow in build-packages.yml release-packages.yml; do

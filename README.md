@@ -10,7 +10,7 @@ Mihomo 内核。
 - 通过 LuCI 管理配置文件、订阅、混入配置、访问控制、规则、编辑器、面板和日志
 - 编译时打包目标架构的 Mihomo 内核，不依赖独立的 `mihomo-meta` 或
   `mihomo-alpha` 软件包
-- 基于固定 Mihomo Alpha 源码构建官方兼容内核
+- GitHub Actions 每次构建自动解析最新 Mihomo Alpha 源码，并在同一轮构建中固定提交和校验值
 - 运行时内核更新包含可信 SHA256、原子替换及失败回滚
 - 编译时打包 GeoSite、GeoIP、ASN 数据和 Zashboard
 - 首次安装时可导入现有 Nikki 配置，但不会修改或启用 Nikki
@@ -41,8 +41,11 @@ make package/mihomox/compile V=s
 make package/luci-app-mihomox/compile V=s
 ```
 
-构建使用 `mihomox/Makefile` 固定的 Mihomo 源码版本。源码、规则数据和面板资源会缓存
-在 OpenWrt `DL_DIR`，源码或资源校验不通过时构建直接失败。
+GitHub Actions 会先执行 `mihomox/scripts/refresh_alpha_source.sh`，解析 Alpha 分支最新提交，
+下载源码归档并计算 SHA256；四个 OpenWrt 版本在同一轮构建中共享该提交和校验值，避免
+并行任务取得不同版本。直接在本地 SDK 编译时使用 `mihomox/Makefile` 中的基线版本，
+可在编译前运行该脚本刷新。源码、规则数据和面板资源会缓存在 OpenWrt `DL_DIR`，解析、
+下载或校验失败时构建直接停止。
 
 ## 使用
 

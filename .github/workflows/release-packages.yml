@@ -11,7 +11,20 @@ permissions:
   contents: read
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      source_version: ${{ steps.mihomo.outputs.source_version }}
+      source_hash: ${{ steps.mihomo.outputs.source_hash }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - id: mihomo
+        name: resolve latest Mihomo Alpha
+        run: ./mihomox/scripts/refresh_alpha_source.sh
+
   release:
+    needs: resolve
     name: x86_64-${{ matrix.branch }} release
     runs-on: ubuntu-latest
     permissions:
@@ -28,6 +41,12 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: use resolved Mihomo Alpha
+        env:
+          MIHOMO_SOURCE_VERSION: ${{ needs.resolve.outputs.source_version }}
+          MIHOMO_SOURCE_HASH: ${{ needs.resolve.outputs.source_hash }}
+        run: ./mihomox/scripts/refresh_alpha_source.sh
 
       - name: build
         uses: openwrt/gh-action-sdk@797d0e3d0eb13b355c3447f60d0179d4b43089e2 # main
