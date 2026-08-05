@@ -41,11 +41,11 @@ make package/mihomox/compile V=s
 make package/luci-app-mihomox/compile V=s
 ```
 
-GitHub Actions 会先执行 `mihomox/scripts/refresh_alpha_source.sh`，解析 Alpha 分支最新提交，
-下载源码归档并计算 SHA256；四个 OpenWrt 版本在同一轮构建中共享该提交和校验值，避免
-并行任务取得不同版本。直接在本地 SDK 编译时使用 `mihomox/Makefile` 中的基线版本，
-可在编译前运行该脚本刷新。源码、规则数据和面板资源会缓存在 OpenWrt `DL_DIR`，解析、
-下载或校验失败时构建直接停止。
+GitHub Actions 只构建 `x86_64-openwrt-25.12`。构建前会执行
+`mihomox/scripts/refresh_alpha_source.sh`，解析 Alpha 分支最新提交，下载源码归档并计算
+SHA256。直接在本地 SDK 编译时使用 `mihomox/Makefile` 中的基线版本，可在编译前运行该
+脚本刷新。源码、规则数据和面板资源会缓存在 OpenWrt `DL_DIR`，解析、下载或校验失败时
+构建直接停止。
 
 ## 使用
 

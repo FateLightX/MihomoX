@@ -79,7 +79,7 @@ LuCI `network.js` 按行调用 `luci.mihomox.network_test`，rpcd 实现在
 ## 4. 编译期交付
 
 GitHub Actions 首先执行 `refresh_alpha_source.sh`，读取 Mihomo `Alpha` 分支最新提交，
-下载对应源码归档并计算 SHA256，再把同一组提交和校验值传给所有并行构建。随后
+下载对应源码归档并计算 SHA256，再将该提交和校验值用于 `x86_64-openwrt-25.12` 构建。随后
 `mihomox/Makefile` 的准备阶段依次执行：
 
 1. 下载本轮构建已固定 SHA256 的 Mihomo 源码。
