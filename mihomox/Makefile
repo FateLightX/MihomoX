@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=14
+PKG_RELEASE:=15
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/mihomox-$(PKG_VERSION)
 PKG_BUILD_PARALLEL:=1
@@ -28,7 +28,8 @@ define Package/mihomox
   CATEGORY:=Network
   TITLE:=Transparent Proxy with Mihomo on OpenWrt.
   URL:=https://github.com/nikkinikki-org/OpenWrt-nikki
-  DEPENDS:=+ca-bundle +curl +yq +firewall4 +ip-full +jsonfilter +ucode +coreutils-nohup +kmod-inet-diag +kmod-nft-socket +kmod-nft-tproxy +kmod-tun +kmod-dummy
+  DEPENDS:=
+  EXTRA_DEPENDS:=ca-bundle (>=0), curl (>=0), yq (>=0), firewall4 (>=0), ip-full (>=0), jsonfilter (>=0), ucode (>=0), coreutils-nohup (>=0), kmod-inet-diag (>=0), kmod-nft-socket (>=0), kmod-nft-tproxy (>=0), kmod-tun (>=0), kmod-dummy (>=0)
 endef
 
 define Package/mihomox/conffiles

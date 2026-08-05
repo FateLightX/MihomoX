@@ -45,6 +45,13 @@ if grep -Eq 'MIHOMO_SOURCE_VERSION|GoPackage|golang-package[.]mk|golang/host' "$
 	echo "Mihomo must be packaged from the official Alpha binary, not compiled from source" >&2
 	exit 1
 fi
+grep -Fq 'EXTRA_DEPENDS:=ca-bundle (>=0), curl (>=0)' "$ROOT_DIR/mihomox/Makefile"
+if grep -Eq '^  DEPENDS:=[^[:space:]]' "$ROOT_DIR/mihomox/Makefile"; then
+	echo "runtime dependencies must not be SDK build dependencies" >&2
+	exit 1
+fi
+grep -Fq 'LUCI_EXTRA_DEPENDS:=luci-base (>=0), mihomox (>=0), ucode-mod-resolv (>=0)' "$ROOT_DIR/luci-app-mihomox/Makefile"
+grep -Fqx 'LUCI_DEPENDS:=' "$ROOT_DIR/luci-app-mihomox/Makefile"
 grep -q "option 'channel' 'Prerelease-Alpha'" "$ROOT_DIR/mihomox/files/mihomox.conf"
 
 echo "fetch architecture tests passed"

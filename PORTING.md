@@ -89,6 +89,9 @@ GitHub Actions 使用 `x86_64-openwrt-25.12` SDK，`mihomox/Makefile` 的准备�
 工具链；工具链只编译 MihomoX 的 STUN C 辅助程序。解析、下载或校验失败必须终止构建，
 未知架构由 `fetch_mihomo.sh` 拒绝。
 
+设备运行时依赖使用 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入包元数据，不作为当前
+Feed 的源码构建依赖；安装阶段仍由目标 OpenWrt 软件源解析这些依赖。
+
 ## 5. 运行时内核更新
 
 LuCI 和 `/etc/init.d/mihomox update_core` 最终都调用
