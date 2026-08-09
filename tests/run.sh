@@ -9,7 +9,6 @@ for file in $(find "$ROOT_DIR" -type f \( -name '*.sh' -o -name '*.init' \) | so
 done
 
 "$ROOT_DIR/tests/test_fetch_arch.sh"
-"$ROOT_DIR/tests/test_release_support.sh"
 "$ROOT_DIR/tests/test_fetch_geodata.sh"
 "$ROOT_DIR/tests/test_fetch_zashboard.sh"
 "$ROOT_DIR/tests/test_update_core.sh"

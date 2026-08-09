@@ -78,7 +78,7 @@ LuCI `network.js` 按行调用 `luci.mihomox.network_test`，rpcd 实现在
 
 ## 4. 编译期交付
 
-GitHub Actions 使用 `x86_64-openwrt-25.12` SDK，`mihomox/Makefile` 的准备阶段依次执行：
+OpenWrt SDK 构建时，`mihomox/Makefile` 的准备阶段依次执行：
 
 1. `fetch_mihomo.sh`：解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、gzip
    格式和 ELF 架构。

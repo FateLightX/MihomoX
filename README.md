@@ -41,20 +41,13 @@ make package/mihomox/compile V=s
 make package/luci-app-mihomox/compile V=s
 ```
 
-GitHub Actions 只构建 `x86_64-openwrt-25.12`。构建前会执行
-`mihomox/scripts/fetch_mihomo.sh`，解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、
-gzip 格式和 ELF 架构后直接打包；不会重新编译 Mihomo Go 源码。OpenWrt 工具链只编译
-MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源会缓存在 OpenWrt
-`DL_DIR`，解析、下载或校验失败时构建直接停止。
+构建时 `mihomox/Makefile` 会执行 `mihomox/scripts/fetch_mihomo.sh`，解析并下载官方
+最新 Alpha 二进制，验证发布资产 SHA256、gzip 格式和 ELF 架构后直接打包；不会重新
+编译 Mihomo Go 源码。OpenWrt 工具链只编译 MihomoX 自带的轻量 STUN 辅助程序。内核、
+规则数据和面板资源会缓存在 OpenWrt `DL_DIR`，解析、下载或校验失败时构建直接停止。
 
-设备运行时依赖通过 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入 APK 元数据，不加入
-Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 OpenWrt 软件源解析依赖。
-
-手动运行 `release-packages` 时不需要填写版本号。工作流先执行 `tests/run.sh`，然后从
-`mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 读取 `PKG_VERSION`、`PKG_RELEASE`，
-在两个包的 `PKG_VERSION` 一致时生成 `v<version>-<mihomox-release>-<luci-release>`
-作为 GitHub Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。
-Cloudflare 凭据未配置时仅跳过 Feed 部署，不影响 GitHub Release 成功。
+设备运行时依赖通过 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入 APK 元数据，不作为
+当前 Feed 的源码构建依赖。安装时仍由 `apk` 或 `opkg` 从对应 OpenWrt 软件源解析依赖。
 
 ## 使用
 
