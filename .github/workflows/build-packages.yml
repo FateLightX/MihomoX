@@ -1,0 +1,40 @@
+name: build-packages
+# mihomox-actions-index: force workflow registration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: test
+        run: ./tests/run.sh
+
+  build:
+    needs: check
+    name: x86_64-openwrt-25.12 build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: build
+        uses: openwrt/gh-action-sdk@797d0e3d0eb13b355c3447f60d0179d4b43089e2 # main
+        env:
+          ARCH: x86_64-openwrt-25.12
+          FEEDNAME: mihomox
+          PACKAGES: mihomox luci-app-mihomox
+          NO_REFRESH_CHECK: true
+
+      - name: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mihomox_x86_64-openwrt-25.12
+          path: bin/packages/x86_64/mihomox

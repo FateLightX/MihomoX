@@ -1,0 +1,109 @@
+name: release-packages
+# mihomox-actions-index: force workflow registration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.version.outputs.release_version }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: test
+        run: ./tests/run.sh
+      - id: version
+        name: resolve release version
+        run: |
+          mihomox_version=$(sed -n 's/^PKG_VERSION:=//p' mihomox/Makefile | head -n1)
+          mihomox_release=$(sed -n 's/^PKG_RELEASE:=//p' mihomox/Makefile | head -n1)
+          luci_version=$(sed -n 's/^PKG_VERSION:=//p' luci-app-mihomox/Makefile | head -n1)
+          luci_release=$(sed -n 's/^PKG_RELEASE:=//p' luci-app-mihomox/Makefile | head -n1)
+          [ -n "$mihomox_version" ] && [ -n "$mihomox_release" ] && [ -n "$luci_version" ] && [ -n "$luci_release" ] || exit 1
+          [ "$mihomox_version" = "$luci_version" ] || { echo "mihomox and luci-app-mihomox versions must match" >&2; exit 1; }
+          release_version="v${mihomox_version}-${mihomox_release}-${luci_release}"
+          printf '%s\n' "$release_version" | grep -Eq '^v[0-9]+[.][0-9]+[.][0-9]+([.-][0-9A-Za-z.-]+)?$'
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: validate
+    name: x86_64-openwrt-25.12 release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: build
+        uses: openwrt/gh-action-sdk@797d0e3d0eb13b355c3447f60d0179d4b43089e2 # main
+        env:
+          ARCH: x86_64-openwrt-25.12
+          FEEDNAME: mihomox
+          PACKAGES: mihomox luci-app-mihomox
+          INDEX: 1
+          KEY_BUILD: ${{ secrets.KEY_BUILD }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          NO_REFRESH_CHECK: true
+
+      - name: compress
+        run: |
+          tar -c -z -f mihomox_x86_64-openwrt-25.12.tar.gz -C bin/packages/x86_64/mihomox .
+          mkdir -p public/openwrt-25.12/x86_64
+          mv bin/packages/x86_64/mihomox public/openwrt-25.12/x86_64
+          tar -c -z -f feed_mihomox_x86_64-openwrt-25.12.tar.gz public/openwrt-25.12/x86_64
+
+      - name: release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
+        with:
+          tag_name: ${{ needs.validate.outputs.release_version }}
+          name: ${{ needs.validate.outputs.release_version }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            mihomox_x86_64-openwrt-25.12.tar.gz
+
+      - name: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: feed_mihomox_x86_64-openwrt-25.12
+          path: feed_mihomox_x86_64-openwrt-25.12.tar.gz
+
+  feed:
+    needs: release
+    name: feed
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    steps:
+      - name: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: feed_mihomox_*
+          merge-multiple: true
+
+      - name: uncompress
+        run: |
+          for file in feed_mihomox_*.tar.gz; do tar -x -z -f "$file"; done
+
+      - name: prepare
+        run: |
+          echo "${{ secrets.KEY_BUILD_PUB }}" > public/key-build.pub
+          echo "${{ secrets.PUBLIC_KEY }}" > public/public-key.pem
+          tree --dirsfirst --sort name -P '*.apk|*.ipk' --prune --noreport -H "" -T "MihomoX's Feed" --charset utf-8 -o public/index.html public
+          sed -i '/<p class="VERSION">/,/<\/p>/d' public/index.html
+
+      - name: feed
+        if: env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_API_TOKEN != ''
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy public --project-name=mihomox

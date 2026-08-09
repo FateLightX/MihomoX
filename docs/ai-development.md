@@ -3,7 +3,7 @@
 本文件是后续 AI 或开发者继续开发 MihomoX 时的主操作手册。第一次进入仓库，按下面的顺序读取：
 
 1. `AGENTS.md`：最短操作约定和提交边界。
-2. 本文件：代码结构、开发循环、版本规则和验证命令。
+2. 本文件：代码结构、开发循环、发布流程和验证命令。
 3. `PORTING.md`：长期架构边界和参考来源。
 4. `docs/upstream.md`：参考仓库同步与逐次审计记录。
 5. `README.md`：用户视角的功能和安装说明。
@@ -176,15 +176,39 @@ make package/luci-app-mihomox/compile V=s
 
 - `mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 的 `PKG_VERSION` 必须一致。
 - 每次发布对应包内容变化时，把对应包的 `PKG_RELEASE` 加一。
-- 发布 tag 建议使用 `v<PKG_VERSION>-<mihomox PKG_RELEASE>-<luci-app-mihomox PKG_RELEASE>`。
+- `release-packages` 不需要手动填版本。
+- Release tag 由工作流生成：`v<PKG_VERSION>-<mihomox PKG_RELEASE>-<luci-app-mihomox PKG_RELEASE>`。
 
-发布前必须运行 `./tests/run.sh`。
+发布前必须运行 `./tests/run.sh`。`release-packages` 的 `validate` job 已内置测试；不要绕过。
 
 ### 修改安装或 Feed 脚本
 
 `install.sh`、`feed.sh` 使用 `set -eu`，包管理器、下载或解析失败必须退出，不能继续打印 `success`。可选查询（如不存在某种语言包）必须显式容错。
 
-## 6. 运行时内核更新
+## 6. GitHub Actions
+
+### `build-packages`
+
+- 手动触发。
+- `check` 运行 `./tests/run.sh`。
+- `build` 构建 `x86_64-openwrt-25.12` 并上传产物。
+- 不生成 Release，不部署 Feed。
+
+### `release-packages`
+
+- 手动触发。
+- `validate` 运行测试并校验两个包版本。
+- `release` 构建、签名索引、压缩、上传 GitHub Release 和 artifact。
+- `feed` 在配置 Cloudflare 凭据时部署 Pages；未配置时跳过，不影响 Release。
+
+### 其他工作流
+
+- `stale-issues.yml`：自动标记和关闭无活动 issue。
+- `delete-workflow-runs.yml`：手动清理旧的 workflow run。
+
+MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版本并加注释。
+
+## 7. 运行时内核更新
 
 入口：
 
@@ -203,24 +227,25 @@ make package/luci-app-mihomox/compile V=s
 
 自定义 URL 必须为 HTTP(S)，且必须提供 64 位 SHA256。
 
-## 7. 安全与兼容约束
+## 8. 安全与兼容约束
 
 - OpenWrt 23.05 是兼容下限。
 - rpcd ucode 外部命令参数逐项引用。
 - RPC 文件写入只允许明确路径，禁止目录穿越，单文件上限 16 MiB。
 - 分块文本必须使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - 调试输出必须脱敏：secret、password、token、订阅 URL、代理服务器等。
-- 不暴露用户凭据、订阅内容或仓库 secret。
+- 不暴露用户凭据、订阅内容或 Actions secret。
 - Nikki、Momo、Clashoo 只能按 `PORTING.md` 的边界参考，不得整目录覆盖。
 
-## 8. 已知边界和后续优化
+## 9. 已知边界和后续优化
 
 当前未处理、但后续 AI 应优先阅读或评估的问题：
 
 - GeoData 的四个 SHA256 默认为空，构建不会强制校验；建议补固定哈希或 fail closed。
 - `core_api_request()` 对 HTTP/HTTPS 都传 `--insecure`；如支持 TLS 控制器，应改成按配置信任 CA。
+- `stale-issues.yml` 使用 3 天 stale、1 天关闭，策略偏激进；如 issue 量不需要快速清空，建议放宽。
 
-## 9. 提交和推送
+## 10. 提交和推送
 
 只有用户明确要求时执行：
 
