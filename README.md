@@ -50,9 +50,11 @@ MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源
 设备运行时依赖通过 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入 APK 元数据，不加入
 Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 OpenWrt 软件源解析依赖。
 
-手动运行 `release-packages` 时填写 `v1.0.0` 形式的语义版本号。工作流使用该值作为
-GitHub Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。Cloudflare
-凭据未配置时仅跳过 Feed 部署，不影响 GitHub Release 成功。
+手动运行 `release-packages` 时不需要填写版本号。工作流先执行 `tests/run.sh`，然后从
+`mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 读取 `PKG_VERSION`、`PKG_RELEASE`，
+在两个包的 `PKG_VERSION` 一致时生成 `v<version>-<mihomox-release>-<luci-release>`
+作为 GitHub Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。
+Cloudflare 凭据未配置时仅跳过 Feed 部署，不影响 GitHub Release 成功。
 
 ## 使用
 
@@ -121,6 +123,7 @@ cron 表达式自定义时间，也可以手动执行：
 
 - [移植与架构设计](PORTING.md)
 - [AI/开发者操作约定](AGENTS.md)
+- [AI 开发手册](docs/ai-development.md)
 - [参考源审计](docs/upstream.md)
 
 Nikki 是主要功能基础；Clashoo 仅作为内核交付和更新设计的次级参考；Momo 只用于

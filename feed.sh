@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -eu
+
 # MihomoX's feed
 
 # check env

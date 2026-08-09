@@ -1,7 +1,8 @@
 # MihomoX 开发约定
 
-本文件是后续 AI/开发者进入仓库后的最短操作说明。用户文档看 `README.md`，架构边界看
-`PORTING.md`，参考源审计记录看 `docs/upstream.md`。
+本文件是后续 AI/开发者进入仓库后的最短操作说明。完整 AI 开发手册看
+`docs/ai-development.md`，用户文档看 `README.md`，架构边界看 `PORTING.md`，参考源
+审计记录看 `docs/upstream.md`。
 
 ## 1. 修改前
 

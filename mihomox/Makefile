@@ -27,7 +27,7 @@ define Package/mihomox
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Transparent Proxy with Mihomo on OpenWrt.
-  URL:=https://github.com/nikkinikki-org/OpenWrt-nikki
+  URL:=https://github.com/FateLightX/MihomoX
   DEPENDS:=
   EXTRA_DEPENDS:=ca-bundle (>=0), curl (>=0), yq (>=0), firewall4 (>=0), ip-full (>=0), jsonfilter (>=0), ucode (>=0), coreutils-nohup (>=0), kmod-inet-diag (>=0), kmod-nft-socket (>=0), kmod-nft-tproxy (>=0), kmod-tun (>=0), kmod-dummy (>=0)
 endef

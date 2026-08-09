@@ -1,7 +1,7 @@
 # MihomoX 移植与架构边界
 
-本文只记录长期有效的架构、兼容和验收边界。开发操作看 `AGENTS.md`，参考仓库的版本
-和逐次结论看 `docs/upstream.md`。
+本文只记录长期有效的架构、兼容和验收边界。开发操作看 `AGENTS.md` 和
+`docs/ai-development.md`，参考仓库的版本和逐次结论看 `docs/upstream.md`。
 
 ## 1. 项目边界
 

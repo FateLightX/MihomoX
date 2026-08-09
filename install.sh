@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -eu
+
 # MihomoX's installer
 
 # check env
@@ -51,8 +53,8 @@ if [ -x "/bin/opkg" ]; then
 	wget -O "$version_file" "$feed_url/index.json"
 	# install ipks
 	echo "install ipks"
-	mihomox_version=$(jsonfilter -i "$version_file" -e "@['packages']['mihomox']")
-	luci_app_mihomox_version=$(jsonfilter -i "$version_file" -e "@['packages']['luci-app-mihomox']")
+	mihomox_version=$(jsonfilter -i "$version_file" -e "@['packages']['mihomox']") || { echo "missing package version metadata" >&2; exit 1; }
+	luci_app_mihomox_version=$(jsonfilter -i "$version_file" -e "@['packages']['luci-app-mihomox']") || { echo "missing package version metadata" >&2; exit 1; }
 	case "$mihomox_version:$luci_app_mihomox_version" in
 		*[!A-Za-z0-9._+~:-]*) echo "invalid package version metadata" >&2; exit 1 ;;
 	esac
@@ -60,7 +62,7 @@ if [ -x "/bin/opkg" ]; then
 	opkg install "$feed_url/mihomox_${mihomox_version}_${arch}.ipk"
 	opkg install "$feed_url/luci-app-mihomox_${luci_app_mihomox_version}_all.ipk"
 	for lang in $languages; do
-		lang_version=$(jsonfilter -i "$version_file" -e "@['packages']['luci-i18n-mihomox-${lang}']")
+		lang_version=$(jsonfilter -i "$version_file" -e "@['packages']['luci-i18n-mihomox-${lang}']" 2>/dev/null || true)
 		case "$lang:$lang_version" in
 			*[!A-Za-z0-9._+~:-]*) echo "invalid language package metadata" >&2; exit 1 ;;
 		esac
