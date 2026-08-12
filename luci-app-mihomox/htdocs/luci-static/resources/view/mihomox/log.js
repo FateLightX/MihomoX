@@ -6,6 +6,15 @@
 'require poll';
 'require tools.mihomox as mihomox';
 
+function validateCron(value) {
+    const fields = String(value || '').trim().split(/\s+/);
+    if (fields.length !== 5 || fields.some(function (field) {
+        return !/^[0-9*/,-]+$/.test(field);
+    }))
+        return _('Invalid cron expression');
+    return true;
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -35,6 +44,9 @@ return view.extend({
         o = s.taboption('log_config', form.Value, 'scheduled_clear_cron', _('Scheduled Clear Cron'));
         o.retain = true;
         o.rmempty = false;
+        o.validate = function (_, value) {
+            return validateCron(value);
+        };
         o.depends('scheduled_clear', '1');
 
         o = s.taboption('log_config', form.Value, 'scheduled_clear_size_limit', _('Scheduled Clear Size Limit'));

@@ -39,7 +39,9 @@ git rev-list --left-right --count HEAD...@{upstream}
   `tests/test_default_settings.sh`。
 - 新增 LuCI RPC 时同时更新前端声明、rpcd 方法和 ACL，并补测试。
 - 长耗时 RPC 禁止批处理，必须有设备端超时和浏览器端超时；页面不能永久停留在加载状态。
-- OpenWrt 23.05 是兼容下限。不要使用该版本没有的软件包或 ucode API。
+- OpenWrt 23.05 是源码/API 兼容下限。不要使用该版本没有的软件包或 ucode API。
+- 公开安装脚本、Feed 和 CI 产物只覆盖 OpenWrt 25.12 x86_64；扩展发布目标前先补
+  对应 SDK 构建和验证，不要只修改声明。
 - rpcd ucode 兼容旧实现：外部命令参数逐项引用；布尔值和数字可能以字符串传入。
 - C 辅助程序必须用 `$(TARGET_CC)` 构建，不引入设备端编译器或解释器依赖。
 - 用户可见字符串使用 `_()`，并同步 POT、简体中文、繁体中文和俄语 PO。

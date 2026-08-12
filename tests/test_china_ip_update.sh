@@ -18,6 +18,9 @@ grep -q "extra_command 'update_china_ip'" "$INIT_SCRIPT"
 grep -q 'update_china_ip #mihomox china ip update' "$INIT_SCRIPT"
 grep -q 'config_get china_ip_update_cron "proxy" "china_ip_update_cron" "0 4 \* \* 1"' "$INIT_SCRIPT"
 grep -q 'update_china_ip.sh' "$MAKEFILE"
+grep -q 'kill -0 "$lock_pid"' "$SCRIPT"
+grep -q 'Remove stale update lock.' "$SCRIPT"
+grep -q 'cmp -s "$candidate" "$target"' "$SCRIPT"
 if grep -q 'restart.*mihomo' "$SCRIPT"; then
 	echo "China IP updater must not restart Mihomo" >&2
 	exit 1

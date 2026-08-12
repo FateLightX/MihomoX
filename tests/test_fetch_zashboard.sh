@@ -51,4 +51,7 @@ if "$FETCH_SCRIPT" \
 	exit 1
 fi
 
+grep -Eq '^ZASHBOARD_URL\?=https://github[.]com/Zephyruso/zashboard/releases/download/v[0-9]+[.][0-9]+[.][0-9]+/dist[.]zip$' "$ROOT_DIR/mihomox/Makefile"
+grep -Eq '^ZASHBOARD_SHA256\?=[0-9a-f]{64}$' "$ROOT_DIR/mihomox/Makefile"
+
 echo "fetch Zashboard tests passed"

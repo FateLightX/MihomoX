@@ -188,7 +188,13 @@ return baseclass.extend({
     },
 
     updateDashboard: function () {
-        return callMihomoXAPI('POST', '/upgrade/ui');
+        return callMihomoXAPI('POST', '/upgrade/ui').then(function (result) {
+            if (!result?.success) {
+                const detail = result?.status ? `HTTP ${result.status}` : (result?.error || 'request_failed');
+                return Promise.reject(new Error(detail));
+            }
+            return result.data;
+        });
     },
 
     openDashboard: async function () {

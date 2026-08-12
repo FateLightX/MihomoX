@@ -1208,6 +1208,9 @@ msgstr ""
 msgid "Invalid cron expression"
 msgstr ""
 
+msgid "Invalid URL"
+msgstr ""
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:148
 msgid "Bind Address"
 msgstr ""
@@ -1479,6 +1482,12 @@ msgid "Test Start Failed"
 msgstr ""
 
 msgid "Invalid Test Result"
+msgstr ""
+
+msgid "Not Configured"
+msgstr ""
+
+msgid "Request Failed"
 msgstr ""
 
 msgid "Direct Test Isolation Unavailable"

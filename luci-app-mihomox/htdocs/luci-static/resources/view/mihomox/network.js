@@ -47,15 +47,19 @@ function natType(value) {
 }
 
 function errorText(result) {
-    const errors = {
+	if (result?.error === 'timeout' && result?.udp)
+		return _('UDP Timeout');
+	const errors = {
         no_ipv6: _('No IPv6 Connectivity'),
-        timeout: _('UDP Timeout'),
+        timeout: _('Test Timeout'),
         resolve_failed: _('DNS Resolution Failed'),
         missing_helper: _('NAT Helper Missing'),
         start_failed: _('Test Start Failed'),
         isolation_unavailable: _('Direct Test Isolation Unavailable'),
         mark_failed: _('Direct Test Mark Failed'),
-        invalid_result: _('Invalid Test Result')
+        invalid_result: _('Invalid Test Result'),
+        not_configured: _('Not Configured'),
+        request_failed: _('Request Failed')
     };
     return errors[result?.error] || _('Unavailable');
 }

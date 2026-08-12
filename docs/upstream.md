@@ -11,7 +11,7 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 | --- | --- | --- | --- |
 | [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `388f34e` |
 | [OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo) | `../OpenWrt-momo` | 同组织辅助参考 | `6fb94df` |
-| [openwrt-clashoo](https://github.com/kenzok8/openwrt-clashoo) | `../openwrt-clashoo` | 内核更新次级参考 | `95de5e2` |
+| [openwrt-clashoo](https://github.com/kenzok8/openwrt-clashoo) | `../openwrt-clashoo` | 内核更新次级参考 | `53f0766` |
 
 ## 同步流程
 
@@ -33,6 +33,27 @@ git -C ../openwrt-clashoo merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-08-12：Clashoo
+
+- 上游：`kenzok8/openwrt-clashoo`
+- 旧参考：`95de5e2`
+- 已审计至：`53f0766`
+- 范围：`95de5e2..53f0766`（40 个提交）
+
+审计结果：
+
+- `b2d5fb2 Make IPv6 usable in fake-ip mode`
+  - 确认 Fake-IP 开启 IPv6 时需要显式 IPv6 地址池及对应防火墙处理。
+  - 决策：只移植 MihomoX 相关的 IPv6 Fake-IP 默认值与回归测试，不复制 Clashoo 的
+    sing-box 归一化、页面或整套防火墙实现。
+- `ce1cb5b Guarantee China direct rule and skip needless firewall reload (#41)`
+  - 内容未变化时跳过 nft set 刷新适用于 MihomoX 的 China IP 更新脚本。
+  - 决策：只移植内容比较和失效锁恢复，不移植 Clashoo 的诊断工具及 China bypass 架构。
+- 其余内核版本、规则数据刷新、面板、APK 组件更新、访问探测和 LuCI 变化不在当前
+  Clashoo 参考边界，或 MihomoX 已有独立实现；无需移植。
+
+本轮仅按上述两个提交移植相关行为，不合并参考仓库提交或目录。
 
 ## 2026-08-05：Nikki
 

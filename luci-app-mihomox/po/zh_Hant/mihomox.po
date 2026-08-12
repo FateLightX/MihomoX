@@ -1215,6 +1215,9 @@ msgstr "必須填寫自訂核心 SHA256"
 msgid "Invalid cron expression"
 msgstr "Cron 表達式無效"
 
+msgid "Invalid URL"
+msgstr "URL 無效"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:148
 msgid "Bind Address"
 msgstr "綁定位址"
@@ -1487,6 +1490,12 @@ msgstr "測試啟動失敗"
 
 msgid "Invalid Test Result"
 msgstr "測試結果無效"
+
+msgid "Not Configured"
+msgstr "未設定"
+
+msgid "Request Failed"
+msgstr "請求失敗"
 
 msgid "Direct Test Isolation Unavailable"
 msgstr "直連測試隔離不可用"

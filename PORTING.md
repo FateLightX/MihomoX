@@ -10,7 +10,8 @@ MihomoX 是单 Mihomo 内核的 OpenWrt 透明代理服务：
 - 主包：`mihomox`
 - LuCI 包：`luci-app-mihomox`
 - 内核：`/etc/mihomox/bin/mihomo`
-- 支持 OpenWrt 23.05、24.10、25.12 和 SNAPSHOT
+- 源码/API 兼容 OpenWrt 23.05、24.10、25.12 和 SNAPSHOT
+- 公开安装脚本和 Feed 只支持 OpenWrt 25.12 x86_64；其他目标需自行构建验证
 - 支持 Redirect、TPROXY、TUN 及 IPv4/IPv6
 - 编译期打包内核、GeoData 和 Zashboard
 - 运行时只替换自带内核，不调用 `opkg` 或 `apk` 更新内核
@@ -82,8 +83,9 @@ GitHub Actions 使用 `x86_64-openwrt-25.12` SDK，`mihomox/Makefile` 的准备�
 
 1. `fetch_mihomo.sh`：解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、gzip
    格式和 ELF 架构。
-2. `fetch_geodata.sh`：准备 GeoSite、Country.mmdb、GeoIP.dat 和 ASN.mmdb。
-3. `fetch_zashboard.sh`：准备离线面板。
+2. `fetch_geodata.sh`：从带提交版本的 URL 准备 GeoSite、Country.mmdb、GeoIP.dat 和
+   ASN.mmdb，并强制校验 Makefile 中的 SHA256。
+3. `fetch_zashboard.sh`：从固定发布标签准备离线面板，并强制校验 SHA256。
 
 内核和资源缓存在 OpenWrt `DL_DIR`。Mihomo 使用官方预编译二进制，不经过 OpenWrt Go
 工具链；工具链只编译 MihomoX 的 STUN C 辅助程序。解析、下载或校验失败必须终止构建，
@@ -128,10 +130,14 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 
 ## 7. 兼容与安全约束
 
-- OpenWrt 23.05 是 API 和依赖兼容下限。
+- OpenWrt 23.05 是源码/API 兼容下限。
+- 公开产物只覆盖 OpenWrt 25.12 x86_64；扩展发布范围前需补对应 SDK 构建与验证。
 - rpcd ucode 外部命令参数必须引用；兼容字符串形式的布尔值和数字。
 - RPC 文件写入只允许明确路径，禁止目录穿越，单文件上限 16 MiB。
 - 长任务必须有限时、错误状态和 UI 恢复路径，不能无限占用 ubus。
+- reload/stop 只删除 MihomoX 实际安装的路由规则和路由，不 flush 可能共享的路由表。
+- HTTPS Core API 默认校验证书；仅在最终配置明确提供本地证书和私钥时兼容自签证书。
+- 订阅文件和对应 UCI 元数据必须在完整校验成功后一起切换，失败时保留上一份有效状态。
 - 网络测试只能访问代码内固定目标，不接受用户传入 URL、命令或 STUN 地址。
 - 分块文本使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - ACL 只开放页面实际需要的方法和文件范围。

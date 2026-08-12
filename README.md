@@ -14,14 +14,18 @@ Mihomo 内核。
 - 运行时内核更新包含可信 SHA256、原子替换及失败回滚
 - 编译时打包 GeoSite、GeoIP、ASN 数据和 Zashboard
 - 首次安装时可导入现有 Nikki 配置，但不会修改或启用 Nikki
+- 首次启动为 API 和本地代理认证生成随机凭据，不携带固定默认密码
+- 订阅更新、路由清理和 China IP 更新均保留失败前的有效运行状态
 
 ## 系统要求
 
-- OpenWrt 23.05、24.10、25.12 或 SNAPSHOT
+- 使用公开安装脚本或 Feed：OpenWrt 25.12、`x86_64`
 - `firewall4`
-- OpenWrt Go 工具链支持的目标架构
+- 从源码构建：源码/API 兼容下限为 OpenWrt 23.05，支持其 Go 工具链覆盖的目标架构；
+  非公开产物目标需自行构建验证
 
-OpenWrt 23.05 软件源使用该系列最后一个正式版 SDK 23.05.5 构建。
+公开安装脚本和 Feed 会在下载前拒绝非 OpenWrt 25.12 或非 `x86_64` 设备，避免请求
+当前发布链未生成的路径。
 
 ## 安装
 
@@ -29,7 +33,7 @@ OpenWrt 23.05 软件源使用该系列最后一个正式版 SDK 23.05.5 构建�
 wget -qO- https://raw.githubusercontent.com/FateLightX/MihomoX/main/install.sh | sh
 ```
 
-安装脚本同时支持使用 `opkg` 和 `apk` 的 OpenWrt。
+安装脚本同时支持使用 `opkg` 和 `apk` 的 OpenWrt 25.12 x86_64 设备。
 
 ## 编译
 
@@ -45,7 +49,9 @@ GitHub Actions 只构建 `x86_64-openwrt-25.12`。构建前会执行
 `mihomox/scripts/fetch_mihomo.sh`，解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、
 gzip 格式和 ELF 架构后直接打包；不会重新编译 Mihomo Go 源码。OpenWrt 工具链只编译
 MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源会缓存在 OpenWrt
-`DL_DIR`，解析、下载或校验失败时构建直接停止。
+`DL_DIR`。GeoData 使用带提交版本的原始文件 URL，Zashboard 固定发布标签；两者均使用
+Makefile 中的固定 SHA256，解析、下载或校验失败时构建直接停止。更新资源时必须同时
+更新 URL 和摘要。
 
 设备运行时依赖通过 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入 APK 元数据，不加入
 Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 OpenWrt 软件源解析依赖。
@@ -76,7 +82,10 @@ LuCI 页面位于 `服务 → MihomoX`：
 ```
 
 自定义内核地址必须同时填写 64 位 SHA256。运行时更新不会通过 `opkg` 或 `apk` 安装、
-删除或升级软件包。
+删除或升级软件包；服务重启失败或更新进程被信号中断时会返回失败并记录对应状态。
+
+订阅只有在下载内容通过 YAML 校验并成功替换文件后，才会更新配额、更新时间和成功状态；
+下载、校验或替换失败时保留上一份订阅文件及元数据。
 
 ### 中国大陆 IP 绕过列表更新
 
@@ -100,7 +109,8 @@ cron 表达式自定义时间，也可以手动执行：
 ```
 
 更新只替换运行中的 nftables `china_ip` / `china_ip6` 集合，不重载完整 Mihomo 配置，
-不会触发订阅更新或节点测速。单个地址列表更新失败时保留对应的旧列表。
+不会触发订阅更新或节点测速。内容未变化时跳过 nftables 更新；失效的更新锁会自动恢复。
+单个地址列表更新失败时保留对应的旧列表。
 
 ## 迁移与保留
 
@@ -116,8 +126,8 @@ cron 表达式自定义时间，也可以手动执行：
 ./tests/run.sh
 ```
 
-测试覆盖 Shell 语法、架构映射、资源下载、内核更新、LuCI 请求流程、文件编辑、上传、
-网络检测/STUN 以及 RPC/ACL 安全检查。
+测试覆盖 Shell 语法、架构映射、资源摘要、内核更新及重启失败、订阅原子更新、运行路由
+清理、China IP 锁恢复、LuCI 请求流程、文件编辑、网络检测/STUN 以及 RPC/ACL 安全检查。
 
 ## 设计与上游审计
 

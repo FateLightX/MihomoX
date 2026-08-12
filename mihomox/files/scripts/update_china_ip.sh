@@ -12,20 +12,33 @@ CHINA_IP_JSDELIVR_URL="https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip
 CHINA_IP6_JSDELIVR_URL="https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-ip@ip-lists/china6.txt"
 
 LOCK_DIR="$TEMP_DIR/china-ip-update.lock"
+LOCK_HELD=0
 
 log_update() {
 	log "ChinaIP" "$1"
 }
 
 cleanup_update() {
-	rm -rf "$LOCK_DIR" "$TEMP_DIR/china-ip-"*.tmp "$TEMP_DIR/china-ip-"*.raw "$TEMP_DIR/china-ip-"*.valid "$TEMP_DIR/china-ip-"*.list "$TEMP_DIR/china-ip-"*.nft "$TEMP_DIR/china-ip-"*.apply
+	[ "$LOCK_HELD" -eq 1 ] && rm -rf "$LOCK_DIR"
+	rm -f "$TEMP_DIR/china-ip-"*.tmp "$TEMP_DIR/china-ip-"*.raw "$TEMP_DIR/china-ip-"*.valid "$TEMP_DIR/china-ip-"*.list "$TEMP_DIR/china-ip-"*.nft "$TEMP_DIR/china-ip-"*.apply
 }
 
 prepare_files
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-	log_update "Update already running."
-	exit 0
+	lock_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+	if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+		log_update "Update already running."
+		exit 0
+	fi
+	log_update "Remove stale update lock."
+	rm -rf "$LOCK_DIR"
+	mkdir "$LOCK_DIR" 2>/dev/null || {
+		log_update "Unable to acquire update lock."
+		exit 1
+	}
 fi
+LOCK_HELD=1
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
 trap cleanup_update EXIT INT TERM
 
 download_list() {
@@ -138,6 +151,10 @@ update_family() {
 		return 1
 	fi
 	write_nft_file "$set_name" "$list" "$candidate"
+	if cmp -s "$candidate" "$target"; then
+		log_update "$family list unchanged ($(wc -l < "$list") CIDRs)."
+		return 0
+	fi
 
 	if nft list set inet mihomox "$set_name" >/dev/null 2>&1; then
 		write_apply_file "$set_name" "$list" "$apply"

@@ -4,6 +4,11 @@
 'require uci';
 'require tools.mihomox as mihomox';
 
+function validateURL(value) {
+    value = String(value || '').trim();
+    return !value || /^https?:\/\/[^\s]+$/.test(value) ? true : _('Invalid URL');
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -78,10 +83,16 @@ return view.extend({
 
         o = s.option(form.Value, 'info_url', _('Subscription Info Url'));
         o.modalonly = true;
+        o.validate = function (_, value) {
+            return validateURL(value);
+        };
 
         o = s.option(form.Value, 'url', _('Subscription Url'));
         o.modalonly = true;
         o.rmempty = false;
+        o.validate = function (_, value) {
+            return validateURL(value);
+        };
 
         o = s.option(form.Value, 'user_agent', _('User Agent'));
         o.default = 'clash';

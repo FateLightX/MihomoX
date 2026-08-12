@@ -82,6 +82,24 @@ run_update Prerelease-Alpha "file://$TEST_DIR/new-mihomo.gz" "$NEW_CORE_SHA256"
 grep -q '^channel=Prerelease-Alpha$' "$TEST_DIR/core/mihomo.version"
 grep -q '^state=success$' "$TEST_DIR/run/core-update.status"
 
+cat > "$TEST_DIR/init" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+chmod 0755 "$TEST_DIR/init"
+touch "$TEST_DIR/run/started.flag"
+if run_update release "file://$TEST_DIR/new-mihomo.gz" "$NEW_CORE_SHA256"; then
+	echo "restart failure unexpectedly succeeded" >&2
+	exit 1
+fi
+grep -q '^state=restart_failed$' "$TEST_DIR/run/core-update.status"
+grep -q '^message=内核已更新，但 MihomoX 重启失败$' "$TEST_DIR/run/core-update.status"
+rm -f "$TEST_DIR/run/started.flag" "$TEST_DIR/init"
+
+grep -q '^interrupted() {' "$UPDATE_SCRIPT"
+grep -q 'write_status "failed" "内核更新已中断"' "$UPDATE_SCRIPT"
+grep -q 'trap interrupted HUP INT TERM' "$UPDATE_SCRIPT"
+
 write_core "$TEST_DIR/core/mihomo" "v1.0.0"
 printf 'version=v1.0.0\narchitecture=linux-amd64-v1\n' > "$TEST_DIR/core/mihomo.version"
 cat > "$TEST_DIR/bin/mv" <<EOF

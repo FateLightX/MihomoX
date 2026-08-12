@@ -37,7 +37,8 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 
 - 主包：`mihomox`
 - LuCI 包：`luci-app-mihomox`
-- 支持 OpenWrt 23.05、24.10、25.12 和 SNAPSHOT
+- 源码/API 兼容 OpenWrt 23.05、24.10、25.12 和 SNAPSHOT
+- 公开安装脚本和 Feed 只支持 OpenWrt 25.12 x86_64；其他目标需自行构建验证
 - 支持 Redirect、TPROXY、TUN，以及 IPv4/IPv6
 - 编译期下载官方 Mihomo Alpha 二进制，验证 SHA256、gzip 和 ELF 架构后打包
 - 编译期同时准备 GeoSite、GeoIP、ASN 数据和 Zashboard
@@ -168,7 +169,9 @@ make package/luci-app-mihomox/compile V=s
 - 对应 `mihomox/scripts/fetch_*.sh`
 - `tests/test_fetch_*.sh`
 
-内核必须做 SHA256、gzip 和 ELF 架构校验。规则数据建议提供固定 SHA256；不得把“无校验下载”作为默认发布状态。
+内核必须做 SHA256、gzip 和 ELF 架构校验。GeoData 默认 URL 固定到上游提交，Zashboard
+默认 URL 固定到发布标签，两者的 SHA256 与 URL 一起维护；不得把“无校验下载”作为
+默认发布状态。
 
 ### 修改版本和发布
 
@@ -222,14 +225,16 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 3. 下载并校验 SHA256、压缩格式、ELF 架构和可执行版本。
 4. 原子替换内核和元数据，先备份。
 5. 新内核失败时回滚。
-6. 只在更新前运行时重启。
-7. 写状态文件并清理临时文件和锁。
+6. 只在更新前运行时重启；重启失败返回非零并写 `restart_failed`。
+7. HUP、INT、TERM 中断写失败状态，避免状态永久停在 `running`。
+8. 写状态文件并清理临时文件和锁。
 
 自定义 URL 必须为 HTTP(S)，且必须提供 64 位 SHA256。
 
 ## 8. 安全与兼容约束
 
-- OpenWrt 23.05 是兼容下限。
+- OpenWrt 23.05 是源码/API 兼容下限。
+- 公开产物只覆盖 OpenWrt 25.12 x86_64；新增发布目标必须先进入 CI 构建和发布路径。
 - rpcd ucode 外部命令参数逐项引用。
 - RPC 文件写入只允许明确路径，禁止目录穿越，单文件上限 16 MiB。
 - 分块文本必须使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
@@ -239,11 +244,17 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 
 ## 9. 已知边界和后续优化
 
-当前未处理、但后续 AI 应优先阅读或评估的问题：
+当前边界：
 
-- GeoData 的四个 SHA256 默认为空，构建不会强制校验；建议补固定哈希或 fail closed。
-- `core_api_request()` 对 HTTP/HTTPS 都传 `--insecure`；如支持 TLS 控制器，应改成按配置信任 CA。
-- `stale-issues.yml` 使用 3 天 stale、1 天关闭，策略偏激进；如 issue 量不需要快速清空，建议放宽。
+- 本地回归测试不替代 OpenWrt SDK 交叉编译和真机 rpcd/LuCI/网络验证。
+- 公开发布矩阵目前只有 OpenWrt 25.12 x86_64；不要仅修改安装声明来扩展目标。
+- GeoData 和 Zashboard 固定 URL 与 SHA256，更新上游资源时必须成对更新并运行下载测试。
+- 运行路由参数保存在 `/var/run/mihomox/routing.state`；reload/stop 必须用旧运行参数精确
+  删除 MihomoX 创建的规则和路由，禁止恢复为整表 flush。
+- Core API HTTPS 默认校验证书；只有最终配置明确提供本地证书和私钥时才允许自签场景。
+- 网络代理探测从最终 profile 按 `mixed-port`、`port`、`socks-port` 顺序选择端口，并同时
+  使用最终 profile 的认证信息。
+
 
 ## 10. 提交和推送
 

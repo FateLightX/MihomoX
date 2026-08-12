@@ -176,6 +176,8 @@ async function testLogView() {
     await logView.load();
     logView.render([null, 'app', 'core']);
     assert.strictEqual(polls.length, 2);
+    assert.strictEqual(rendered.scheduled_clear_cron.validate(null, '0 3 * * *'), true);
+    assert.strictEqual(rendered.scheduled_clear_cron.validate(null, '* * * * *;reboot'), 'Invalid cron expression');
 
     await assert.rejects(
         rendered._generate_download_debug_log.onclick(),

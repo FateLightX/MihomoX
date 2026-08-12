@@ -537,6 +537,25 @@ service_started() {
 		# check hijack
 		if nft list tables | grep -q mihomox; then
 			log "Proxy" "Hijack successful."
+			# Persist the parameters actually installed so reload removes the old state.
+			local routing_state_tmp; routing_state_tmp="$ROUTING_STATE_PATH.$$"
+			{
+				printf 'tproxy_enable=%s\n' "$tproxy_enable"
+				printf 'tun_enable=%s\n' "$tun_enable"
+				printf 'ipv4_proxy=%s\n' "$ipv4_proxy"
+				printf 'ipv6_proxy=%s\n' "$ipv6_proxy"
+				printf 'tproxy_fw_mark=%s\n' "$tproxy_fw_mark"
+				printf 'tproxy_fw_mask=%s\n' "$tproxy_fw_mask"
+				printf 'tun_fw_mark=%s\n' "$tun_fw_mark"
+				printf 'tun_fw_mask=%s\n' "$tun_fw_mask"
+				printf 'tproxy_rule_pref=%s\n' "$tproxy_rule_pref"
+				printf 'tun_rule_pref=%s\n' "$tun_rule_pref"
+				printf 'tproxy_route_table=%s\n' "$tproxy_route_table"
+				printf 'tun_route_table=%s\n' "$tun_route_table"
+				printf 'tun_device=%s\n' "$tun_device"
+				printf 'fake_ip6_range=%s\n' "$fake_ip6_range"
+				printf 'dummy_device=%s\n' "$dummy_device"
+			} > "$routing_state_tmp" && mv -f "$routing_state_tmp" "$ROUTING_STATE_PATH"
 		else
 			log "Proxy" "Hijack failed."
 			log "App" "Exit."
@@ -566,29 +585,79 @@ cleanup() {
 	## log config
 	local log_clear_at_stop
 	config_get_bool log_clear_at_stop "log" "clear_at_stop" 0
-	## routing config
-	local tproxy_route_table tun_route_table dummy_device
+	## routing config, overridden by the last successfully installed runtime state
+	local tproxy_enable tun_enable ipv4_proxy ipv6_proxy tproxy_fw_mark tproxy_fw_mask tun_fw_mark tun_fw_mask tproxy_rule_pref tun_rule_pref tproxy_route_table tun_route_table tun_device fake_ip6_range dummy_device
+	tproxy_enable=0; tun_enable=0; ipv4_proxy=0; ipv6_proxy=0
+	config_get tproxy_fw_mark "routing" "tproxy_fw_mark" "0x80"
+	config_get tproxy_fw_mask "routing" "tproxy_fw_mask" "0xFF"
+	config_get tun_fw_mark "routing" "tun_fw_mark" "0x81"
+	config_get tun_fw_mask "routing" "tun_fw_mask" "0xFF"
+	config_get tproxy_rule_pref "routing" "tproxy_rule_pref" "1024"
+	config_get tun_rule_pref "routing" "tun_rule_pref" "1025"
 	config_get tproxy_route_table "routing" "tproxy_route_table" "80"
 	config_get tun_route_table "routing" "tun_route_table" "81"
 	config_get dummy_device "routing" "dummy_device" "mihomox-dummy"
+	if [ -r "$ROUTING_STATE_PATH" ]; then
+		while IFS='=' read -r state_key state_value; do
+			case "$state_key" in
+				tproxy_enable) tproxy_enable="$state_value" ;;
+				tun_enable) tun_enable="$state_value" ;;
+				ipv4_proxy) ipv4_proxy="$state_value" ;;
+				ipv6_proxy) ipv6_proxy="$state_value" ;;
+				tproxy_fw_mark) tproxy_fw_mark="$state_value" ;;
+				tproxy_fw_mask) tproxy_fw_mask="$state_value" ;;
+				tun_fw_mark) tun_fw_mark="$state_value" ;;
+				tun_fw_mask) tun_fw_mask="$state_value" ;;
+				tproxy_rule_pref) tproxy_rule_pref="$state_value" ;;
+				tun_rule_pref) tun_rule_pref="$state_value" ;;
+				tproxy_route_table) tproxy_route_table="$state_value" ;;
+				tun_route_table) tun_route_table="$state_value" ;;
+				tun_device) tun_device="$state_value" ;;
+				fake_ip6_range) fake_ip6_range="$state_value" ;;
+				dummy_device) dummy_device="$state_value" ;;
+			esac
+		done < "$ROUTING_STATE_PATH"
+	elif [ -f "$STARTED_FLAG_PATH" ]; then
+		local tcp_mode udp_mode
+		config_get tcp_mode "proxy" "tcp_mode"
+		config_get udp_mode "proxy" "udp_mode"
+		config_get_bool ipv4_proxy "proxy" "ipv4_proxy" 0
+		config_get_bool ipv6_proxy "proxy" "ipv6_proxy" 0
+		if [ "$tcp_mode" = "tproxy" ] || [ "$udp_mode" = "tproxy" ]; then tproxy_enable=1; fi
+		if [ "$tcp_mode" = "tun" ] || [ "$udp_mode" = "tun" ]; then tun_enable=1; fi
+	fi
 	# clear logs if needed
 	if [  "$log_clear_at_stop" = 1 ]; then
 		echo -n > "$APP_LOG_PATH"
 		echo -n > "$CORE_LOG_PATH"
 		log "Log" "Logs are cleared due to clear at stop is enabled."
 	fi
-	# delete routing policy
-	ip -4 rule del table "$tproxy_route_table" > /dev/null 2>&1
-	ip -4 rule del table "$tun_route_table" > /dev/null 2>&1
-	ip -6 rule del table "$tproxy_route_table" > /dev/null 2>&1
-	ip -6 rule del table "$tun_route_table" > /dev/null 2>&1
-	# delete routing table
-	ip -4 route flush table "$tproxy_route_table" > /dev/null 2>&1
-	ip -4 route flush table "$tun_route_table" > /dev/null 2>&1
-	ip -6 route flush table "$tproxy_route_table" > /dev/null 2>&1
-	ip -6 route flush table "$tun_route_table" > /dev/null 2>&1
-	# delete dummy device
-	ip -6 link del "$dummy_device" > /dev/null 2>&1
+	# delete only the policy rules and routes installed by MihomoX
+	if [ "$tproxy_enable" = 1 ]; then
+		if [ "$ipv4_proxy" = 1 ]; then
+			ip -4 rule del pref "$tproxy_rule_pref" fwmark "$tproxy_fw_mark/$tproxy_fw_mask" table "$tproxy_route_table" > /dev/null 2>&1
+			ip -4 route del local default dev lo table "$tproxy_route_table" > /dev/null 2>&1
+		fi
+		if [ "$ipv6_proxy" = 1 ]; then
+			ip -6 rule del pref "$tproxy_rule_pref" fwmark "$tproxy_fw_mark/$tproxy_fw_mask" table "$tproxy_route_table" > /dev/null 2>&1
+			ip -6 route del local default dev lo table "$tproxy_route_table" > /dev/null 2>&1
+		fi
+	fi
+	if [ "$tun_enable" = 1 ]; then
+		if [ "$ipv4_proxy" = 1 ]; then
+			ip -4 rule del pref "$tun_rule_pref" fwmark "$tun_fw_mark/$tun_fw_mask" table "$tun_route_table" > /dev/null 2>&1
+			ip -4 route del unicast default dev "$tun_device" table "$tun_route_table" > /dev/null 2>&1
+		fi
+		if [ "$ipv6_proxy" = 1 ]; then
+			ip -6 rule del pref "$tun_rule_pref" fwmark "$tun_fw_mark/$tun_fw_mask" table "$tun_route_table" > /dev/null 2>&1
+			ip -6 route del unicast default dev "$tun_device" table "$tun_route_table" > /dev/null 2>&1
+		fi
+	fi
+	if [ -n "$fake_ip6_range" ]; then
+		ip -6 route del "$fake_ip6_range" dev "$dummy_device" > /dev/null 2>&1
+		ip link del "$dummy_device" type dummy > /dev/null 2>&1
+	fi
+	rm -f "$ROUTING_STATE_PATH"
 	# delete hijack
 	nft delete table inet mihomox > /dev/null 2>&1
 	local handles handle
@@ -695,15 +764,6 @@ update_subscription() {
 			return 1
 			;;
 	esac
-	# reset subscription info
-	uci_remove "mihomox" "$subscription_section" "expire" > /dev/null 2>&1
-	uci_remove "mihomox" "$subscription_section" "upload" > /dev/null 2>&1
-	uci_remove "mihomox" "$subscription_section" "download" > /dev/null 2>&1
-	uci_remove "mihomox" "$subscription_section" "total" > /dev/null 2>&1
-	uci_remove "mihomox" "$subscription_section" "used" > /dev/null 2>&1
-	uci_remove "mihomox" "$subscription_section" "avaliable" > /dev/null 2>&1
-	uci_remove "mihomox" "$subscription_section" "update" > /dev/null 2>&1
-	uci_remove "mihomox" "$subscription_section" "success" > /dev/null 2>&1
 	# update subscription
 	log "Profile" "Update subscription: $subscription_name."
 	local success
@@ -742,6 +802,13 @@ update_subscription() {
 	# check if success
 	if [ "$success" = 1 ]; then
 		log "Profile" "Subscription update successful."
+		# Replace metadata only after the new subscription has been validated.
+		uci_remove "mihomox" "$subscription_section" "expire" > /dev/null 2>&1
+		uci_remove "mihomox" "$subscription_section" "upload" > /dev/null 2>&1
+		uci_remove "mihomox" "$subscription_section" "download" > /dev/null 2>&1
+		uci_remove "mihomox" "$subscription_section" "total" > /dev/null 2>&1
+		uci_remove "mihomox" "$subscription_section" "used" > /dev/null 2>&1
+		uci_remove "mihomox" "$subscription_section" "avaliable" > /dev/null 2>&1
 		if [ -f "$subscription_info_file" ]; then
 			local subscription_expire subscription_upload subscription_download subscription_total subscription_used subscription_avaliable
 			subscription_expire=$(grep -i "subscription-userinfo: " "$subscription_info_file" | grep -i -o -E "expire=[[:digit:]]+" | cut -d '=' -f 2)
@@ -774,20 +841,23 @@ update_subscription() {
 				uci_set "mihomox" "$subscription_section" "avaliable" "$(format_filesize "$subscription_avaliable")"
 			fi
 		fi
-		uci_set "mihomox" "$subscription_section" "update" "$(date "+%Y-%m-%d %H:%M:%S")"
-		uci_set "mihomox" "$subscription_section" "success" "1"
 		# update subscription file
 		rm -f "$subscription_info_header_tmpfile"
 		rm -f "$subscription_header_tmpfile"
-		mv -f "$subscription_tmpfile" "$subscription_file"
+		if ! mv -f "$subscription_tmpfile" "$subscription_file"; then
+			log "Profile" "Subscription file update failed."
+			uci revert "mihomox.$subscription_section" > /dev/null 2>&1
+			return 1
+		fi
+		uci_set "mihomox" "$subscription_section" "update" "$(date "+%Y-%m-%d %H:%M:%S")"
+		uci_set "mihomox" "$subscription_section" "success" "1"
 	elif [ "$success" = 0 ]; then
 		log "Profile" "Subscription update failed."
-		# update subscription info
-		uci_set "mihomox" "$subscription_section" "success" "0"
 		# remove tmpfile
 		rm -f "$subscription_info_header_tmpfile"
 		rm -f "$subscription_header_tmpfile"
 		rm -f "$subscription_tmpfile"
 	fi
-	uci_commit "mihomox"
+	uci_commit "mihomox" || return 1
+	[ "$success" = 1 ]
 }

@@ -18,6 +18,7 @@ DOWNLOAD_BASE="${MIHOMO_DOWNLOAD_BASE:-https://github.com/MetaCubeX/mihomo/relea
 CHECKSUM_BASE="https://github.com/MetaCubeX/mihomo/releases/download"
 TMP_DIR=""
 LOCK_HELD=0
+STATUS_STARTED=0
 LATEST_VERSION=""
 SELECTED_ARCH=""
 RELEASE_TAG=""
@@ -61,7 +62,12 @@ cleanup() {
 }
 
 trap cleanup EXIT
-trap 'exit 1' HUP INT TERM
+interrupted() {
+	log_line "更新被信号中断"
+	[ "$STATUS_STARTED" -eq 1 ] && write_status "failed" "内核更新已中断"
+	exit 1
+}
+trap interrupted HUP INT TERM
 
 has_cpu_flag() {
 	case " $CPU_FLAGS " in
@@ -323,6 +329,7 @@ rm -f "$PENDING_FILE"
 
 TMP_DIR=$(mktemp -d /tmp/mihomox-core.XXXXXX) || fail "无法创建临时目录"
 write_status "running" "正在检查最新版本"
+STATUS_STARTED=1
 log_line "开始更新 Mihomo 内核"
 
 CHANNEL="${MIHOMOX_CHANNEL:-$(uci -q get mihomox.core.channel 2>/dev/null)}"
@@ -454,13 +461,18 @@ if ! mv -f "$CORE_TMP" "$CORE_PATH" || ! mv -f "$VERSION_TMP" "$VERSION_FILE" ||
 	fail "内核替换失败，已回滚"
 fi
 
+if [ "$was_running" -eq 1 ] && [ -x "$INIT_SCRIPT" ]; then
+	log_line "重启 MihomoX 使新内核生效"
+	if ! "$INIT_SCRIPT" restart >/dev/null 2>&1; then
+		log_line "MihomoX 重启失败，请手动检查服务"
+		write_status "restart_failed" "内核已更新，但 MihomoX 重启失败" "$NEW_VERSION" "$SELECTED_ARCH"
+		rm -f "$BACKUP_BIN" "$BACKUP_VERSION"
+		exit 1
+	fi
+fi
+
 rm -f "$BACKUP_BIN" "$BACKUP_VERSION"
 log_line "内核更新完成：$NEW_VERSION ($SELECTED_ARCH)"
 write_status "success" "内核更新完成" "$NEW_VERSION" "$SELECTED_ARCH"
-
-if [ "$was_running" -eq 1 ] && [ -x "$INIT_SCRIPT" ]; then
-	log_line "重启 MihomoX 使新内核生效"
-	"$INIT_SCRIPT" restart >/dev/null 2>&1 || log_line "MihomoX 重启失败，请手动检查服务"
-fi
 
 exit 0

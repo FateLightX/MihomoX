@@ -55,6 +55,11 @@ assert.ok(rpcSource.includes("curl_probe('https://ifconfig.co/country', 4, proxy
 assert.ok(rpcSource.includes("ipv6_probe([ 'https://v6.ipgg.cn' ])"), 'domestic IPv6 must use ipgg');
 assert.ok(rpcSource.includes("const proxy = local_proxy()"), 'overseas probes must use the local Mihomo proxy');
 assert.ok(rpcSource.indexOf('function local_proxy()') < rpcSource.indexOf('function overseas_ipv4_probe()'), 'local proxy helper must be declared before use for ucode compatibility');
+assert.ok(rpcSource.includes("port = int(profile?.['port'])"), 'local proxy must fall back from mixed-port to the final HTTP port');
+assert.ok(rpcSource.includes("port = int(profile?.['socks-port'])"), 'local proxy must fall back from HTTP to the final SOCKS port');
+assert.ok(rpcSource.includes("scheme = 'socks5h'"), 'SOCKS fallback must use a SOCKS proxy URL');
+assert.ok(rpcSource.includes('const authentications = profile?.authentication'), 'local proxy authentication must come from the final profile');
+assert.ok(!/function local_proxy\(\)[\s\S]*?uci\.foreach\('mihomox', 'authentication'/.test(rpcSource), 'local proxy must not mix final profile ports with UCI authentication');
 assert.ok(rpcSource.includes('!!valid_address && !!valid_country'), 'overseas IPv4 must validate the returned IP and country');
 assert.ok(rpcSource.includes("'--doh-url', 'https://dns.alidns.com/dns-query'"), 'IPv6 probes must bypass fake-IP DNS');
 assert.ok(rpcSource.includes("resolve_public_ipv4('stun.cloudflare.com')"), 'STUN must bypass fake-IP DNS');
@@ -62,6 +67,10 @@ assert.ok(rpcSource.includes("network_test_fw_mark"), 'STUN must bypass transpar
 assert.ok(rpcSource.includes('direct_network_command(args)'), 'direct probes must use the MihomoX bypass cgroup');
 assert.ok(rpcSource.includes("push(args, '--noproxy', '*')"), 'IP protocol probes must bypass environment proxies');
 assert.ok(source.includes("no_ipv6: _('No IPv6 Connectivity')"), 'network errors must be visible');
+assert.ok(source.includes("timeout: _('Test Timeout')"), 'browser watchdogs must use a generic timeout message');
+assert.ok(source.includes("result?.error === 'timeout' && result?.udp"), 'NAT/STUN timeouts must retain the UDP-specific message');
+assert.ok(source.includes("not_configured: _('Not Configured')"), 'missing local proxy configuration must be visible');
+assert.ok(source.includes("request_failed: _('Request Failed')"), 'HTTP probe failures must be visible');
 assert.ok(source.includes('mihomox-network-progress'), 'network page must expose overall progress');
 assert.ok(source.includes('var(--success-color'), 'network status colors must use semantic theme variables');
 assert.ok(source.includes('color-mix(in srgb,currentColor'), 'network outlines must inherit the active theme color');

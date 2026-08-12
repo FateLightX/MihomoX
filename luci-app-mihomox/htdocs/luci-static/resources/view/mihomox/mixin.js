@@ -8,6 +8,11 @@
 'require tools.widgets as widgets';
 'require tools.mihomox as mihomox';
 
+function validateURL(value) {
+    value = String(value || '').trim();
+    return !value || /^https?:\/\/[^\s]+$/.test(value) ? true : _('Invalid URL');
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -98,12 +103,16 @@ return view.extend({
 
         o = s.taboption('external_control', form.Value, 'ui_path', _('UI Path'));
         o.placeholder = _('Unmodified');
+        o.datatype = 'directory';
 
         o = s.taboption('external_control', form.Value, 'ui_name', _('UI Name'));
         o.placeholder = _('Unmodified');
 
         o = s.taboption('external_control', form.Value, 'ui_url', _('UI Url'));
         o.placeholder = _('Unmodified');
+        o.validate = function (_, value) {
+            return validateURL(value);
+        };
         o.value('https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip', 'Zashboard (CDN Fonts)');
         o.value('https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip', 'Zashboard');
         o.value('https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip', 'MetaCubeXD');
@@ -120,12 +129,15 @@ return view.extend({
 
         o = s.taboption('external_control', form.Value, 'api_tls_cert', _('API TLS Cert'));
         o.placeholder = _('Unmodified');
+        o.datatype = 'file';
 
         o = s.taboption('external_control', form.Value, 'api_tls_key', _('API TLS Key'));
         o.placeholder = _('Unmodified');
+        o.datatype = 'file';
 
         o = s.taboption('external_control', form.Value, 'api_tls_ech_key', _('API TLS ECH Key'));
         o.placeholder = _('Unmodified');
+        o.datatype = 'file';
 
         o = s.taboption('external_control', form.Value, 'api_secret', _('API Secret'));
         o.password = true;
@@ -539,6 +551,9 @@ return view.extend({
         so = o.subsection.option(form.Value, 'url', _('Url'));
         so.modalonly = true;
         so.rmempty = false;
+        so.validate = function (_, value) {
+            return validateURL(value);
+        };
         so.depends('type', 'http');
 
         so = o.subsection.option(form.Value, 'node', _('Node'));
@@ -660,15 +675,27 @@ return view.extend({
 
         o = s.taboption('geox', form.Value, 'geosite_url', _('GeoSite Url'));
         o.placeholder = _('Unmodified');
+        o.validate = function (_, value) {
+            return validateURL(value);
+        };
 
         o = s.taboption('geox', form.Value, 'geoip_mmdb_url', _('GeoIP(MMDB) Url'));
         o.placeholder = _('Unmodified');
+        o.validate = function (_, value) {
+            return validateURL(value);
+        };
 
         o = s.taboption('geox', form.Value, 'geoip_dat_url', _('GeoIP(DAT) Url'));
         o.placeholder = _('Unmodified');
+        o.validate = function (_, value) {
+            return validateURL(value);
+        };
 
         o = s.taboption('geox', form.Value, 'geoip_asn_url', _('GeoIP(ASN) Url'));
         o.placeholder = _('Unmodified');
+        o.validate = function (_, value) {
+            return validateURL(value);
+        };
 
         o = s.taboption('geox', form.ListValue, 'geox_auto_update', _('GeoX Auto Update'));
         o.optional = true;

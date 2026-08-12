@@ -140,6 +140,11 @@ function validateCron(value) {
     return true;
 }
 
+function validateURL(value) {
+    value = String(value || '').trim();
+    return !value || /^https?:\/\/[^\s]+$/.test(value) ? true : _('Invalid URL');
+}
+
 return view.extend({
     load: function () {
         // Keep initial view load light; version/status/coreStatus can be slow on OpenWrt.
@@ -290,7 +295,9 @@ return view.extend({
         mirrorOption.placeholder = 'https://example.com/';
 
         const downloadUrlOption = s.option(form.Value, 'download_url', _('Custom Core URL'));
-        downloadUrlOption.datatype = 'url';
+        downloadUrlOption.validate = function (_, value) {
+            return validateURL(value);
+        };
         downloadUrlOption.placeholder = 'https://example.com/mihomo.gz';
 
         const downloadSha256Option = s.option(form.Value, 'download_sha256', _('Custom Core SHA256'));

@@ -140,13 +140,12 @@ function url_encode_component(value) {
 }
 
 function core_api_request(method, path, query, body) {
-	let result = {};
 	const profile = load_profile();
 	const api_listen = profile['external-controller'];
 	const api_tls_listen = profile['external-controller-tls'];
 	const api_secret = profile['secret'];
 	if (!api_listen && !api_tls_listen)
-		return result;
+		return { success: false, status: 0, data: null, error: 'not_configured' };
 
 	const protocol = api_tls_listen ? 'https' : 'http';
 	const listen = api_tls_listen || api_listen;
@@ -154,8 +153,12 @@ function core_api_request(method, path, query, body) {
 	const curl_args = [
 		'curl', '--silent', '--show-error', '--max-time', '30',
 		'--connect-timeout', '10', '--proto-default', protocol,
-		'--insecure', '--request', method
+		'--request', method,
+		'--write-out', '\n__MIHOMOX_API__%{http_code}'
 	];
+	const tls = profile?.tls;
+	if (protocol == 'https' && tls?.certificate && tls?.['private-key'])
+		push(curl_args, '--insecure');
 	if (api_secret)
 		push(curl_args, '--oauth2-bearer', api_secret);
 	push(curl_args, '--url-query', query || '');
@@ -164,12 +167,32 @@ function core_api_request(method, path, query, body) {
 	push(curl_args, '--url', url);
 
 	const process = popen(join(' ', map(curl_args, shell_quote)), 'r');
-	if (process) {
-		const output = process.read('all') || '';
-		process.close();
-		try { result = json(output) || {}; } catch (e) { result = {}; }
+	if (!process)
+		return { success: false, status: 0, data: null, error: 'start_failed' };
+
+	const output = process.read('all') || '';
+	process.close();
+	const marker = '\n__MIHOMOX_API__';
+	const marker_position = rindex(output, marker);
+	if (marker_position < 0)
+		return { success: false, status: 0, data: null, error: 'request_failed' };
+
+	const response_body = substr(output, 0, marker_position);
+	const status = int(trim(substr(output, marker_position + length(marker))));
+	let data = null;
+	if (length(trim(response_body)) > 0) {
+		try { data = json(response_body); }
+		catch (e) {
+			return { success: false, status: status, data: null, error: 'invalid_response' };
+		}
 	}
-	return result;
+	const success = status >= 200 && status < 300;
+	return {
+		success: success,
+		status: status,
+		data: data,
+		error: success ? '' : (status > 0 ? 'http_error' : 'request_failed')
+	};
 }
 
 function writable_path(path) {
@@ -326,17 +349,27 @@ function ipv6_probe(urls) {
 
 function local_proxy() {
 	const profile = load_profile();
-	const port = int(profile?.['mixed-port']);
+	let scheme = 'http';
+	let port = int(profile?.['mixed-port']);
+	if (port <= 0 || port > 65535)
+		port = int(profile?.['port']);
+	if (port <= 0 || port > 65535) {
+		port = int(profile?.['socks-port']);
+		scheme = 'socks5h';
+	}
 	if (port <= 0 || port > 65535)
 		return null;
 	let auth = '';
-	const uci = cursor();
-	uci.load('mihomox');
-	uci.foreach('mihomox', 'authentication', (section) => {
-		if (!auth && (section.enabled == '1' || section.enabled == true) && section.username && section.password)
-			auth = `${section.username}:${section.password}`;
-	});
-	return { url: `http://127.0.0.1:${port}`, auth: auth };
+	const authentications = profile?.authentication;
+	if (type(authentications) == 'array') {
+		for (let authentication in authentications) {
+			if (type(authentication) == 'string' && length(authentication) > 0) {
+				auth = authentication;
+				break;
+			}
+		}
+	}
+	return { url: `${scheme}://127.0.0.1:${port}`, auth: auth };
 }
 
 function overseas_ipv4_probe() {
@@ -409,6 +442,8 @@ function nat_test() {
 	process.close();
 	try {
 		const result = json(output);
+		if (result?.error == 'timeout')
+			result.udp = true;
 		return result || { success: false, type: 'Unknown', error: 'invalid_result' };
 	} catch (e) {
 		return { success: false, type: 'Unknown', error: 'invalid_result' };
@@ -701,7 +736,7 @@ const methods = {
 				!valid_api_value(path, 4096) ||
 				!valid_api_value(query, 8192) ||
 				!valid_api_value(body, 1048576))
-					return {};
+					return { success: false, status: 0, data: null, error: 'invalid_request' };
 			return core_api_request(method, path, query, body);
 		}
 	},

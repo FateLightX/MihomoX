@@ -254,6 +254,9 @@ if [ -n "$legacy_proxy_dns_policy" ]; then
 	uci -q delete mihomox.mixin.proxy_server_nameserver_policy
 fi
 
+# IPv6 fake-IP has no core default; add the range for existing installations.
+[ -z "$(uci -q get mihomox.mixin.fake_ip6_range)" ] && uci set mihomox.mixin.fake_ip6_range=fc00::/18
+
 # replace missing legacy credentials before the service is started
 if [ -z "$(uci -q get mihomox.mixin.api_secret)" ]; then
 	api_secret=$(generate_secret) || exit 1

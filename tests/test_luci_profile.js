@@ -91,6 +91,10 @@ const profileView = new Function(
 async function main() {
     profileView.render();
 
+    assert.strictEqual(options.info_url.validate(null, ''), true);
+    assert.strictEqual(options.info_url.validate(null, 'https://example.com/info'), true);
+    assert.strictEqual(options.url.validate(null, 'ftp://example.com/sub'), 'Invalid URL');
+
     await options.update_subscription.onclick(null, 'subscription_test');
     assert.strictEqual(loadCalls, 1);
     assert.strictEqual(unloadCalls, 1);

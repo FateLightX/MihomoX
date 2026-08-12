@@ -13,26 +13,12 @@ fi
 # include openwrt_release
 . /etc/openwrt_release
 
-# get branch/arch
+# The public feed currently publishes only the target built by GitHub Actions.
 arch="$DISTRIB_ARCH"
-branch=
+[ "$arch" = "x86_64" ] || { echo "unsupported architecture: $arch (published feed: x86_64 only)"; exit 1; }
 case "$DISTRIB_RELEASE" in
-	*"23.05"*)
-		branch="openwrt-23.05"
-		;;
-	*"24.10"*)
-		branch="openwrt-24.10"
-		;;
-	*"25.12"*)
-		branch="openwrt-25.12"
-		;;
-	"SNAPSHOT")
-		branch="SNAPSHOT"
-		;;
-	*)
-		echo "unsupported release: $DISTRIB_RELEASE"
-		exit 1
-		;;
+	*"25.12"*) branch="openwrt-25.12" ;;
+	*) echo "unsupported release: $DISTRIB_RELEASE (published feed: OpenWrt 25.12 only)"; exit 1 ;;
 esac
 
 # feed url

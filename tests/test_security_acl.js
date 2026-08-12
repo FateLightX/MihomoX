@@ -33,6 +33,24 @@ assert.ok(
     rpcSource.includes('const url = controller_url(listen, protocol, path);'),
     'core API requests must build the URL from the selected listen address'
 );
+assert.ok(
+    rpcSource.includes("'--write-out', '\\n__MIHOMOX_API__%{http_code}'"),
+    'core API requests must capture the HTTP status'
+);
+assert.ok(
+    rpcSource.includes("return { success: false, status: 0, data: null, error: 'not_configured' }"),
+    'core API requests must expose configuration failures'
+);
+assert.ok(
+    rpcSource.includes("error: success ? '' : (status > 0 ? 'http_error' : 'request_failed')"),
+    'core API requests must expose non-2xx HTTP responses'
+);
+assert.ok(!rpcSource.includes("'--proto-default', protocol,\n\t\t'--insecure'"), 'core API must not disable TLS verification unconditionally');
+assert.ok(
+    rpcSource.includes("protocol == 'https' && tls?.certificate && tls?.['private-key']") &&
+    rpcSource.includes("push(curl_args, '--insecure')"),
+    'core API may relax TLS verification only for the explicit local certificate/key configuration'
+);
 assert.ok(rpcSource.includes("match(section_id, /^[A-Za-z0-9_-]{1,64}$/)"));
 
 const installSource = fs.readFileSync(path.join(root, 'install.sh'), 'utf8');

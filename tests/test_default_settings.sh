@@ -6,6 +6,7 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIG="$ROOT_DIR/mihomox/files/mihomox.conf"
 INIT_DEFAULTS="$ROOT_DIR/mihomox/files/uci-defaults/init.sh"
 INIT_SCRIPT="$ROOT_DIR/mihomox/files/mihomox.init"
+MIGRATE="$ROOT_DIR/mihomox/files/uci-defaults/migrate.sh"
 
 grep -q "option 'fast_reload' '1'" "$CONFIG"
 grep -q "option 'unify_delay' '1'" "$CONFIG"
@@ -14,10 +15,11 @@ grep -q "option 'authentication' '1'" "$CONFIG"
 grep -q "option 'tun_enabled' '0'" "$CONFIG"
 grep -q "option 'tcp_mode' 'tproxy'" "$CONFIG"
 grep -q "option 'udp_mode' 'tproxy'" "$CONFIG"
-grep -q "option 'password' '2333'" "$CONFIG"
+grep -q "option 'password' ''" "$CONFIG"
 grep -q "option 'dns_cache_algorithm' 'arc'" "$CONFIG"
 grep -q "option 'fake_ip_filter' '1'" "$CONFIG"
 grep -q "option 'fake_ip_filter_mode' 'blacklist'" "$CONFIG"
+grep -q "option 'fake_ip6_range' 'fc00::/18'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.gstatic.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.miwifi.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.market.xiaomi.com'" "$CONFIG"
@@ -53,9 +55,8 @@ in_sniff { block = block $0 "\n" }
 END { if (in_sniff) finish_block(); exit !(http && tls && quic) }
 ' "$CONFIG"
 
-if grep -q 'auth_password=$(generate_secret)' "$INIT_DEFAULTS"; then
-	echo "uci-defaults must preserve the configured authentication password" >&2
-	exit 1
-fi
+grep -q 'auth_password=$(generate_secret)' "$MIGRATE"
+grep -q 'auth_password=$(generate_secret)' "$INIT_DEFAULTS"
+grep -q 'mihomox.mixin.fake_ip6_range=fc00::/18' "$MIGRATE"
 
 echo "default settings tests passed"

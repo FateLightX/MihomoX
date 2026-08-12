@@ -14,7 +14,7 @@ GEOIP_DAT_SHA256="${GEOIP_DAT_SHA256:-}"
 GEOIP_ASN_SHA256="${GEOIP_ASN_SHA256:-}"
 
 usage() {
-	echo "usage: $0 --dl-dir <dir> --output-dir <dir> [--geosite-url <url>] [--geoip-mmdb-url <url>] [--geoip-dat-url <url>] [--geoip-asn-url <url>] [--*-sha256 <hex>]" >&2
+	echo "usage: $0 --dl-dir <dir> --output-dir <dir> [--*-url <url>] --geosite-sha256 <hex> --geoip-mmdb-sha256 <hex> --geoip-dat-sha256 <hex> --geoip-asn-sha256 <hex>" >&2
 	exit 2
 }
 
@@ -57,7 +57,8 @@ sha256_text() {
 }
 
 valid_sha256() {
-	[ -z "$1" ] || printf '%s\n' "$1" | awk 'length($0) == 64 && $0 !~ /[^0-9a-fA-F]/ { exit 0 } { exit 1 }'
+	[ -n "$1" ] || return 1
+	printf '%s\n' "$1" | awk 'length($0) == 64 && $0 !~ /[^0-9a-fA-F]/ { exit 0 } { exit 1 }'
 }
 
 download() {
@@ -67,7 +68,7 @@ download() {
 	valid_sha256 "$expected_sha256" || { echo "invalid SHA256 for $name" >&2; exit 1; }
 	url_key=$(sha256_text "$url")
 	cache_file="$CACHE_DIR/$name.$url_key"
-	if [ -s "$cache_file" ] && [ -n "$expected_sha256" ]; then
+	if [ -s "$cache_file" ]; then
 		cached_sha256=$(sha256_file "$cache_file")
 		[ "$(printf '%s' "$cached_sha256" | tr 'A-F' 'a-f')" = "$(printf '%s' "$expected_sha256" | tr 'A-F' 'a-f')" ] || rm -f "$cache_file"
 	fi
@@ -79,13 +80,11 @@ download() {
 		curl -fsSL --retry 2 --connect-timeout 20 --max-time 600 \
 			-A "MihomoX-Build" -o "$cache_tmp" "$url"
 		[ -s "$cache_tmp" ] || { echo "downloaded $name is empty" >&2; exit 1; }
-		if [ -n "$expected_sha256" ]; then
-			downloaded_sha256=$(sha256_file "$cache_tmp")
-			[ "$(printf '%s' "$downloaded_sha256" | tr 'A-F' 'a-f')" = "$(printf '%s' "$expected_sha256" | tr 'A-F' 'a-f')" ] || {
-				echo "SHA256 verification failed for $name" >&2
-				exit 1
-			}
-		fi
+		downloaded_sha256=$(sha256_file "$cache_tmp")
+		[ "$(printf '%s' "$downloaded_sha256" | tr 'A-F' 'a-f')" = "$(printf '%s' "$expected_sha256" | tr 'A-F' 'a-f')" ] || {
+			echo "SHA256 verification failed for $name" >&2
+			exit 1
+		}
 		mv -f "$cache_tmp" "$cache_file"
 		trap - EXIT HUP INT TERM
 	else
