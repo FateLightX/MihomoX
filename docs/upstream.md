@@ -9,7 +9,7 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `388f34e` |
+| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `3799926` |
 | [OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo) | `../OpenWrt-momo` | 同组织辅助参考 | `6fb94df` |
 | [openwrt-clashoo](https://github.com/kenzok8/openwrt-clashoo) | `../openwrt-clashoo` | 内核更新次级参考 | `53f0766` |
 
@@ -33,6 +33,31 @@ git -C ../openwrt-clashoo merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-08-17：Nikki
+
+- 上游：`nikkinikki-org/OpenWrt-nikki`
+- 旧参考：`388f34e`
+- 已审计至：`3799926`
+- 范围：`388f34e..3799926`（5 个提交）
+
+审计结果：
+
+- `3799926 fix: redundant cron task in edge cases`
+  - 仅在文件中发现旧任务时清除 `#mihomox` Cron，并确保删除任务后重启 Cron；停止时
+    没有 MihomoX 任务则不做无意义重启。
+  - 决策：按 MihomoX 的定时重启、日志清理和 China IP 更新范围移植，并补静态回归测试。
+- `2221830 fix: allow read/write to the target of log file symbolic link`
+  - OpenWrt 的 `/var/log` 最终指向 `/tmp/log`，LuCI 文件读取会校验解析后的目标路径。
+  - 决策：为 `/tmp/log/mihomox/*.log` 增加读写 ACL，保留原 `/var/log` 路径，并补 ACL 测试。
+- `8aaa68c`、`6beb04c` 更新 Alpha 内核至 `3cac869`、`ac017cd`。
+  - MihomoX 通过官方 Release 资产独立解析最新 Alpha；当前设备和构建链已使用 `ac017cd`。
+  - 决策：无需移植独立 `mihomo-alpha` 包版本。
+- `c7cee04` 更新稳定内核至 `v1.19.30`。
+  - MihomoX 不交付独立 `mihomo-meta` 包。
+  - 决策：无需移植。
+
+本轮只移植 Cron 生命周期和日志真实路径 ACL，不合并 Nikki 提交或目录。
 
 ## 2026-08-12：Clashoo
 

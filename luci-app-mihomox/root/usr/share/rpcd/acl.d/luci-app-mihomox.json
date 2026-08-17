@@ -16,7 +16,8 @@
                 "/etc/mihomox/run/config.yaml": ["read"],
                 "/etc/mihomox/run/providers/rule/*": ["read"],
                 "/etc/mihomox/run/providers/proxy/*": ["read"],
-                "/var/log/mihomox/*.log": ["read"]
+                "/var/log/mihomox/*.log": ["read"],
+                "/tmp/log/mihomox/*.log": ["read"]
             }
         },
         "write": {
@@ -34,7 +35,8 @@
                 "/etc/mihomox/run/config.yaml": ["write"],
                 "/etc/mihomox/run/providers/rule/*": ["write"],
                 "/etc/mihomox/run/providers/proxy/*": ["write"],
-                "/var/log/mihomox/*.log": ["write"]
+                "/var/log/mihomox/*.log": ["write"],
+                "/tmp/log/mihomox/*.log": ["write"]
             }
         }
     }

@@ -17,6 +17,10 @@ assert.ok(acl.read.ubus['luci.mihomox'].includes('log'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('update_core'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('write_file'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('api'));
+assert.ok(acl.read.file['/var/log/mihomox/*.log'].includes('read'));
+assert.ok(acl.read.file['/tmp/log/mihomox/*.log'].includes('read'));
+assert.ok(acl.write.file['/var/log/mihomox/*.log'].includes('write'));
+assert.ok(acl.write.file['/tmp/log/mihomox/*.log'].includes('write'));
 
 const rpcSource = fs.readFileSync(path.join(
     root,

@@ -44,6 +44,10 @@ grep -q "option 'china_ip6_url' 'https://raw.githubusercontent.com/gaoyifan/chin
 grep -q "option 'network_test_fw_mark' '0x82'" "$CONFIG"
 grep -q 'config_get_bool fast_reload "procd" "fast_reload" 1' "$INIT_SCRIPT"
 
+cron_guard_count=$(grep -c 'if grep -q "#mihomox" "/etc/crontabs/root"; then' "$INIT_SCRIPT")
+[ "$cron_guard_count" -eq 2 ]
+grep -A4 'log "App" "Clear cron\."' "$INIT_SCRIPT" | grep -q 'reload_cron=1'
+
 awk '
 function finish_block() {
 	if (block ~ /option '\''protocol'\'' '\''HTTP'\''/ && block ~ /option '\''enabled'\'' '\''1'\''/) http = 1

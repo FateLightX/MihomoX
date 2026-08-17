@@ -349,7 +349,11 @@ start_service() {
 	procd_close_instance
 	# cron
 	local reload_cron; reload_cron=0
-	sed -i '/#mihomox/d' "/etc/crontabs/root" > /dev/null 2>&1
+	if grep -q "#mihomox" "/etc/crontabs/root"; then
+		log "App" "Clear cron."
+		sed -i '/#mihomox/d' "/etc/crontabs/root" > /dev/null 2>&1
+		reload_cron=1
+	fi
 	if [ "$scheduled_restart" = 1 ] && is_valid_cron "$scheduled_restart_cron"; then
 		log "App" "Set scheduled restart."
 		echo "$scheduled_restart_cron /etc/init.d/mihomox restart #mihomox scheduled restart" >> "/etc/crontabs/root"
@@ -680,8 +684,10 @@ cleanup() {
 		sysctl -q -w net.bridge.bridge-nf-call-ip6tables=1
 	fi
 	# delete cron
-	sed -i "/#mihomox/d" "/etc/crontabs/root" > /dev/null 2>&1
-	/etc/init.d/cron restart
+	if grep -q "#mihomox" "/etc/crontabs/root"; then
+		sed -i "/#mihomox/d" "/etc/crontabs/root" > /dev/null 2>&1
+		/etc/init.d/cron restart
+	fi
 }
 
 clear_logs() {
