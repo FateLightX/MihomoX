@@ -124,5 +124,4 @@ make package/luci-app-mihomox/compile V=s
 
 - 只交付 Mihomo，不生成独立 `mihomo-meta`、`mihomo-alpha` 或 sing-box 包。
 - 内核、GeoData 和 Zashboard 在编译期打包；运行时内核更新不经过包管理器。
-- Nikki 是主要功能基础；Clashoo 和 Momo 只能在 `PORTING.md` 定义的范围内逐项参考。
 - 参考仓库不得整目录覆盖，审计结果记录到 `docs/upstream.md`。

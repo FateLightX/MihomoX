@@ -271,6 +271,19 @@ for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@auth
 	fi
 done
 
+# since v1.26.1
+
+# ensure sniffer skip-domain covers local domains for existing installations
+if [ "$(uci -q get mihomox.mixin.sniffer_ignore_domain_name)" = "1" ]; then
+	has_lan=0; has_local=0
+	for domain in $(uci -q get mihomox.mixin.sniffer_ignore_domain_names); do
+		[ "$domain" = "+.lan" ] && has_lan=1
+		[ "$domain" = "+.local" ] && has_local=1
+	done
+	[ "$has_lan" = "0" ] && uci add_list mihomox.mixin.sniffer_ignore_domain_names="+.lan"
+	[ "$has_local" = "0" ] && uci add_list mihomox.mixin.sniffer_ignore_domain_names="+.local"
+fi
+
 # commit
 uci commit mihomox
 

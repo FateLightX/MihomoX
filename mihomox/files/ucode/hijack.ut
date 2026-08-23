@@ -119,7 +119,8 @@
 			push(lan_inbound_device, device);
 		}
 	}
-	const lan_access_control = [];
+	const lan_access_control_specific = [];
+	const lan_access_control_catchall = [];
 	uci.foreach('mihomox', 'lan_access_control', (access_control) => {
 		access_control['enabled'] = uci_bool(access_control['enabled']);
 		access_control['ip'] = safe_list(access_control['ip'], /^[0-9A-Fa-f:.\/-]+$/);
@@ -128,9 +129,14 @@
 		access_control['proxy'] = uci_bool(access_control['proxy']);
 		access_control['dns'] = uci_bool(access_control['dns']);
 		if (access_control['enabled']) {
-			push(lan_access_control, access_control);
+			if (length(access_control['ip']) == 0 && length(access_control['ip6']) == 0 && length(access_control['mac']) == 0) {
+				push(lan_access_control_catchall, access_control);
+			} else {
+				push(lan_access_control_specific, access_control);
+			}
 		}
 	});
+	const lan_access_control = [...lan_access_control_specific, ...lan_access_control_catchall];
 
 	const reserved_ip = safe_list(uci.get('mihomox', 'proxy', 'reserved_ip'), /^[0-9A-Fa-f:.\/-]+$/);
 	const reserved_ip6 = safe_list(uci.get('mihomox', 'proxy', 'reserved_ip6'), /^[0-9A-Fa-f:.\/-]+$/);

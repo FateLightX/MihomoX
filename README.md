@@ -136,12 +136,9 @@ cron 表达式自定义时间，也可以手动执行：
 - [AI 开发手册](docs/ai-development.md)
 - [参考源审计](docs/upstream.md)
 
-Nikki 是主要功能基础；Clashoo 仅作为内核交付和更新设计的次级参考；Momo 只用于
-对照通用 OpenWrt/LuCI 实现，其 sing-box 专用逻辑不属于 MihomoX。
+Nikki 是主要功能基础。
 
 ## 致谢
 
 - [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki)
-- [openwrt-clashoo](https://github.com/kenzok8/openwrt-clashoo)
-- [OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo)
 - [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo)

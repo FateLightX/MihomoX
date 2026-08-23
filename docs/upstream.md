@@ -10,8 +10,6 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
 | [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `3799926` |
-| [OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo) | `../OpenWrt-momo` | 同组织辅助参考 | `6fb94df` |
-| [openwrt-clashoo](https://github.com/kenzok8/openwrt-clashoo) | `../openwrt-clashoo` | 内核更新次级参考 | `53f0766` |
 
 ## 同步流程
 
@@ -21,14 +19,6 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 git -C ../OpenWrt-nikki status --short --branch
 git -C ../OpenWrt-nikki fetch --prune origin
 git -C ../OpenWrt-nikki merge --ff-only origin/main
-
-git -C ../OpenWrt-momo status --short --branch
-git -C ../OpenWrt-momo fetch --prune origin
-git -C ../OpenWrt-momo merge --ff-only origin/main
-
-git -C ../openwrt-clashoo status --short --branch
-git -C ../openwrt-clashoo fetch --prune origin
-git -C ../openwrt-clashoo merge --ff-only origin/main
 ```
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
@@ -58,6 +48,34 @@ git -C ../openwrt-clashoo merge --ff-only origin/main
   - 决策：无需移植。
 
 本轮只移植 Cron 生命周期和日志真实路径 ACL，不合并 Nikki 提交或目录。
+
+## 2026-08-24：Clashoo（最终审计与移植）
+
+- 上游：`kenzok8/openwrt-clashoo`
+- 已审计至：`a93f16f`
+- 范围：`53f0766..a93f16f`（17 个提交）
+
+审计结果：
+
+- `062cbf7 fix acl catch-all ordering and log date offset`
+  - LAN ACL catch-all 规则排到设备规则之后；日志日期字段偏移修正。
+  - 决策：移植 catch-all 排序到 `hijack.ut`。MihomoX 无对应 log_format.awk。
+- `1126a25 Skip local domains in injected sniffer`
+  - Sniffer skip-domain 加 `+.lan`/`+.local`，防止嗅探覆盖局域网域名真实 IP。
+  - 决策：修改默认值并补迁移脚本，为已有安装自动追加。
+- `ef9b20f Fix local fake-IP filtering`
+  - fake-ip-filter 从 `*.lan` 改为 `+.lan`/`+.local` 并加迁移。
+  - MihomoX 默认值已是 `+.lan`/`+.local`。
+  - 决策：无需移植。
+- `ce1cb5b Guarantee China direct rule and skip needless firewall reload (#41)`
+  - 内容比较跳过防火墙重载、锁恢复已在 MihomoX 实现。
+  - 决策：无需移植。
+- 其余内核 bump ×8、规则数据刷新 ×1、Feed 同步修复、opkg 兼容修复、China bypass
+  回归修复不在移植边界或已有独立实现。
+
+本轮从 Clashoo 移植两项行为后移除该参考源。
+
+> **注意**：Clashoo 参考源已于 2026-08-24 移除，以下为历史审计记录。
 
 ## 2026-08-12：Clashoo
 
@@ -136,6 +154,8 @@ git -C ../openwrt-clashoo merge --ff-only origin/main
   错误分类尚未移植，但不属于当前 Clashoo 参考边界。
 
 本轮结论：无需移植源码。
+
+> **注意**：Momo 参考源已于 2026-08-24 移除，以下为历史审计记录。
 
 ## 2026-07-29：Momo
 

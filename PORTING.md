@@ -30,16 +30,6 @@ MihomoX 是单 Mihomo 内核的 OpenWrt 透明代理服务：
 主要功能基础，包括 UCI、procd、firewall4、策略路由、DNS 劫持、访问控制、配置混入、
 订阅及 LuCI/RPC 结构。MihomoX 不移植 Nikki 的独立核心软件包。
 
-### Clashoo
-
-只参考内核架构识别、Release 资产下载、SHA256、原子替换、回滚和按运行状态重启。
-其多内核、规则数据、DNS、ACL 和页面布局不属于参考范围。
-
-### Momo
-
-只对照通用 OpenWrt、firewall4、策略路由和 LuCI/RPC 模式。sing-box JSON、inbound、
-命令行和配置字段不得直接移植。
-
 ## 3. 配置和运行链
 
 ```text

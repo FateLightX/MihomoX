@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
 PKG_VERSION:=2026.7.25
-PKG_RELEASE:=15
+PKG_RELEASE:=16
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/mihomox-$(PKG_VERSION)
 PKG_BUILD_PARALLEL:=1
@@ -11,12 +11,12 @@ GEOSITE_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/8616d0c1
 GEOIP_MMDB_URL?=https://raw.githubusercontent.com/Loyalsoldier/geoip/f2ea0d917fc0cf235bc6ac9045794662ba1b70f3/Country.mmdb
 GEOIP_DAT_URL?=https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/8616d0c188f1eed5b7e01bd088f1c3b3002d5496/geoip.dat
 GEOIP_ASN_URL?=https://raw.githubusercontent.com/xishang0128/geoip/381f52765ac5c16d24a946020d0a9dd55f930224/GeoLite2-ASN.mmdb
-ZASHBOARD_URL?=https://github.com/Zephyruso/zashboard/releases/download/v3.18.0/dist.zip
+ZASHBOARD_URL?=https://github.com/Zephyruso/zashboard/releases/download/v3.21.0/dist.zip
 GEOSITE_SHA256?=0dd6474f59287d925ff2b10957e21657872c72170919a0b947bcc1ed6957cceb
 GEOIP_MMDB_SHA256?=6e6e7622abe1f9c8c171426695c3431f12ba575aaa071cec7e08e1f1940c42df
 GEOIP_DAT_SHA256?=53dc90b50877d2ed974ea81fb0fbdcbac84e189c0ac7fdcab7a966bb5e36b6e6
 GEOIP_ASN_SHA256?=e15e27752c8ca454170162bdaba12506642e13bc17dfe7d60b2b62e6255d3d13
-ZASHBOARD_SHA256?=6a02253f22daa80b8bfbae63edb220d5c962fb2b2cfcf33eebf12763712f57ce
+ZASHBOARD_SHA256?=5348e6ce1a6bceecfbbf07d27a78e3efa72817b979e847337151ff1ab201ef21
 
 PKG_LICENSE:=GPL3.0+
 PKG_MAINTAINER:=MihomoX contributors

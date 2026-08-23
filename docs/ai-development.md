@@ -240,7 +240,7 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 - 分块文本必须使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - 调试输出必须脱敏：secret、password、token、订阅 URL、代理服务器等。
 - 不暴露用户凭据、订阅内容或 Actions secret。
-- Nikki、Momo、Clashoo 只能按 `PORTING.md` 的边界参考，不得整目录覆盖。
+- Nikki 是唯一参考仓库，只能按 `PORTING.md` 的边界参考，不得整目录覆盖。
 
 ## 9. 已知边界和后续优化
 
