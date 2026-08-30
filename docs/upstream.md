@@ -60,7 +60,7 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 - 实测 latest 为 `v3.24.0`，`dist.zip` SHA256 为 `5ba15d3388adf0483929970663053871c530312224dd6d13bdf396a7f517697b`；该值仅记录审计证据，不写回默认 Makefile，避免固定版本。
 - 默认 GeoData loader 调整为 `memconservative`，与当前核心默认值一致。
 - `external-controller-routing-mark` 和 `dns.listen-routing-mark` 属于可选能力，本轮未暴露到 UCI/LuCI；不影响现有面板和配置兼容。
-- 本轮对应包发布号：`mihomox` release 17、`luci-app-mihomox` release 12。
+- 本轮对应包版本统一更新为 `2026.8.30`，两个包的 release 重置为 1。
 
 本轮未发现需要移植的 Mihomo API 破坏性变更。
 

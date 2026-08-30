@@ -66,7 +66,7 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 | --- | --- | --- |
 | Mihomo Alpha | `65287f0e0f3f8e5aaa1e95ded15a80235ecb8c04` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
 | Zashboard | `v3.24.0`，`dist.zip` SHA256 `5ba15d3388adf0483929970663053871c530312224dd6d13bdf396a7f517697b` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
-| 包发布号 | `mihomox` release 17；`luci-app-mihomox` release 12 | 后续改动对应包内容时继续递增 |
+| 包版本 | `2026.8.30`，两个包 release 均为 1 | 后续改动对应包内容时继续递增 release |
 
 重新查询：
 
@@ -249,6 +249,7 @@ cat "$verify_root/output/.version"
 版本规则：
 
 - `mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 的 `PKG_VERSION` 必须一致。
+- 更新 `PKG_VERSION` 时，两个包使用同一版本，并把对应 `PKG_RELEASE` 重置为 1。
 - 每次发布对应包内容变化时，把对应包的 `PKG_RELEASE` 加一。
 - `release-packages` 不需要手动填版本。
 - Release tag 由工作流生成：`v<PKG_VERSION>-<mihomox PKG_RELEASE>-<luci-app-mihomox PKG_RELEASE>`。
