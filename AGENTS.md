@@ -125,3 +125,10 @@ make package/luci-app-mihomox/compile V=s
 - 只交付 Mihomo，不生成独立 `mihomo-meta`、`mihomo-alpha` 或 sing-box 包。
 - 内核、GeoData 和 Zashboard 在编译期打包；运行时内核更新不经过包管理器。
 - 参考仓库不得整目录覆盖，审计结果记录到 `docs/upstream.md`。
+- Mihomo 配置/API 以官方 `Alpha` 分支源码为权威；开始适配前先运行
+  `git ls-remote https://github.com/MetaCubeX/mihomo.git refs/heads/Alpha`，并把审计提交写入
+  `docs/upstream.md`。
+- Zashboard 默认使用 `releases/latest/download/dist.zip`；`ZASHBOARD_SHA256` 留空是有意设计，
+  `fetch_zashboard.sh` 会解析发布资产的上游 SHA256。自定义 URL 才必须显式传入摘要。
+- `.codex-verification/` 仅用于临时下载和人工验证，已忽略，禁止提交；正式回归测试保留在
+  `tests/`。

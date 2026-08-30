@@ -13,6 +13,123 @@ function validateURL(value) {
     return !value || /^https?:\/\/[^\s]+$/.test(value) ? true : _('Invalid URL');
 }
 
+function relativePathEscapes(value) {
+    let depth = 0;
+    for (const part of value.split('/')) {
+        if (!part || part === '.')
+            continue;
+        if (part === '..') {
+            if (depth === 0)
+                return true;
+            depth--;
+        } else {
+            depth++;
+        }
+    }
+    return false;
+}
+
+const FAKE_IP_RULE_TYPES = new Set([
+    'DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-REGEX',
+    'DOMAIN-WILDCARD', 'GEOSITE', 'RULE-SET', 'MATCH'
+]);
+
+function validateUIName(value) {
+    value = String(value || '').trim();
+    if (!value)
+        return true;
+    const normalized = value.replace(/\\/g, '/').replace(/\/+/g, '/');
+    if (value.includes('\0') || normalized.startsWith('/') || relativePathEscapes(normalized))
+        return _('UI Name must be a local relative path.');
+    return true;
+}
+
+function validateUIPath(value) {
+    value = String(value || '').trim();
+    if (!value)
+        return true;
+    if (value.includes('\0'))
+        return _('Relative UI Path must stay within Mihomo home.');
+    if (value.startsWith('/'))
+        return true;
+    const normalized = value.replace(/\\/g, '/').replace(/\/+/g, '/');
+    if (relativePathEscapes(normalized))
+        return _('Relative UI Path must stay within Mihomo home.');
+    return true;
+}
+
+function validateDomainPattern(value) {
+    const values = Array.isArray(value) ? value : [value];
+    for (const raw of values) {
+        const item = String(raw || '');
+        if (!item)
+            continue;
+        if (item.trim() !== item || item.endsWith('.'))
+            return _('Invalid domain pattern.');
+
+        const lower = item.toLowerCase();
+        if (lower.startsWith('geosite:') || lower.startsWith('rule-set:')) {
+            const payload = item.slice(item.indexOf(':') + 1);
+            if (!payload || payload.split(',').some((part) => !part || part.trim() !== part))
+                return _('Invalid domain pattern.');
+            continue;
+        }
+
+        const labels = item.split('.');
+        if (labels.length === 1 && labels[0] === '+')
+            return _('Invalid domain pattern.');
+        for (let index = 0; index < labels.length; index++) {
+            const label = labels[index];
+            if (index > 0 && label === '')
+                return _('Invalid domain pattern.');
+            if (label.includes('+') && !(index === 0 && label === '+'))
+                return _('Invalid domain pattern.');
+            if (label.includes('*') && label !== '*')
+                return _('Invalid domain pattern.');
+        }
+    }
+    return true;
+}
+
+function validatePolicyMatcher(section_id, value) {
+    const matcher = String(value || '').trim();
+    if (!matcher)
+        return _('Invalid DNS policy matcher.');
+    for (const part of matcher.split(',')) {
+        const result = validateDomainPattern(part);
+        if (result !== true)
+            return _('Invalid DNS policy matcher.');
+    }
+    return true;
+}
+
+function validateFakeIPRule(value) {
+    const values = Array.isArray(value) ? value : [value];
+    for (const raw of values) {
+        const item = String(raw || '').trim();
+        if (!item)
+            continue;
+        const parts = item.split(',').map((part) => part.trim());
+        const type = String(parts[0] || '').trim().toUpperCase();
+        const regexRule = type === 'DOMAIN-REGEX';
+        const actionIndex = type === 'MATCH' ? 1 : regexRule ? parts.length - 1 : 2;
+        const action = String(parts[actionIndex] || '').toLowerCase();
+        const validShape = type === 'MATCH'
+            ? parts.length === 2
+            : parts.length >= 3;
+        const payload = regexRule ? parts.slice(1, -1).join(',').trim() : String(parts[1] || '');
+        const domainTypes = ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD'];
+        const payloadValid = type === 'MATCH'
+            ? true
+            : regexRule
+                ? !!payload
+                : !domainTypes.includes(type) || validateDomainPattern(payload) === true;
+        if (!FAKE_IP_RULE_TYPES.has(type) || !validShape || !payloadValid || !/^(fake-ip|real-ip)$/.test(action))
+            return _('Rule mode requires complete domain rules ending with fake-ip or real-ip.');
+    }
+    return true;
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -24,6 +141,18 @@ return view.extend({
         const networks = data[1];
 
         let m, s, o, so;
+        let apiTlsListenOption, apiTlsCertOption, apiTlsKeyOption, apiTlsEchKeyOption;
+        let fakeIpFilterModeOption, ruleTypeOption;
+
+        function validateTLSBundle(section_id) {
+            const listen = String(apiTlsListenOption?.formvalue(section_id) || '').trim();
+            const cert = String(apiTlsCertOption?.formvalue(section_id) || '').trim();
+            const key = String(apiTlsKeyOption?.formvalue(section_id) || '').trim();
+            const ech = String(apiTlsEchKeyOption?.formvalue(section_id) || '').trim();
+            if ((listen || cert || key || ech) && !(listen && cert && key))
+                return _('API TLS requires listen address, certificate and private key together.');
+            return true;
+        }
 
         m = new form.Map('mihomox');
 
@@ -104,9 +233,15 @@ return view.extend({
         o = s.taboption('external_control', form.Value, 'ui_path', _('UI Path'));
         o.placeholder = _('Unmodified');
         o.datatype = 'directory';
+        o.validate = function (_, value) {
+            return validateUIPath(value);
+        };
 
         o = s.taboption('external_control', form.Value, 'ui_name', _('UI Name'));
         o.placeholder = _('Unmodified');
+        o.validate = function (_, value) {
+            return validateUIName(value);
+        };
 
         o = s.taboption('external_control', form.Value, 'ui_url', _('UI Url'));
         o.placeholder = _('Unmodified');
@@ -123,21 +258,29 @@ return view.extend({
         o.datatype = 'ipaddrport(1)';
         o.placeholder = _('Unmodified');
 
-        o = s.taboption('external_control', form.Value, 'api_tls_listen', _('API TLS Listen'));
+        apiTlsListenOption = s.taboption('external_control', form.Value, 'api_tls_listen', _('API TLS Listen'));
+        o = apiTlsListenOption;
         o.datatype = 'ipaddrport(1)';
         o.placeholder = _('Unmodified');
+        o.validate = validateTLSBundle;
 
-        o = s.taboption('external_control', form.Value, 'api_tls_cert', _('API TLS Cert'));
+        apiTlsCertOption = s.taboption('external_control', form.Value, 'api_tls_cert', _('API TLS Cert'));
+        o = apiTlsCertOption;
         o.placeholder = _('Unmodified');
         o.datatype = 'file';
+        o.validate = validateTLSBundle;
 
-        o = s.taboption('external_control', form.Value, 'api_tls_key', _('API TLS Key'));
+        apiTlsKeyOption = s.taboption('external_control', form.Value, 'api_tls_key', _('API TLS Key'));
+        o = apiTlsKeyOption;
         o.placeholder = _('Unmodified');
         o.datatype = 'file';
+        o.validate = validateTLSBundle;
 
-        o = s.taboption('external_control', form.Value, 'api_tls_ech_key', _('API TLS ECH Key'));
+        apiTlsEchKeyOption = s.taboption('external_control', form.Value, 'api_tls_ech_key', _('API TLS ECH Key'));
+        o = apiTlsEchKeyOption;
         o.placeholder = _('Unmodified');
         o.datatype = 'file';
+        o.validate = validateTLSBundle;
 
         o = s.taboption('external_control', form.Value, 'api_secret', _('API Secret'));
         o.password = true;
@@ -326,8 +469,13 @@ return view.extend({
         o = s.taboption('dns', form.DynamicList, 'fake_ip_filters', _('Edit Fake-IP Filters'));
         o.retain = true;
         o.depends('fake_ip_filter', '1');
+        o.validate = function (section_id, value) {
+            const mode = String(fakeIpFilterModeOption?.formvalue(section_id) || 'blacklist');
+            return mode === 'rule' ? validateFakeIPRule(value) : validateDomainPattern(value);
+        };
 
-        o = s.taboption('dns', form.ListValue, 'fake_ip_filter_mode', _('Fake-IP Filter Mode'));
+        fakeIpFilterModeOption = s.taboption('dns', form.ListValue, 'fake_ip_filter_mode', _('Fake-IP Filter Mode'));
+        o = fakeIpFilterModeOption;
         o.default = 'blacklist';
         o.value('blacklist', _('Block Mode'));
         o.value('whitelist', _('Allow Mode'));
@@ -423,6 +571,7 @@ return view.extend({
 
         so = o.subsection.option(form.Value, 'matcher', _('Matcher'));
         so.rmempty = false;
+        so.validate = validatePolicyMatcher;
 
         so = o.subsection.option(form.DynamicList, 'nameserver', _('Nameserver'));
 
@@ -448,6 +597,7 @@ return view.extend({
 
         so = o.subsection.option(form.Value, 'matcher', _('Matcher'));
         so.rmempty = false;
+        so.validate = validatePolicyMatcher;
 
         so = o.subsection.option(form.DynamicList, 'nameserver', _('Nameserver'));
 
@@ -487,6 +637,9 @@ return view.extend({
         o = s.taboption('sniffer', form.DynamicList, 'sniffer_force_domain_names', _('Force Sniff Domain Name'));
         o.retain = true;
         o.depends('sniffer_force_domain_name', '1');
+        o.validate = function (_, value) {
+            return validateDomainPattern(value);
+        };
 
         o = s.taboption('sniffer', form.Flag, 'sniffer_ignore_domain_name', _('Overwrite Ignore Sniff Domain Name'));
         o.rmempty = false;
@@ -494,6 +647,9 @@ return view.extend({
         o = s.taboption('sniffer', form.DynamicList, 'sniffer_ignore_domain_names', _('Ignore Sniff Domain Name'));
         o.retain = true;
         o.depends('sniffer_ignore_domain_name', '1');
+        o.validate = function (_, value) {
+            return validateDomainPattern(value);
+        };
 
         o = s.taboption('sniffer', form.Flag, 'sniffer_sniff', _('Overwrite Sniff By Protocol'));
         o.rmempty = false;
@@ -619,6 +775,7 @@ return view.extend({
         so.rmempty = false;
 
         so = o.subsection.option(form.Value, 'type', _('Type'));
+        ruleTypeOption = so;
         so.rmempty = false;
         so.value('RULE-SET', _('Rule Set'));
         so.value('DOMAIN', _('Domain Name'));
@@ -645,6 +802,12 @@ return view.extend({
         so = o.subsection.option(form.Value, 'matcher', _('Matcher'));
         so.rmempty = false;
         so.depends({ 'type': /MATCH/i, '!reverse': true });
+        so.validate = function (section_id, value) {
+            const type = String(ruleTypeOption?.formvalue(section_id) || '').toUpperCase();
+            if (['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'GEOSITE'].includes(type))
+                return validatePolicyMatcher(section_id, value);
+            return true;
+        };
 
         so = o.subsection.option(form.Value, 'node', _('Node'));
         so.default = 'GLOBAL';

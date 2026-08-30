@@ -31,4 +31,11 @@ if grep -q 'route flush table' "$INIT_SCRIPT"; then
 	exit 1
 fi
 
+grep -q '^validate_final_profile() {' "$INIT_SCRIPT"
+grep -q '^warn_legacy_profile() {' "$INIT_SCRIPT"
+grep -q '\."external-controller-tls" // ""' "$INIT_SCRIPT"
+grep -q 'API TLS requires listen address, certificate and private key together.' "$INIT_SCRIPT"
+grep -q 'DNS policy requires at least one proxy-server-nameserver.' "$INIT_SCRIPT"
+grep -q 'Fake-IP rule mode requires complete domain rules ending with fake-ip or real-ip.' "$INIT_SCRIPT"
+
 echo "backend regression tests passed"

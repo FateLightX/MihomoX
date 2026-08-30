@@ -49,9 +49,9 @@ GitHub Actions 只构建 `x86_64-openwrt-25.12`。构建前会执行
 `mihomox/scripts/fetch_mihomo.sh`，解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、
 gzip 格式和 ELF 架构后直接打包；不会重新编译 Mihomo Go 源码。OpenWrt 工具链只编译
 MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源会缓存在 OpenWrt
-`DL_DIR`。GeoData 使用带提交版本的原始文件 URL，Zashboard 固定发布标签；两者均使用
-Makefile 中的固定 SHA256，解析、下载或校验失败时构建直接停止。更新资源时必须同时
-更新 URL 和摘要。
+`DL_DIR`。GeoData 使用带提交版本的原始文件 URL 和 Makefile 固定 SHA256；Zashboard
+默认跟随最新发布版本，并在构建时解析上游 SHA256。下载或校验失败时构建直接停止。
+更新资源时必须同时验证 URL 和摘要。
 
 设备运行时依赖通过 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入 APK 元数据，不加入
 Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 OpenWrt 软件源解析依赖。

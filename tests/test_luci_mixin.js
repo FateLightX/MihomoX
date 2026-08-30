@@ -47,5 +47,17 @@ for (const option of ['api_tls_cert', 'api_tls_key', 'api_tls_ech_key']) {
 }
 assert.ok(/'ui_path'[\s\S]{0,180}\.datatype = 'directory'/.test(source), 'UI path must validate directory syntax');
 assert.ok(/'url', _\('Url'\)[\s\S]{0,280}validateURL\(value\)/.test(source), 'HTTP rule providers must validate URL syntax');
+assert.ok(source.includes('function validateDomainPattern'), 'domain pattern validation is missing');
+assert.ok(source.includes('function validateFakeIPRule'), 'Fake-IP rule validation is missing');
+assert.ok(source.includes('function validateTLSBundle'), 'TLS bundle validation is missing');
+assert.ok(source.includes('function validatePolicyMatcher'), 'DNS policy matcher validation is missing');
+assert.ok(source.includes("UI Name must be a local relative path."), 'UI name path validation is missing');
+assert.ok(source.includes("Relative UI Path must stay within Mihomo home."), 'UI path validation is missing');
+assert.ok(source.includes("API TLS requires listen address, certificate and private key together."), 'TLS pair validation is missing');
+assert.ok(source.includes("mode === 'rule' ? validateFakeIPRule(value) : validateDomainPattern(value)"), 'Fake-IP mode-aware validation is missing');
+assert.ok(source.includes('so.validate = validatePolicyMatcher;'), 'DNS policy matcher validation is missing');
+for (const type of ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'GEOSITE', 'RULE-SET', 'MATCH']) {
+    assert.ok(source.includes(`'${type}'`), `missing Fake-IP rule type: ${type}`);
+}
 
 console.log('LuCI mixin tests passed');

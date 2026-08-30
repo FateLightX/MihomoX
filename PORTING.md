@@ -75,7 +75,7 @@ GitHub Actions 使用 `x86_64-openwrt-25.12` SDK，`mihomox/Makefile` 的准备�
    格式和 ELF 架构。
 2. `fetch_geodata.sh`：从带提交版本的 URL 准备 GeoSite、Country.mmdb、GeoIP.dat 和
    ASN.mmdb，并强制校验 Makefile 中的 SHA256。
-3. `fetch_zashboard.sh`：从固定发布标签准备离线面板，并强制校验 SHA256。
+3. `fetch_zashboard.sh`：解析最新发布版本准备离线面板，并强制校验 SHA256。
 
 内核和资源缓存在 OpenWrt `DL_DIR`。Mihomo 使用官方预编译二进制，不经过 OpenWrt Go
 工具链；工具链只编译 MihomoX 的 STUN C 辅助程序。解析、下载或校验失败必须终止构建，

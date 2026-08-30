@@ -270,6 +270,11 @@ start_service() {
 			fi
 		fi
 	fi
+	if ! validate_final_profile; then
+		log "App" "Exit."
+		return
+	fi
+	warn_legacy_profile
 	# check profile
 	if [ "$core_only" = 0 ] && [ "$proxy_enabled" = 1 ]; then
 		log "Profile" "Checking..."
@@ -390,6 +395,72 @@ rollback_failed_start() {
 	procd_kill mihomox mihomox > /dev/null 2>&1
 	cleanup
 	log "App" "Startup rollback completed."
+}
+
+validate_final_profile() {
+	local tls_listen tls_cert tls_key tls_ech_key
+	tls_listen=$(yq -M '."external-controller-tls" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
+	tls_cert=$(yq -M '.tls.certificate // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
+	tls_key=$(yq -M '.tls."private-key" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
+	tls_ech_key=$(yq -M '.tls."ech-key" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
+	if [ -n "$tls_listen" ] || [ -n "$tls_cert" ] || [ -n "$tls_key" ] || [ -n "$tls_ech_key" ]; then
+		if [ -z "$tls_listen" ] || [ -z "$tls_cert" ] || [ -z "$tls_key" ]; then
+			log "Security" "API TLS requires listen address, certificate and private key together."
+			return 1
+		fi
+	fi
+
+	local dns_respect_rules proxy_policy_count proxy_nameserver_count fake_ip_filter_mode fake_ip_rules invalid_fake_ip_rules
+	dns_respect_rules=$(yq -M '.dns."respect-rules" // false' "$RUN_PROFILE_PATH" 2>/dev/null || echo false)
+	proxy_policy_count=$(yq -M '((.dns."proxy-server-nameserver-policy" // {}) | length)' "$RUN_PROFILE_PATH" 2>/dev/null || echo 0)
+	proxy_nameserver_count=$(yq -M '((.dns."proxy-server-nameserver" // []) | length)' "$RUN_PROFILE_PATH" 2>/dev/null || echo 0)
+	if { [ "$dns_respect_rules" = true ] || [ "$proxy_policy_count" -gt 0 ]; } && [ "$proxy_nameserver_count" -eq 0 ]; then
+		log "Profile" "DNS policy requires at least one proxy-server-nameserver."
+		return 1
+	fi
+
+	fake_ip_filter_mode=$(yq -M '.dns."fake-ip-filter-mode" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
+	if [ "$fake_ip_filter_mode" = "rule" ]; then
+		if ! fake_ip_rules=$(yq -M '(.dns."fake-ip-filter" // [])[]' "$RUN_PROFILE_PATH" 2>/dev/null); then
+			log "Profile" "Unable to read Fake-IP rules from the final profile."
+			return 1
+		fi
+		if [ -z "$fake_ip_rules" ]; then
+			invalid_fake_ip_rules=0
+		else
+			invalid_fake_ip_rules=$(printf '%s\n' "$fake_ip_rules" | awk -F, '
+			function trim(value) { sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+$/, "", value); return value }
+			function action_ok(value) { value=tolower(trim(value)); return value == "fake-ip" || value == "real-ip" }
+			{
+				type=toupper(trim($1)); valid=0
+				if (type == "MATCH")
+					valid=(NF == 2 && action_ok($2))
+				else if (type == "DOMAIN-REGEX")
+					valid=(NF >= 3 && length(trim($2)) > 0 && action_ok($NF))
+				else if (type ~ /^(DOMAIN|DOMAIN-SUFFIX|DOMAIN-KEYWORD|DOMAIN-WILDCARD|GEOSITE|RULE-SET)$/)
+					valid=(NF >= 3 && length(trim($2)) > 0 && action_ok($3))
+				if (!valid) invalid++
+			}
+			END { print invalid + 0 }
+			')
+		fi
+		if [ "$invalid_fake_ip_rules" -gt 0 ]; then
+			log "Profile" "Fake-IP rule mode requires complete domain rules ending with fake-ip or real-ip."
+			return 1
+		fi
+	fi
+	return 0
+}
+
+warn_legacy_profile() {
+	local group_legacy_count
+	if yq -M -e 'has("global-client-fingerprint")' "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
+		log "Profile" "global-client-fingerprint is removed; set client-fingerprint on each proxy."
+	fi
+	group_legacy_count=$(yq -M '((."proxy-groups" // []) | map(select(has("routing-mark") or has("interface-name") or has("dialer-proxy"))) | length)' "$RUN_PROFILE_PATH" 2>/dev/null || echo 0)
+	if [ "$group_legacy_count" -gt 0 ]; then
+		log "Profile" "Proxy group routing-mark, interface-name and dialer-proxy are ignored; set them on individual proxies."
+	fi
 }
 
 service_started() {

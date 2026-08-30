@@ -3,12 +3,14 @@
 MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。每次更新先对独立、干净
 的 Git 克隆执行快进同步，再按提交范围审计，最后记录“需要移植”或“无需移植”。
 
-## 本地参考仓库
+## 权威源与本地参考仓库
 
-这些目录与 MihomoX 仓库并列：
+官方 Mihomo/Zashboard 是配置、API 和面板资产的直接权威源；Nikki 是功能参考仓库：
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
+| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `65287f0e0f3f8e5aaa1e95ded15a80235ecb8c04` |
+| [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.24.0` |
 | [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `3799926` |
 
 ## 同步流程
@@ -48,6 +50,19 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
   - 决策：无需移植。
 
 本轮只移植 Cron 生命周期和日志真实路径 ACL，不合并 Nikki 提交或目录。
+
+## 2026-08-30：Mihomo Alpha 与 Zashboard
+
+- Mihomo：官方 `Alpha` 最新提交为 `65287f0e0f3f8e5aaa1e95ded15a80235ecb8c04`（2026-08-29），稳定版为 `v1.19.30`（2026-08-16）。核心下载脚本已能动态解析并校验最新 Alpha 资产。
+- API：REST/WS 端点、Bearer 认证、`/storage`、`/rules/disable`、`/configs` 和 `/upgrade/ui` 与 MihomoX/Zashboard 调用保持兼容。
+- 适配：补充 TLS 证书对校验、Fake-IP Rule 模式、DNS policy 依赖、UI 路径/名称和域名通配符校验；启动时提示已移除的旧字段。
+- Zashboard：默认改为 `releases/latest/download/dist.zip`，构建时解析发布位置并动态获取 SHA256；不再固定旧版本标签。
+- 实测 latest 为 `v3.24.0`，`dist.zip` SHA256 为 `5ba15d3388adf0483929970663053871c530312224dd6d13bdf396a7f517697b`；该值仅记录审计证据，不写回默认 Makefile，避免固定版本。
+- 默认 GeoData loader 调整为 `memconservative`，与当前核心默认值一致。
+- `external-controller-routing-mark` 和 `dns.listen-routing-mark` 属于可选能力，本轮未暴露到 UCI/LuCI；不影响现有面板和配置兼容。
+- 本轮对应包发布号：`mihomox` release 17、`luci-app-mihomox` release 12。
+
+本轮未发现需要移植的 Mihomo API 破坏性变更。
 
 ## 2026-08-24：Clashoo（最终审计与移植）
 

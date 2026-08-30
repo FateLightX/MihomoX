@@ -58,6 +58,60 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 防火墙规则由 `mihomox/files/ucode/hijack.ut` 生成。默认值以
 `mihomox/files/mihomox.conf` 为准，不得只改 LuCI 页面默认值。
 
+### 当前上游接续基线（2026-08-30）
+
+以下只是已验证检查点，开始新一轮适配前必须重新查询，不得假定仍是最新：
+
+| 项目 | 已验证版本 | 本地处理 |
+| --- | --- | --- |
+| Mihomo Alpha | `65287f0e0f3f8e5aaa1e95ded15a80235ecb8c04` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
+| Zashboard | `v3.24.0`，`dist.zip` SHA256 `5ba15d3388adf0483929970663053871c530312224dd6d13bdf396a7f517697b` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
+| 包发布号 | `mihomox` release 17；`luci-app-mihomox` release 12 | 后续改动对应包内容时继续递增 |
+
+重新查询：
+
+```sh
+git ls-remote https://github.com/MetaCubeX/mihomo.git refs/heads/Alpha
+curl -fsSL -o /dev/null -w '%{url_effective}\n' \
+  https://github.com/Zephyruso/zashboard/releases/latest
+```
+
+Mihomo 兼容审计优先读取官方源码：
+
+- `config/config.go`：顶层配置、DNS、TLS、默认值和路径限制。
+- `adapter/outboundgroup/parser.go`：代理组已移除或禁止的字段。
+- `hub/route/server.go`：REST/WS、TLS 和面板服务。
+- Zashboard 实际使用的 API 再与 `luci-app-mihomox/htdocs/luci-static/resources/tools/mihomox.js`
+  对照，不能只看字段名称。
+
+本轮已适配：
+
+- 顶层 `geodata-loader` 默认值改为 `memconservative`。
+- 最终 profile 检查 API TLS 监听、证书、私钥和 ECH 配置组合。
+- 检查 `external-ui` 安全路径和 `external-ui-name` 本地相对路径语义。
+- 检查 DNS `respect-rules`、`proxy-server-nameserver-policy` 对
+  `proxy-server-nameserver` 的依赖。
+- Fake-IP `rule` 模式只接受 Mihomo 支持的域名规则，并要求 `fake-ip`/`real-ip` 动作。
+- 启动时提示已移除的 `global-client-fingerprint`，以及代理组级
+  `routing-mark`、`interface-name`、`dialer-proxy`。
+
+对应本地实现和回归入口：
+
+- LuCI 输入校验：`luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js`。
+- 最终 profile 启动前检查：`mihomox/files/mihomox.init`。
+- 默认值：`mihomox/files/mihomox.conf`。
+- 回归测试：`tests/test_luci_validators.js`、`tests/test_luci_mixin.js`、
+  `tests/test_backend_regressions.sh`、`tests/test_default_settings.sh`。
+
+有意未增加 `external-controller-routing-mark` 和 `dns.listen-routing-mark`：它们是可选功能，
+不是现有配置或 Zashboard 的兼容性前提。需要暴露时，应同时修改 UCI、`mixin.uc`、LuCI、
+翻译和测试，不要仅向 YAML 临时注入。
+
+`mihomox/Makefile` 中空的 `ZASHBOARD_SHA256` 是有意设计：默认 latest URL 会由
+`fetch_zashboard.sh` 解析重定向后的发布标签和 GitHub 资产 SHA256；自定义 URL 没有可信
+发布元数据，必须传入 64 位 SHA256。不要把空值直接替换为某一版本摘要，否则会重新固定
+Zashboard 版本。
+
 ## 3. 目录职责
 
 | 路径 | 职责 |
@@ -104,6 +158,9 @@ msgfmt --check -o /dev/null luci-app-mihomox/po/zh_Hans/mihomox.po
 make package/mihomox/compile V=s
 make package/luci-app-mihomox/compile V=s
 ```
+
+临时下载、解包和人工核验使用系统临时目录，或使用已忽略的 `.codex-verification/`；完成后
+清理。不要删除 `tests/` 下的正式回归测试，也不要把下载产物、面板静态文件或测试缓存提交。
 
 ## 5. 常见修改类型
 
@@ -170,8 +227,22 @@ make package/luci-app-mihomox/compile V=s
 - `tests/test_fetch_*.sh`
 
 内核必须做 SHA256、gzip 和 ELF 架构校验。GeoData 默认 URL 固定到上游提交，Zashboard
-默认 URL 固定到发布标签，两者的 SHA256 与 URL 一起维护；不得把“无校验下载”作为
-默认发布状态。
+默认 URL 跟随最新发布版本，构建时解析并校验 SHA256；不得把“无校验下载”作为默认
+发布状态。
+
+Zashboard 最低验证要求：
+
+```sh
+verify_root="$(mktemp -d /tmp/mihomox-zashboard.XXXXXX)"
+./mihomox/scripts/fetch_zashboard.sh \
+  --dl-dir "$verify_root/dl" \
+  --output-dir "$verify_root/output"
+test -s "$verify_root/output/index.html"
+cat "$verify_root/output/.version"
+```
+
+默认 latest URL 必须能解析上游 SHA256；固定或自定义 URL 必须显式提供 SHA256。下载成功
+但摘要、ZIP 结构或 `index.html` 不符合预期时仍视为失败。
 
 ### 修改版本和发布
 
@@ -240,7 +311,8 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 - 分块文本必须使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - 调试输出必须脱敏：secret、password、token、订阅 URL、代理服务器等。
 - 不暴露用户凭据、订阅内容或 Actions secret。
-- Nikki 是唯一参考仓库，只能按 `PORTING.md` 的边界参考，不得整目录覆盖。
+- 官方 Mihomo/Zashboard 是配置、API 和面板资产权威源；Nikki 是唯一功能参考仓库，只能按
+  `PORTING.md` 的边界参考，不得整目录覆盖。
 
 ## 9. 已知边界和后续优化
 
@@ -248,7 +320,10 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 
 - 本地回归测试不替代 OpenWrt SDK 交叉编译和真机 rpcd/LuCI/网络验证。
 - 公开发布矩阵目前只有 OpenWrt 25.12 x86_64；不要仅修改安装声明来扩展目标。
-- GeoData 和 Zashboard 固定 URL 与 SHA256，更新上游资源时必须成对更新并运行下载测试。
+- GeoData URL 固定到上游提交；Zashboard 默认跟随最新发布 URL，构建时解析并校验 SHA256。
+  更新上游资源时必须运行对应下载测试。
+- 当前兼容审计基线和有意未实现字段记录在本文“当前上游接续基线”；新一轮审计完成后同时
+  更新该节和 `docs/upstream.md`，避免后续 AI 重复猜测。
 - 运行路由参数保存在 `/var/run/mihomox/routing.state`；reload/stop 必须用旧运行参数精确
   删除 MihomoX 创建的规则和路由，禁止恢复为整表 flush。
 - Core API HTTPS 默认校验证书；只有最终配置明确提供本地证书和私钥时才允许自签场景。

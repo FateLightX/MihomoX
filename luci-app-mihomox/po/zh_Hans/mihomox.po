@@ -1543,3 +1543,26 @@ msgstr "部分测试不可用"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Network Status"
 msgstr "网络状态"
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
+msgid "API TLS requires listen address, certificate and private key together."
+msgstr "API TLS 监听、证书和私钥必须同时配置。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
+msgid "Rule mode requires complete domain rules ending with fake-ip or real-ip."
+msgstr "规则模式要求完整的域名规则，并以 fake-ip 或 real-ip 结尾。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
+msgid "Invalid domain pattern."
+msgstr "域名模式无效。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
+msgid "Invalid DNS policy matcher."
+msgstr "DNS 策略匹配器无效。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
+msgid "UI Name must be a local relative path."
+msgstr "UI 名称必须是本地相对路径。"
+
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
+msgid "Relative UI Path must stay within Mihomo home."
+msgstr "相对 UI 路径必须位于 Mihomo 主目录内。"
