@@ -56,6 +56,12 @@ assert.ok(source.includes("Relative UI Path must stay within Mihomo home."), 'UI
 assert.ok(source.includes("API TLS requires listen address, certificate and private key together."), 'TLS pair validation is missing');
 assert.ok(source.includes("mode === 'rule' ? validateFakeIPRule(value) : validateDomainPattern(value)"), 'Fake-IP mode-aware validation is missing');
 assert.ok(source.includes('so.validate = validatePolicyMatcher;'), 'DNS policy matcher validation is missing');
+// The core also honours no-resolve on RULE-SET (rules/provider/rule_set.go), which
+// matters for ipcidr rule sets under Fake-IP.
+assert.ok(
+    /'no_resolve'[\s\S]{0,320}depends\('type', \/RULE-SET\/i\)/.test(source),
+    'no-resolve must be offered for RULE-SET rules'
+);
 for (const type of ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'GEOSITE', 'RULE-SET', 'MATCH']) {
     assert.ok(source.includes(`'${type}'`), `missing Fake-IP rule type: ${type}`);
 }

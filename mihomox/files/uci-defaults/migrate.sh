@@ -284,6 +284,16 @@ if [ "$(uci -q get mihomox.mixin.sniffer_ignore_domain_name)" = "1" ]; then
 	[ "$has_local" = "0" ] && uci add_list mihomox.mixin.sniffer_ignore_domain_names="+.local"
 fi
 
+# since v1.26.2
+
+# QUIC_GO_DISABLE_ECN was never effective on its own: the core rewrites it from its
+# own default on every start, so ECN has always been off regardless of this option.
+# The mixin now emits experimental.quic-go-disable-ecn, so align the stored value
+# with the behaviour existing installations already have.
+if [ "$(uci -q get mihomox.procd.env_disable_quic_go_ecn)" != "1" ]; then
+	uci set mihomox.procd.env_disable_quic_go_ecn=1
+fi
+
 # commit
 uci commit mihomox
 

@@ -821,6 +821,7 @@ return view.extend({
         so.depends('type', /IP-CIDR6?/i);
         so.depends('type', /IP-ASN/i);
         so.depends('type', /GEOIP/i);
+        so.depends('type', /RULE-SET/i);
 
         s.tab('geox', _('GeoX Config'));
 

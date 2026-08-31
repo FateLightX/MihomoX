@@ -9,6 +9,7 @@ INIT_SCRIPT="$ROOT_DIR/mihomox/files/mihomox.init"
 MIGRATE="$ROOT_DIR/mihomox/files/uci-defaults/migrate.sh"
 
 grep -q "option 'fast_reload' '1'" "$CONFIG"
+grep -q "option 'env_disable_quic_go_ecn' '1'" "$CONFIG"
 grep -q "option 'unify_delay' '1'" "$CONFIG"
 grep -q "option 'tcp_concurrent' '1'" "$CONFIG"
 grep -q "option 'authentication' '1'" "$CONFIG"
@@ -64,5 +65,6 @@ END { if (in_sniff) finish_block(); exit !(http && tls && quic) }
 grep -q 'auth_password=$(generate_secret)' "$MIGRATE"
 grep -q 'auth_password=$(generate_secret)' "$INIT_DEFAULTS"
 grep -q 'mihomox.mixin.fake_ip6_range=fc00::/18' "$MIGRATE"
+grep -q 'uci set mihomox.procd.env_disable_quic_go_ecn=1' "$MIGRATE"
 
 echo "default settings tests passed"

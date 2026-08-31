@@ -38,4 +38,18 @@ grep -q 'API TLS requires listen address, certificate and private key together.'
 grep -q 'DNS policy requires at least one proxy-server-nameserver.' "$INIT_SCRIPT"
 grep -q 'Fake-IP rule mode requires complete domain rules ending with fake-ip or real-ip.' "$INIT_SCRIPT"
 
+# An unbalanced yq expression exits non-zero, which silently disables the check it
+# guards instead of reporting a failure.
+awk '
+/yq -M/ {
+	opened = gsub(/\(/, "(")
+	closed = gsub(/\)/, ")")
+	if (opened != closed) {
+		printf "unbalanced parentheses in yq expression at line %d (%d open, %d close)\n", FNR, opened, closed > "/dev/stderr"
+		bad = 1
+	}
+}
+END { exit bad }
+' "$INIT_SCRIPT"
+
 echo "backend regression tests passed"

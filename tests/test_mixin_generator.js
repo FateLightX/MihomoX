@@ -21,6 +21,8 @@ const expectedMappings = [
     "config['sniffer']['skip-src-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_src_addresses'));",
     "config['sniffer']['skip-dst-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_dst_addresses'));",
     "'size-limit': section.file_size_limit,",
+    "config['experimental']['quic-go-disable-gso'] = uci_bool(uci.get('mihomox', 'procd', 'env_disable_quic_go_gso'));",
+    "config['experimental']['quic-go-disable-ecn'] = uci_bool(uci.get('mihomox', 'procd', 'env_disable_quic_go_ecn'));",
 ];
 
 for (const mapping of expectedMappings) {

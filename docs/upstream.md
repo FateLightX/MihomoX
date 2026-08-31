@@ -9,7 +9,7 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `65287f0e0f3f8e5aaa1e95ded15a80235ecb8c04` |
+| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `68ec4fae652318bb1474bdfca3918191b167806d` |
 | [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.24.0` |
 | [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `3799926` |
 
@@ -25,6 +25,50 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-09-01：Mihomo Alpha 全字段核对
+
+- 官方 `Alpha` 最新提交为 `68ec4fae652318bb1474bdfca3918191b167806d`（2026-08-31）。
+  `65287f0e..68ec4fae` 只有 `68ec4fae fix: ipv6 url parse in xhttp (#3160)`，仅改
+  `adapter/outbound/vless.go`，不涉及配置字段和 API。
+- 核对方法：上游对未知键静默忽略（实测塞入 `bogus-key-xyz`、拼错的 `dns.fake-ip-rang`
+  和残留的 `mihomox-rules` 后 `mihomo -t` 仍然通过），因此 `-t` 通过不足以证明键名正确。
+  改为解析上游 Go struct 的 `yaml:` tag 并递归展开 `RawConfig`，逐条比对
+  `ucode/mixin.uc` 与 `mihomox.init` 写入/读取的 93 个配置路径：全部命中，0 缺失。
+- 实测：用真实订阅节点生成“出厂默认值”和“全字段”两份配置，`mihomo -t`（alpha-68ec4fa）
+  均通过，无 deprecation 警告。
+- 枚举核对：`fake-ip-filter-mode` 的 `rule` 对应 `constant/dns.go` 的 `FilterRule`；
+  sniffer 协议集合等于 `constant/sniffer/sniffer.go:26` 的 `List`（`TLS/HTTP/QUIC`，比较前
+  `ToUpper`）；`Mijia Cloud` 通过 `trie.ValidAndSplitDomain`（`2f7eae5a` 只收紧首尾空白、
+  尾点、空 label 和错位通配符）；rule-provider 的 `size-limit`/`interval` 以字符串传出无碍，
+  上游 decoder 开启 `WeaklyTypedInput`；GeoData 文件名与 `constant/path.go:18-20,136-144` 一致。
+- 适配 1：`mihomox.init` 的 TUN 预检 yq 表达式括号不平衡（9 开 10 闭），yq 报
+  `bad expression, got close brackets without matching opening bracket` 并退出非零，
+  使该检查从未生效。已补外层括号，并在 `tests/test_backend_regressions.sh` 增加对全部 yq
+  表达式的括号平衡断言。
+- 适配 2：`QUIC_GO_DISABLE_ECN` 单靠 procd 环境变量无效——`hub/executor/executor.go:218`
+  会按 `config/config.go:573` 的内置默认 `true` 重新 `os.Setenv`，而 quic-go 在建连时才
+  `strconv.ParseBool`（`sys_conn_oob.go:62`）。改为由 mixin 输出
+  `experimental.quic-go-disable-gso` 和 `experimental.quic-go-disable-ecn`，出厂默认与上游
+  对齐（ECN 关闭），迁移脚本把既有安装的存量值对齐到实际运行行为。`QUIC_GO_DISABLE_GSO`
+  原本就有效（上游默认 `false`，核心不覆盖），保留环境变量以覆盖 `core_only` 模式。
+- `/proxies`（`85c1798f`，2026-07-02）不再合并 proxy-provider 节点。MihomoX 前端只调
+  `POST /upgrade/ui`，其余走通用 passthrough，不受影响；面板侧由 Zashboard 负责，latest
+  已在该提交之后。
+- Zashboard latest 仍为 `v3.24.0`，与上一轮记录一致，无需变更。
+- keep-alive 三项不设值时，上游落到 `component/keepalive/tcp_keepalive.go` 的 `0/0/false`，
+  go1.23+ 路径下等价于 `net.KeepAliveConfig{Enable:true, Idle:0, Interval:0}`，Go 文档零值为
+  15s/15s/9，抗 NAT 老化有利，本轮不改。
+- 断流实测（本机 alpha-68ec4fa，仅回环端口，不启用 tun/tproxy/redir）：持续下载
+  290 MB/300 s，每秒采样无 ≥3 s 停顿窗口；定频探测 33/33、DNS over UDP 110/110 成功；
+  内核日志 0 条 warn/error。空闲复用 A/B 中经代理（60 s、95 s 正常，125 s 收到 FIN）比直连
+  （60 s 即被关）撑得更久，属源站 keep-alive 策略，不是断流。
+- 未暴露但可考虑的上游能力：`external-controller-cors`、`ntp`、`etag-support`、`global-ua`、
+  `sub-rules`、`external-doh-server`、rule-provider 的 `header`/`path-in-bundle`/`inline`，
+  以及规则类型中缺少的 16 种。`dns.listen-routing-mark` 与
+  `external-controller-routing-mark` 继续按上一轮决策不暴露。
+- 未验证：nftables 重载对已建立连接的影响、tproxy/conntrack UDP 老化、TUN 栈真机行为，
+  以及修复后 TUN 预检的真机拦截效果。
 
 ## 2026-08-17：Nikki
 

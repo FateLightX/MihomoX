@@ -159,6 +159,12 @@ config['profile'] = {};
 config['profile']['store-selected'] = uci_bool(uci.get('mihomox', 'mixin', 'selection_cache'));
 config['profile']['store-fake-ip'] = uci_bool(uci.get('mihomox', 'mixin', 'fake_ip_cache'));
 
+// The core rewrites QUIC_GO_DISABLE_ECN from its own default on every start, so the
+// procd environment variable alone cannot re-enable ECN; emit the config fields too.
+config['experimental'] = {};
+config['experimental']['quic-go-disable-gso'] = uci_bool(uci.get('mihomox', 'procd', 'env_disable_quic_go_gso'));
+config['experimental']['quic-go-disable-ecn'] = uci_bool(uci.get('mihomox', 'procd', 'env_disable_quic_go_ecn'));
+
 if (uci_bool(uci.get('mihomox', 'mixin', 'rule_provider'))) {
 	config['rule-providers'] = {};
 	uci.foreach('mihomox', 'rule_provider', (section) => {
