@@ -69,6 +69,7 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
   `external-controller-routing-mark` 继续按上一轮决策不暴露。
 - 未验证：nftables 重载对已建立连接的影响、tproxy/conntrack UDP 老化、TUN 栈真机行为，
   以及修复后 TUN 预检的真机拦截效果。
+- 本轮对应包版本统一更新为 `2026.9.1`，两个包的 release 保持 1。
 
 ## 2026-08-17：Nikki
 

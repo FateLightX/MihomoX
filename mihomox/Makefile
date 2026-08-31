@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mihomox
-PKG_VERSION:=2026.8.30
+PKG_VERSION:=2026.9.1
 PKG_RELEASE:=1
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/mihomox-$(PKG_VERSION)
