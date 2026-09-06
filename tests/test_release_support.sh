@@ -82,15 +82,6 @@ done
 
 grep -Fq '使用公开安装脚本或 Feed：OpenWrt 25.12、`x86_64`' "$ROOT_DIR/README.md"
 grep -Fq '公开安装脚本、Feed 和 CI 产物只覆盖 OpenWrt 25.12 x86_64' "$ROOT_DIR/AGENTS.md"
-
-stale_workflow="$ROOT_DIR/.github/workflows/stale-issues.yml"
-grep -Fq 'days-before-issue-stale: 30' "$stale_workflow"
-grep -Fq 'days-before-issue-close: 14' "$stale_workflow"
-if grep -Eq 'days-before-issue-(stale|close): (1|3)$' "$stale_workflow"; then
-	echo "stale issue lifecycle is too aggressive" >&2
-	exit 1
-fi
-
 for workflow in build-packages.yml release-packages.yml; do
 	workflow_path="$ROOT_DIR/.github/workflows/$workflow"
 	grep -Fq 'ARCH: x86_64-openwrt-25.12' "$workflow_path"

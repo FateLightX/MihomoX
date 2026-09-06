@@ -278,7 +278,6 @@ cat "$verify_root/output/.version"
 
 ### 其他工作流
 
-- `stale-issues.yml`：自动标记和关闭无活动 issue。
 - `delete-workflow-runs.yml`：手动清理旧的 workflow run。
 
 MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版本并加注释。
