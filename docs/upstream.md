@@ -82,6 +82,11 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 本轮从 Alpha 移植 `stack: mips` 的 LuCI 可选值，并记录 wildcard 匹配缺陷已由新内核修复。
 
+包版本：本轮同时改动两个包的内容（`mihomox` 的 `include.uc`/`debug.sh`，
+`luci-app-mihomox` 的 `mixin.js`/`luci.mihomox`），按版本规则把 `PKG_VERSION` 从
+`2026.9.1` 更新为日期式 `2026.9.18`，两个包保持一致并把 `PKG_RELEASE` 重置为 1，
+对应 release tag `v2026.9.18-1-1`。
+
 ## 2026-09-18：Nikki
 
 - 上游：`nikkinikki-org/OpenWrt-nikki`

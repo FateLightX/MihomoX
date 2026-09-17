@@ -66,7 +66,7 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 | --- | --- | --- |
 | Mihomo Alpha | `fbb674227d5cf5a3796a1dd1451849fa1872884a` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
 | Zashboard | `v3.28.0`，`dist.zip` SHA256 `8d966a3b75292764d16a0e5796b6c6de0468bc71a7e9302f430f27b681f77b43` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
-| 包版本 | `2026.9.1`，两个包 release 均为 1 | 后续改动对应包内容时继续递增 release |
+| 包版本 | `2026.9.18`，两个包 release 均为 1 | 后续改动对应包内容时继续递增 release |
 
 重新查询：
 
