@@ -57,11 +57,14 @@ MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源
 设备运行时依赖通过 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入 APK 元数据，不加入
 Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 OpenWrt 软件源解析依赖。
 
-手动运行 `release-packages` 时不需要填写版本号。工作流先执行 `tests/run.sh`，然后从
-`mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 读取 `PKG_VERSION`、`PKG_RELEASE`，
-在两个包的 `PKG_VERSION` 一致时生成 `v<version>-<mihomox-release>-<luci-release>`
-作为 GitHub Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。
-Cloudflare 凭据未配置时仅跳过 Feed 部署，不影响 GitHub Release 成功。
+手动运行 `release-packages` 时不需要填写版本号。工作流先执行 `tests/run.sh`，再由
+`scripts/release-version.sh` 从两个 `Makefile` 解析版本，生成日期式标签作为 GitHub
+Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。
+
+`PKG_VERSION` 使用日期（如 `2026.9.18`），tag 为 `v2026.9.18`；同一天再次发布时把两个包的
+`PKG_RELEASE` 一起加一，tag 依次变成 `v2026.9.18.1`、`v2026.9.18.2`。目标 tag 已存在时
+工作流会直接失败，不会把新构建追加到上一次 release。Cloudflare 凭据未配置时仅跳过 Feed
+部署，不影响 GitHub Release 成功。
 
 ## 使用
 

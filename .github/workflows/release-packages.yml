@@ -20,14 +20,7 @@ jobs:
       - id: version
         name: resolve release version
         run: |
-          mihomox_version=$(sed -n 's/^PKG_VERSION:=//p' mihomox/Makefile | head -n1)
-          mihomox_release=$(sed -n 's/^PKG_RELEASE:=//p' mihomox/Makefile | head -n1)
-          luci_version=$(sed -n 's/^PKG_VERSION:=//p' luci-app-mihomox/Makefile | head -n1)
-          luci_release=$(sed -n 's/^PKG_RELEASE:=//p' luci-app-mihomox/Makefile | head -n1)
-          [ -n "$mihomox_version" ] && [ -n "$mihomox_release" ] && [ -n "$luci_version" ] && [ -n "$luci_release" ] || exit 1
-          [ "$mihomox_version" = "$luci_version" ] || { echo "mihomox and luci-app-mihomox versions must match" >&2; exit 1; }
-          release_version="v${mihomox_version}-${mihomox_release}-${luci_release}"
-          printf '%s\n' "$release_version" | grep -Eq '^v[0-9]+[.][0-9]+[.][0-9]+([.-][0-9A-Za-z.-]+)?$'
+          release_version=$(./scripts/release-version.sh --check-remote)
           echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
 
   release:

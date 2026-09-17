@@ -66,7 +66,7 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 | --- | --- | --- |
 | Mihomo Alpha | `fbb674227d5cf5a3796a1dd1451849fa1872884a` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
 | Zashboard | `v3.28.0`，`dist.zip` SHA256 `8d966a3b75292764d16a0e5796b6c6de0468bc71a7e9302f430f27b681f77b43` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
-| 包版本 | `2026.9.18`，两个包 release 均为 1 | 后续改动对应包内容时继续递增 release |
+| 包版本 | `2026.9.18`，两个包 release 均为 1 | 同日再发布时把两个包 release 一起加一；tag 见上文“修改版本和发布” |
 
 重新查询：
 
@@ -259,11 +259,25 @@ cat "$verify_root/output/.version"
 
 版本规则：
 
-- `mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 的 `PKG_VERSION` 必须一致。
+- `mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 的 `PKG_VERSION` 必须一致，且必须
+  使用日期式版本，例如 `2026.9.18`。
 - 更新 `PKG_VERSION` 时，两个包使用同一版本，并把对应 `PKG_RELEASE` 重置为 1。
-- 每次发布对应包内容变化时，把对应包的 `PKG_RELEASE` 加一。
+- 同一天需要再次发布时，不新建日期，而是把两个包的 `PKG_RELEASE` 一起加一。
 - `release-packages` 不需要手动填版本。
-- Release tag 由工作流生成：`v<PKG_VERSION>-<mihomox PKG_RELEASE>-<luci-app-mihomox PKG_RELEASE>`。
+- Release tag 由 `scripts/release-version.sh` 生成，规则是“日期 + 递增序号”：
+
+  | `PKG_VERSION` | `PKG_RELEASE` | Release tag |
+  | --- | --- | --- |
+  | `2026.9.18` | 1 | `v2026.9.18` |
+  | `2026.9.18` | 2 | `v2026.9.18.1` |
+  | `2026.9.18` | 3 | `v2026.9.18.2` |
+  | `2026.9.19` | 1 | `v2026.9.19` |
+
+  即 `PKG_RELEASE` 为 1 时用纯日期 tag，之后按 `PKG_RELEASE - 1` 追加序号；换新日期并把
+  `PKG_RELEASE` 重置为 1 后又回到纯日期 tag。两个包的 `PKG_RELEASE` 必须相等，否则脚本
+  拒绝生成 tag。
+- 工作流调用 `scripts/release-version.sh --check-remote`：目标 tag 已存在于 origin 时直接
+  失败，避免 `action-gh-release` 把新构建追加到上一次 release。
 
 发布前必须运行 `./tests/run.sh`。`release-packages` 的 `validate` job 已内置测试；不要绕过。
 

@@ -93,28 +93,105 @@ for workflow in build-packages.yml release-packages.yml; do
 done
 
 release_workflow="$ROOT_DIR/.github/workflows/release-packages.yml"
-mihomox_version=$(sed -n 's/^PKG_VERSION:=//p' "$ROOT_DIR/mihomox/Makefile" | head -n1)
-mihomox_release=$(sed -n 's/^PKG_RELEASE:=//p' "$ROOT_DIR/mihomox/Makefile" | head -n1)
-luci_version=$(sed -n 's/^PKG_VERSION:=//p' "$ROOT_DIR/luci-app-mihomox/Makefile" | head -n1)
-luci_release=$(sed -n 's/^PKG_RELEASE:=//p' "$ROOT_DIR/luci-app-mihomox/Makefile" | head -n1)
-[ "$mihomox_version" = "$luci_version" ] || { echo "package versions must match" >&2; exit 1; }
-release_version="v${mihomox_version}-${mihomox_release}-${luci_release}"
-printf '%s\n' "$release_version" | grep -Eq '^v[0-9]+[.][0-9]+[.][0-9]+([.-][0-9A-Za-z.-]+)?$'
+version_script="$ROOT_DIR/scripts/release-version.sh"
+
+[ -x "$version_script" ] || { echo "release-version.sh must be executable" >&2; exit 1; }
+
+# The workflow must derive the tag through the shared script, so the scheme is
+# testable outside CI instead of being an inline shell expression.
 grep -Fq 'run: ./tests/run.sh' "$release_workflow"
-grep -Fq "release_version=\"v\${mihomox_version}-\${mihomox_release}-\${luci_release}\"" "$release_workflow"
-grep -Fq 'mihomox_version=$(sed -n '\''s/^PKG_VERSION:=//p'\'' mihomox/Makefile | head -n1)' "$release_workflow"
-grep -Fq 'mihomox_release=$(sed -n '\''s/^PKG_RELEASE:=//p'\'' mihomox/Makefile | head -n1)' "$release_workflow"
-grep -Fq 'luci_version=$(sed -n '\''s/^PKG_VERSION:=//p'\'' luci-app-mihomox/Makefile | head -n1)' "$release_workflow"
-grep -Fq 'luci_release=$(sed -n '\''s/^PKG_RELEASE:=//p'\'' luci-app-mihomox/Makefile | head -n1)' "$release_workflow"
+grep -Fq 'release_version=$(./scripts/release-version.sh --check-remote)' "$release_workflow"
+# An existing tag would make action-gh-release append to the previous release,
+# so CI must refuse it rather than publish a stale build.
+grep -Fq -- '--check-remote' "$version_script"
+grep -Fq 'already exists on origin' "$version_script"
 grep -Fq 'tag_name: ${{ needs.validate.outputs.release_version }}' "$release_workflow"
-grep -Fq 'name: ${{ needs.validate.outputs.release_version }}' "$release_workflow"
+grep -Fq 'name: MihomoX ${{ needs.validate.outputs.release_version }}' "$release_workflow"
 grep -Fq "if: env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_API_TOKEN != ''" "$release_workflow"
-if grep -Eq 'inputs:|default: v1.0.0|RELEASE_VERSION' "$release_workflow"; then
-	echo "release version must be derived from package Makefiles" >&2
-	exit 1
-fi
 if grep -Fq "github.event_name == 'push'" "$release_workflow"; then
 	echo "manual releases must not skip GitHub Release publishing" >&2
+	exit 1
+fi
+
+# The tag is the dated PKG_VERSION; a further release of the same version appends
+# one incrementing number derived from PKG_RELEASE.
+assert_version_tag() {
+	version="$1"
+	release="$2"
+	luci_release="$3"
+	expected_status="$4"
+	expected_tag="$5"
+	expected_message="${6:-}"
+	fixture=$(mktemp -d)
+	mkdir -p "$fixture/mihomox" "$fixture/luci-app-mihomox" "$fixture/scripts"
+	cp "$version_script" "$fixture/scripts/release-version.sh"
+	{
+		printf 'PKG_NAME:=mihomox\n'
+		printf 'PKG_VERSION:=%s\n' "$version"
+		printf 'PKG_RELEASE:=%s\n' "$release"
+	} > "$fixture/mihomox/Makefile"
+	{
+		printf 'PKG_VERSION:=%s\n' "$version"
+		printf 'PKG_RELEASE:=%s\n' "$luci_release"
+	} > "$fixture/luci-app-mihomox/Makefile"
+
+	set +e
+	output=$("$fixture/scripts/release-version.sh" 2>&1)
+	status=$?
+	set -e
+	rm -rf "$fixture"
+
+	[ "$status" -eq "$expected_status" ] || {
+		echo "release-version.sh returned $status for version=$version release=$release, expected $expected_status" >&2
+		printf '%s\n' "$output" >&2
+		exit 1
+	}
+	if [ "$expected_status" -eq 0 ]; then
+		[ "$output" = "$expected_tag" ] || {
+			echo "version=$version release=$release produced '$output', expected '$expected_tag'" >&2
+			exit 1
+		}
+	else
+		printf '%s\n' "$output" | grep -Fq "$expected_message" || {
+			echo "version=$version release=$release did not report: $expected_message" >&2
+			printf '%s\n' "$output" >&2
+			exit 1
+		}
+	fi
+}
+
+assert_version_tag 2026.9.18 1 1 0 v2026.9.18 ''
+assert_version_tag 2026.9.18 2 2 0 v2026.9.18.1 ''
+assert_version_tag 2026.9.18 3 3 0 v2026.9.18.2 ''
+assert_version_tag 2026.9.19 1 1 0 v2026.9.19 ''
+assert_version_tag 2026.10.1 1 1 0 v2026.10.1 ''
+assert_version_tag 2026.9.18 1 2 1 'package releases must match'
+assert_version_tag 2026.9.18 2 3 1 'package releases must match'
+assert_version_tag 1.26.1 1 1 1 'PKG_VERSION must be a dated version'
+assert_version_tag 2026-9-18 1 1 1 'PKG_VERSION must be a dated version'
+assert_version_tag 20260918 1 1 1 'PKG_VERSION must be a dated version'
+assert_version_tag 2026.9 1 1 1 'PKG_VERSION must be a dated version'
+# A zero-padded date is accepted and echoed verbatim, never reformatted.
+assert_version_tag 2026.09.18 1 1 0 v2026.09.18 ''
+assert_version_tag 2026.09.18 2 2 0 v2026.09.18.1 ''
+assert_version_tag 2026.9.18 0 0 1 'PKG_RELEASE must be at least 1'
+assert_version_tag 2026.9.18 1 1 0 v2026.9.18 ''
+
+# The current checkout must resolve to a valid dated tag.
+current_tag=$("$version_script")
+printf '%s\n' "$current_tag" | grep -Eq '^v[0-9]{4}[.][0-9]{1,2}[.][0-9]{1,2}([.][0-9]+)?$' || {
+	echo "current release tag is malformed: $current_tag" >&2
+	exit 1
+}
+current_version=$(sed -n 's/^PKG_VERSION:=//p' "$ROOT_DIR/mihomox/Makefile" | head -n1)
+case "$current_tag" in
+	"v$current_version"|"v$current_version".*) ;;
+	*) echo "release tag $current_tag does not match PKG_VERSION $current_version" >&2; exit 1 ;;
+esac
+
+# The old scheme embedded package release numbers in the tag; it must not return.
+if grep -Eq 'release_version="v\$\{mihomox_version\}-' "$release_workflow"; then
+	echo "release tag must not embed PKG_RELEASE numbers" >&2
 	exit 1
 fi
 

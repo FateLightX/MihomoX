@@ -84,8 +84,12 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 包版本：本轮同时改动两个包的内容（`mihomox` 的 `include.uc`/`debug.sh`，
 `luci-app-mihomox` 的 `mixin.js`/`luci.mihomox`），按版本规则把 `PKG_VERSION` 从
-`2026.9.1` 更新为日期式 `2026.9.18`，两个包保持一致并把 `PKG_RELEASE` 重置为 1，
-对应 release tag `v2026.9.18-1-1`。
+`2026.9.1` 更新为日期式 `2026.9.18`，两个包保持一致并把 `PKG_RELEASE` 重置为 1。
+
+Release tag 规则同时改为“日期 + 递增序号”：tag 由 `scripts/release-version.sh` 生成，
+`PKG_RELEASE=1` 时是 `v2026.9.18`，同日再发布则 `PKG_RELEASE=2` 对应 `v2026.9.18.1`。
+旧的 `v<PKG_VERSION>-<release>-<release>` 方案弃用（`v2026.9.1-1-1` 已被 `47a00a9`
+占用，是同一天重发时撞车的根因）。工作流带 `--check-remote`，目标 tag 已存在即失败。
 
 ## 2026-09-18：Nikki
 
