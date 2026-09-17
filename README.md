@@ -6,7 +6,8 @@ Mihomo 内核。
 
 ## 主要功能
 
-- 支持 IPv4、IPv6 的 Redirect、TPROXY 和 TUN 透明代理
+- 支持 IPv4、IPv6 的 Redirect、TPROXY 和 TUN 透明代理；TUN 可选
+  system / gVisor / Mixed / Mips 四种协议栈
 - 通过 LuCI 管理配置文件、订阅、混入配置、访问控制、规则、编辑器、面板和日志
 - 编译时打包目标架构的 Mihomo 内核，不依赖独立的 `mihomo-meta` 或
   `mihomo-alpha` 软件包

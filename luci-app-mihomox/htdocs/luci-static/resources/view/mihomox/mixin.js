@@ -378,6 +378,9 @@ return view.extend({
         o.value('system', 'System');
         o.value('gvisor', 'gVisor');
         o.value('mixed', 'Mixed');
+        // mipstack (Mihomo Alpha 2026-09-14, ab405bad): lower memory than gVisor
+        // on memory-constrained routers, no with_gvisor build tag required.
+        o.value('mips', 'Mips');
 
         o = s.taboption('tun', form.Value, 'tun_mtu', _('MTU'));
         o.datatype = 'uinteger';

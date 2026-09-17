@@ -58,15 +58,15 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 防火墙规则由 `mihomox/files/ucode/hijack.ut` 生成。默认值以
 `mihomox/files/mihomox.conf` 为准，不得只改 LuCI 页面默认值。
 
-### 当前上游接续基线（2026-08-30）
+### 当前上游接续基线（2026-09-18）
 
 以下只是已验证检查点，开始新一轮适配前必须重新查询，不得假定仍是最新：
 
 | 项目 | 已验证版本 | 本地处理 |
 | --- | --- | --- |
-| Mihomo Alpha | `65287f0e0f3f8e5aaa1e95ded15a80235ecb8c04` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
-| Zashboard | `v3.24.0`，`dist.zip` SHA256 `5ba15d3388adf0483929970663053871c530312224dd6d13bdf396a7f517697b` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
-| 包版本 | `2026.8.30`，两个包 release 均为 1 | 后续改动对应包内容时继续递增 release |
+| Mihomo Alpha | `fbb674227d5cf5a3796a1dd1451849fa1872884a` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
+| Zashboard | `v3.28.0`，`dist.zip` SHA256 `8d966a3b75292764d16a0e5796b6c6de0468bc71a7e9302f430f27b681f77b43` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
+| 包版本 | `2026.9.1`，两个包 release 均为 1 | 后续改动对应包内容时继续递增 release |
 
 重新查询：
 
@@ -94,6 +94,9 @@ Mihomo 兼容审计优先读取官方源码：
 - Fake-IP `rule` 模式只接受 Mihomo 支持的域名规则，并要求 `fake-ip`/`real-ip` 动作。
 - 启动时提示已移除的 `global-client-fingerprint`，以及代理组级
   `routing-mark`、`interface-name`、`dialer-proxy`。
+- TUN `stack` 提供 `system`/`gvisor`/`mixed`/`mips`；`mips` 是 Alpha `ab405bad` 新增的
+  mipstack 后端，不需要 `with_gvisor` 构建标签。新增或删除内核栈枚举时，同时更新
+  `mixin.js` 的 `tun_stack` 选项和 `tests/test_luci_mixin.js` 的栈断言。
 
 对应本地实现和回归入口：
 
@@ -106,6 +109,14 @@ Mihomo 兼容审计优先读取官方源码：
 有意未增加 `external-controller-routing-mark` 和 `dns.listen-routing-mark`：它们是可选功能，
 不是现有配置或 Zashboard 的兼容性前提。需要暴露时，应同时修改 UCI、`mixin.uc`、LuCI、
 翻译和测试，不要仅向 YAML 临时注入。
+
+Alpha `fbb6742` 审计后有意未实现的项，不要为它们添加 UCI/LuCI 字段：
+
+- `tun.processors-per-channel`：上游源码注释标注为 "Non-public option; do not include it
+  in the document"，默认值 1 已由核心内部生效，写不写都一样，不要暴露。
+- `easytier` outbound 与 ZeroTier `identity-secret`：属节点级能力，节点列表由订阅提供，
+  不在页面做静态枚举。用户需要时经 `mixin.yaml` 的 `mihomox-proxies` 自行声明。
+- EasyTier 的 `et://` / `easytier://` DNS 名称服务器：同上，属节点级配置。
 
 `mihomox/Makefile` 中空的 `ZASHBOARD_SHA256` 是有意设计：默认 latest URL 会由
 `fetch_zashboard.sh` 解析重定向后的发布标签和 GitHub 资产 SHA256；自定义 URL 没有可信

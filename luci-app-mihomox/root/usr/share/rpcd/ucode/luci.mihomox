@@ -475,7 +475,8 @@ const methods = {
 				const command = `yq -M -p yaml -o json eval-all 'select(fi == 0) *? select(fi == 1)' ${tmpFilepath} ${filepath}`;
 				const process = popen(command);
 				if (process) {
-					profile = json(process);
+					// Read fully: json() on a handle fails on 1024-byte chunk boundaries.
+					profile = json(process.read('all'));
 					process.close();
 				}
 			}

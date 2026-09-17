@@ -186,7 +186,8 @@ function desensitize_profile() {
 	let profile = {};
 	const process = popen("yq -M -p yaml -o json /etc/mihomox/run/config.yaml");
 	if (process) {
-		profile = json(process);
+		// Read fully: json() on a handle fails on 1024-byte chunk boundaries.
+		profile = json(process.read('all'));
 		if (exists(profile, "secret")) {
 			profile["secret"] = "*";
 		}

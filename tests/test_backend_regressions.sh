@@ -52,4 +52,19 @@ awk '
 END { exit bad }
 ' "$INIT_SCRIPT"
 
+# ucode's json() parses a handle in 1024-byte chunks and raises "Trailing garbage
+# after JSON data" whenever the document ends exactly on a chunk boundary; the
+# whole popen() output must be read before parsing (Nikki #905).
+for stream_file in \
+	"$ROOT_DIR/mihomox/files/ucode/include.uc" \
+	"$ROOT_DIR/mihomox/files/scripts/debug.sh" \
+	"$ROOT_DIR/luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox"
+do
+	if grep -n 'json(process)' "$stream_file"; then
+		echo "json() must not parse a process handle directly: $stream_file" >&2
+		exit 1
+	fi
+	grep -q "json(process.read('all'))" "$stream_file"
+done
+
 echo "backend regression tests passed"

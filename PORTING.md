@@ -131,6 +131,9 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 - 网络测试只能访问代码内固定目标，不接受用户传入 URL、命令或 STUN 地址。
 - 分块文本使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - ACL 只开放页面实际需要的方法和文件范围。
+- 内核枚举必须与 LuCI 选项保持同集：TUN `stack`、`dns.fake-ip-filter-mode` 和 sniffer 协议
+  都直接写入核心，多一项会在 `-t` 阶段失败，少一项会让该能力无法选择。内核增删枚举值时，
+  同步改 `mixin.js`、断言测试和 `docs/upstream.md` 的审计记录。
 
 ## 8. 验收
 
@@ -144,7 +147,7 @@ git diff --check
 发布前还需验证：
 
 - OpenWrt SDK 能交叉编译 `mihomox` 和 `luci-app-mihomox`。
-- 首次启动、Redirect/TPROXY/TUN、IPv4/IPv6 和防火墙规则正常。
+- 首次启动、Redirect/TPROXY/TUN、IPv4/IPv6 和防火墙规则正常；TUN 的每种协议栈至少各测一次。
 - LuCI 菜单、RPC、编辑器、日志和网络测试在真机工作。
 - 网络失败或 RPC 缺失时页面会超时恢复，不永久显示加载状态。
 - 内核更新失败会回滚，停止状态更新后仍保持停止。

@@ -66,4 +66,13 @@ for (const type of ['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCAR
     assert.ok(source.includes(`'${type}'`), `missing Fake-IP rule type: ${type}`);
 }
 
+// Mihomo Alpha ab405bad added the mipstack TUN stack; the core accepts it, so the
+// page must offer it next to system/gvisor/mixed or the option is unreachable.
+for (const stack of ['system', 'gvisor', 'mixed', 'mips']) {
+    assert.ok(
+        new RegExp(`'tun_stack'[\\s\\S]{0,640}o\\.value\\('${stack}'`).test(source),
+        `TUN stack option is missing: ${stack}`
+    );
+}
+
 console.log('LuCI mixin tests passed');

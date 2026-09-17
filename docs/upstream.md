@@ -9,9 +9,9 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `68ec4fae652318bb1474bdfca3918191b167806d` |
-| [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.24.0` |
-| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `3799926` |
+| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `fbb674227d5cf5a3796a1dd1451849fa1872884a` |
+| [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.28.0` |
+| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `7b203f6` |
 
 ## 同步流程
 
@@ -25,6 +25,94 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-09-18：Mihomo Alpha 与 Zashboard
+
+- Mihomo：官方 `Alpha` 最新提交为 `fbb674227d5cf5a3796a1dd1451849fa1872884a`（2026-09-16）；
+  上一轮审计基线为 `68ec4fae`（2026-08-31）。范围 `68ec4fae..fbb6742` 共 38 个提交。
+  稳定版为 `v1.19.31`（2026-09-14）。
+- 核对方法（沿用 2026-09-01 的结论：`-t` 通过不能证明键名正确，上游对未知键静默忽略）：
+  在两个 revision 上分别编译 `config.DefaultRawConfig()` 的反射遍历程序，展开全部 `yaml:`
+  路径后逐条比对。
+  - `68ec4fae`：179 条路径；`fbb6742`：180 条。差异只有新增 `.tun.processors-per-channel`，
+    没有任何路径被删除或改名，字段类型也全部一致。
+  - `mixin.uc` 写入的路径在 Alpha 中全部命中；`.lan-allowed-ips`、`.lan-disallowed-ips`、
+    `.hosts`、`.sniffer.sniff{}` 这类反射遍历无法展开的 `[]netip.Prefix` 与 map，已在源码
+    中逐一确认仍然存在（`config/config.go:414-415`、`hub/route/configs.go:113`）。
+  - 枚举核对：`fake-ip-filter-mode`、sniffer 协议集合、TUN stack 枚举均在范围内；
+    `constant/dns.go` 与 `constant/sniffer/` 本次零改动。
+- 实测：用 `-tags with_gvisor` 从 `fbb6742` 源码构建 alpha 内核，对覆盖 MihomoX 全部输出
+  字段的“全字段”配置执行 `-t`，结果 `configuration file ... test is successful`，
+  无 warning/deprecation。
+- 上游修复核对（有实际影响的项）：
+  - `5f951098 fix: DomainSet wildcard matching with overlapping rules`：在 `68ec4fae` 上用
+    该提交的三组用例复现，`*.example.com` + `dead.a.example.com` 查 `a.example.com`
+    等三条全部失败；在 `fbb6742` 上同一用例通过。这是本仓库当前运行基线里真实存在的规则
+    匹配缺陷，新 Alpha 已修复，换内核即可获得，无需改配置或代码。
+  - `77b9393c fix: preserve domain rules across Foreach round trips`：影响 `+.domain` /
+    `.domain` 往返与 MRS 导出；MihomoX 不导出规则集，只在 `.mihomox-rules` 写普通规则
+    字符串，不受影响。
+  - `c210be21`（geodata 16 KiB 读缓冲）、`92433dba`（gVisor 内存默认值
+    `processors-per-channel=1`）、`2ecceb5b`（mipstack 背压）属内核内部优化，无配置面变化。
+  - 其余提交为各 outbound/inbound 的连接生命周期修复与 EasyTier/ZeroTier 新能力，
+    不改变 MihomoX 写入的字段。
+- 新增能力核对：
+  - `ab405bad`（TUN 新增 `stack: mips`）：核心新增 `TunMips` 枚举。实测
+    `stack=system/gvisor/mixed/mips` 四种 `-t` 全部通过，非法值报 `invalid tun stack`。
+    MihomoX 的 LuCI 原本只提供 system/gvisor/mixed，该栈在页面上无法选择。
+    决策：**移植**。`mixin.js` 增加 `o.value('mips', 'Mips')`，`tests/test_luci_mixin.js`
+    增加四种栈的存在性断言。mipstack 不需要 `with_gvisor` 构建标签，对内存受限设备比
+    gVisor 更省内存。
+  - `dca26db0`（EasyTier outbound）：新增 outbound 类型与 `et://` / `easytier://`
+    名称服务器；属节点级新能力，MihomoX 节点列表由订阅提供，不做静态枚举，无需移植。
+  - `390870c7`（ZeroTier `identity-secret`）：同为节点级字段，无需移植。
+  - `processors-per-channel`：上游标注为 "Non-public option; do not include it in the
+    document"，默认值 1 已由核心内部生效；MihomoX 不写该键，保持默认，无需移植。
+- 默认值兼容性：把 `mihomox.conf` 随包发布的全部域名模式（`+.lan`、`+.local`、
+  `+.gstatic.com`、`+.miwifi.com`、`+.market.xiaomi.com`、`+.push.apple.com`、
+  `Mijia Cloud`）送进 Alpha 的 `trie.ValidAndSplitDomain()`，全部 accepted；非法样例按预期
+  报具体原因（`a*b.com` 通配符必须占满整个 label、`example.com.` 不允许尾点、空值与首尾
+  空白各有对应错误）。默认配置不会因更严格的解析器在新内核上启动失败。
+- API：`/configs` 的 PATCH schema 只新增可选的非公开字段 `processors-per-channel`，
+  现有端点与 Zashboard 调用不受影响。
+- Zashboard：`latest` 从 `v3.24.0` 更新为 `v3.28.0`（2026-09-17）。实测 `dist.zip`
+  9,428,099 字节，SHA256 `8d966a3b75292764d16a0e5796b6c6de0468bc71a7e9302f430f27b681f77b43`，
+  与 GitHub 发布资产 `digest` 字段一致；该值仅作为审计证据，不写回默认 Makefile。
+  MihomoX 构建时动态解析 `releases/latest` 并校验 SHA256，不固定标签，无需代码改动。
+
+本轮从 Alpha 移植 `stack: mips` 的 LuCI 可选值，并记录 wildcard 匹配缺陷已由新内核修复。
+
+## 2026-09-18：Nikki
+
+- 上游：`nikkinikki-org/OpenWrt-nikki`
+- 旧参考：`3799926`
+- 已审计至：`7b203f6`
+- 范围：`3799926..7b203f6`（2 个提交）
+
+审计结果：
+
+- `21befe0 fix: read yq output fully before json() in load_profile (#905)`
+  - `json(process)` 走 `uc_json_from_object()` 的 1024 字节分块增量解析；当 yq 输出的 JSON
+    正文长度正好是 1024 的整数倍时，`}` 落在块尾、尾随换行落在下一块，ucode 把这一情形判为
+    `Trailing garbage after JSON data`，`load_profile()` 抛异常，hijack 规则不再生成。Nikki 上
+    表现为内核继续运行、LAN 流量静默绕过代理；任何一次配置编辑都可能让同一台设备在成功和
+    失败之间切换，与内容无关，只与长度对齐有关。
+  - MihomoX 存在同一调用形态 3 处：`mihomox/files/ucode/include.uc` 的 `load_profile()`
+    （`hijack.ut` 启动路径直接依赖）、`mihomox/files/scripts/debug.sh` 与 rpcd
+    `luci-app-mihomox/.../luci.mihomox` 的 `profile` 方法。
+  - 决策：三处全部改为 `json(process.read('all'))`，并在 `tests/test_backend_regressions.sh`
+    增加禁止 `json(process)` 的静态断言。复现证据与回滚见
+    `.codex-verification/nikki-905-popen-json-audit-20260918/`：用 json-c 复刻
+    `uc_json_from_object()` 的分块循环，96256 字节正文必失败、96257 字节（含“前导一个空格”
+    的对照）通过；90000..98000 区间失败点恰为每 1024 字节一次。
+  - 差异说明：MihomoX 在 hijack 之后检查 `nft list tables`，缺失即回滚并停止服务，不会像
+    Nikki 那样静默继续运行；yq 输出为空时错误形态由 `null` 变为语法异常，两条都是错误路径。
+  - 兼容性：`read('all')` 自 ucode fs 模块引入即存在，不影响 OpenWrt 23.05 兼容下限。
+- `7b203f6 chore: update mihomo-meta to v1.19.31 (#906)`
+  - 只更新独立 `mihomo-meta` 包版本与镜像哈希。
+  - 决策：MihomoX 不交付独立核心包，无需移植。
+
+本轮只移植 `json(process)` 分块解析修复及其回归断言，不合并 Nikki 提交或目录。
 
 ## 2026-09-01：Mihomo Alpha 全字段核对
 
