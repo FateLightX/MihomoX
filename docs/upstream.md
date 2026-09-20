@@ -9,7 +9,7 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `fbb674227d5cf5a3796a1dd1451849fa1872884a` |
+| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `5019cc090ed7cafb76643f964a76b1e97aee2985` |
 | [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.28.0` |
 | [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `7b203f6` |
 
@@ -25,6 +25,34 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-09-21：Mihomo Alpha
+
+- Mihomo：官方 `Alpha` 最新提交为 `5019cc090ed7cafb76643f964a76b1e97aee2985`（2026-09-19）；
+  上一轮审计基线为 `fbb6742`（2026-09-16）。范围 `fbb6742..5019cc09` 共 1 个提交。
+  稳定版仍为 `v1.19.31`（tag 指向 `ab405bad`，2026-09-14）。
+- 核对结果：
+  - `5019cc09 fix: potential race condition in c.idleSession.Len() in idleCleanupExpTime() for anytls (#3225)`
+    只改 `transport/anytls/session/client.go`，把 `sessionToClose` 的分配移进 `idleSessionLock`。
+  - 配置面：`config/config.go` 的 `yaml:` tag 集合与 `fbb6742` 逐条一致（189 条，`comm -3` 无输出）。
+  - API 面：`hub/route/` 与 `fbb6742` 无差异，路由表与 `/version` 返回结构未变。
+  - CLI 面：`main.go` 未变，`-v` 输出格式不变，`update_core.sh` 的版本解析仍命中。
+  - 结论：无需移植；不改配置、不改面板、不改测试。
+- 与更早基线 `ac017cdd`（2026-08-16，Nikki 侧记录）的差异复核，均不需要本仓库动作：
+  - 新增 `tun.processors-per-channel`（gVisor 专用，上游源码注释标注为非公开选项，默认 1）。
+  - TUN `stack: mips`（`ab405bad`）已在上一轮移植，`constant/tun.go` 与面板选项保持一致。
+  - 新增 `easytier` outbound、`et://` / `easytier://` DNS 名称服务器、ZeroTier `identity-secret`，
+    均为节点级能力，按既有决策不暴露为 UCI/LuCI 字段。
+  - 删除或改名的键：0 条。
+- 资产核对：`mihomo-linux-amd64-v1-alpha-5019cc0.gz` 存在；构建期 `fetch_mihomo.sh` 与运行时
+  `update_core.sh` 的资产解析都要求“前缀匹配 + `.gz$`”，新增的 `.deb` 与 `-go120-`/`-go123-`
+  变体不会被误选；实测
+  `sh mihomox/scripts/fetch_mihomo.sh --arch x86_64 --channel Prerelease-Alpha --resolve-alpha-only`
+  输出该资产名，退出状态 0。
+- Zashboard latest 仍为 `v3.28.0`，无需变更。
+- 本轮无包内容改动，`PKG_VERSION` 保持 `2026.9.18`；`docs/` 不进入包内容，因此不按日期式
+  版本规则递增。
+- 未验证：新内核的真机数据面（TUN/TPROXY 转发、断流表现）本轮未复测；本轮只做源码与资产面核对。
 
 ## 2026-09-18：Mihomo Alpha 与 Zashboard
 

@@ -58,13 +58,13 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 防火墙规则由 `mihomox/files/ucode/hijack.ut` 生成。默认值以
 `mihomox/files/mihomox.conf` 为准，不得只改 LuCI 页面默认值。
 
-### 当前上游接续基线（2026-09-18）
+### 当前上游接续基线（2026-09-21）
 
 以下只是已验证检查点，开始新一轮适配前必须重新查询，不得假定仍是最新：
 
 | 项目 | 已验证版本 | 本地处理 |
 | --- | --- | --- |
-| Mihomo Alpha | `fbb674227d5cf5a3796a1dd1451849fa1872884a` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
+| Mihomo Alpha | `5019cc090ed7cafb76643f964a76b1e97aee2985` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
 | Zashboard | `v3.28.0`，`dist.zip` SHA256 `8d966a3b75292764d16a0e5796b6c6de0468bc71a7e9302f430f27b681f77b43` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
 | 包版本 | `2026.9.18`，两个包 release 均为 1 | 同日再发布时把两个包 release 一起加一；tag 见上文“修改版本和发布” |
 
@@ -98,6 +98,9 @@ Mihomo 兼容审计优先读取官方源码：
   mipstack 后端，不需要 `with_gvisor` 构建标签。新增或删除内核栈枚举时，同时更新
   `mixin.js` 的 `tun_stack` 选项和 `tests/test_luci_mixin.js` 的栈断言。
 
+2026-09-21 轮次（`fbb6742..5019cc09`，1 个提交，仅 anytls 竞态修复）无需适配，
+配置面、REST API、CLI 输出与面板资产解析均无变化。
+
 对应本地实现和回归入口：
 
 - LuCI 输入校验：`luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js`。
@@ -110,7 +113,7 @@ Mihomo 兼容审计优先读取官方源码：
 不是现有配置或 Zashboard 的兼容性前提。需要暴露时，应同时修改 UCI、`mixin.uc`、LuCI、
 翻译和测试，不要仅向 YAML 临时注入。
 
-Alpha `fbb6742` 审计后有意未实现的项，不要为它们添加 UCI/LuCI 字段：
+Alpha `fbb6742` / `5019cc09` 审计后有意未实现的项，不要为它们添加 UCI/LuCI 字段：
 
 - `tun.processors-per-channel`：上游源码注释标注为 "Non-public option; do not include it
   in the document"，默认值 1 已由核心内部生效，写不写都一样，不要暴露。
