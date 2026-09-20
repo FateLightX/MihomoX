@@ -50,8 +50,11 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
   `sh mihomox/scripts/fetch_mihomo.sh --arch x86_64 --channel Prerelease-Alpha --resolve-alpha-only`
   输出该资产名，退出状态 0。
 - Zashboard latest 仍为 `v3.28.0`，无需变更。
-- 本轮无包内容改动，`PKG_VERSION` 保持 `2026.9.18`；`docs/` 不进入包内容，因此不按日期式
-  版本规则递增。
+- 包版本：审计本身不含包内容改动，但上一版 `v2026.9.18` 的 tag 已被
+  `2026-09-18` 的 release 占用，直接重跑会被 `release-version.sh --check-remote` 拦下
+  （报 `release tag v2026.9.18 already exists on origin`）。按日期式规则把 `PKG_VERSION`
+  更新为 `2026.9.21`、`PKG_RELEASE` 保持 1，生成新 tag `v2026.9.21`；该 tag 本次构建会
+  打包上游最新 Alpha `5019cc09`。
 - 未验证：新内核的真机数据面（TUN/TPROXY 转发、断流表现）本轮未复测；本轮只做源码与资产面核对。
 
 ## 2026-09-18：Mihomo Alpha 与 Zashboard

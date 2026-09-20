@@ -91,7 +91,9 @@ if [ "$CHECK_REMOTE" -eq 1 ]; then
 		fail "could not query origin for tag $tag: $existing"
 	fi
 	if [ -n "$existing" ]; then
-		fail "release tag $tag already exists on origin; bump PKG_RELEASE to publish a same-day revision"
+		# Name both remedies: a new date bumps PKG_VERSION, another release of the
+		# same date bumps PKG_RELEASE.
+		fail "release tag $tag already exists on origin; bump PKG_VERSION for a new date, or PKG_RELEASE for another revision of the same version"
 	fi
 fi
 
