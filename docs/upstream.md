@@ -26,6 +26,14 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
 
+## 2026-09-30：发布标签冲突（v2026.9.30 已占用）
+
+- `5cb9319` 的发布已占用 `v2026.9.30`；切到 OpenWrt SNAPSHOT 后重跑 `release-packages`
+  再次在 “resolve release version” 被拦下，报 `release tag v2026.9.30 already exists on origin`。
+- 同日第二次发布，按日期式规则保持 `PKG_VERSION=2026.9.30`，把两个包的 `PKG_RELEASE`
+  一起加一到 2，生成新 tag `v2026.9.30.1`。
+- 未验证：本轮不发公开构建。
+
 ## 2026-09-30：发布标签冲突（v2026.9.21 已占用）
 
 - 2026-09-20 的发布已占用 `v2026.9.21`；2026-09-29 重跑 `release-packages` 在
