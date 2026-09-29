@@ -38,7 +38,7 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 - 主包：`mihomox`
 - LuCI 包：`luci-app-mihomox`
 - 源码/API 兼容 OpenWrt 23.05、24.10、25.12 和 SNAPSHOT
-- 公开安装脚本和 Feed 只支持 OpenWrt 25.12 x86_64；其他目标需自行构建验证
+- 公开安装脚本和 Feed 只支持 OpenWrt SNAPSHOT x86_64；其他目标需自行构建验证
 - 支持 Redirect、TPROXY、TUN，以及 IPv4/IPv6
 - 编译期下载官方 Mihomo Alpha 二进制，验证 SHA256、gzip 和 ELF 架构后打包
 - 编译期同时准备 GeoSite、GeoIP、ASN 数据和 Zashboard
@@ -294,7 +294,7 @@ cat "$verify_root/output/.version"
 
 - 手动触发。
 - `check` 运行 `./tests/run.sh`。
-- `build` 构建 `x86_64-openwrt-25.12` 并上传产物。
+- `build` 构建 `x86_64-SNAPSHOT` 并上传产物。
 - 不生成 Release，不部署 Feed。
 
 ### `release-packages`
@@ -333,7 +333,7 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 ## 8. 安全与兼容约束
 
 - OpenWrt 23.05 是源码/API 兼容下限。
-- 公开产物只覆盖 OpenWrt 25.12 x86_64；新增发布目标必须先进入 CI 构建和发布路径。
+- 公开产物只覆盖 OpenWrt SNAPSHOT x86_64；新增发布目标必须先进入 CI 构建和发布路径。
 - rpcd ucode 外部命令参数逐项引用。
 - RPC 文件写入只允许明确路径，禁止目录穿越，单文件上限 16 MiB。
 - 分块文本必须使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
@@ -347,7 +347,10 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 当前边界：
 
 - 本地回归测试不替代 OpenWrt SDK 交叉编译和真机 rpcd/LuCI/网络验证。
-- 公开发布矩阵目前只有 OpenWrt 25.12 x86_64；不要仅修改安装声明来扩展目标。
+- 公开发布矩阵目前只有 OpenWrt SNAPSHOT x86_64；不要仅修改安装声明来扩展目标。
+- 公开目标使用 `x86_64-SNAPSHOT` SDK 容器（`VERSION_PATH=snapshots`，trunk 最新）；
+  不要改回 `x86_64-openwrt-25.12`，那个容器指向 `releases/25.12-SNAPSHOT`，是 25.12
+  维护分支的每日快照而不是 trunk。设备侧 `DISTRIB_RELEASE` 为 `SNAPSHOT`。
 - GeoData URL 固定到上游提交；Zashboard 默认跟随最新发布 URL，构建时解析并校验 SHA256。
   更新上游资源时必须运行对应下载测试。
 - 当前兼容审计基线和有意未实现字段记录在本文“当前上游接续基线”；新一轮审计完成后同时

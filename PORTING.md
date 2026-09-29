@@ -11,7 +11,7 @@ MihomoX 是单 Mihomo 内核的 OpenWrt 透明代理服务：
 - LuCI 包：`luci-app-mihomox`
 - 内核：`/etc/mihomox/bin/mihomo`
 - 源码/API 兼容 OpenWrt 23.05、24.10、25.12 和 SNAPSHOT
-- 公开安装脚本和 Feed 只支持 OpenWrt 25.12 x86_64；其他目标需自行构建验证
+- 公开安装脚本和 Feed 只支持 OpenWrt SNAPSHOT x86_64；其他目标需自行构建验证
 - 支持 Redirect、TPROXY、TUN 及 IPv4/IPv6
 - 编译期打包内核、GeoData 和 Zashboard
 - 运行时只替换自带内核，不调用 `opkg` 或 `apk` 更新内核
@@ -69,7 +69,7 @@ LuCI `network.js` 按行调用 `luci.mihomox.network_test`，rpcd 实现在
 
 ## 4. 编译期交付
 
-GitHub Actions 使用 `x86_64-openwrt-25.12` SDK，`mihomox/Makefile` 的准备阶段依次执行：
+GitHub Actions 使用 `x86_64-SNAPSHOT` SDK（VERSION_PATH=snapshots，即 trunk 最新），`mihomox/Makefile` 的准备阶段依次执行：
 
 1. `fetch_mihomo.sh`：解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、gzip
    格式和 ELF 架构。
@@ -121,7 +121,7 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 ## 7. 兼容与安全约束
 
 - OpenWrt 23.05 是源码/API 兼容下限。
-- 公开产物只覆盖 OpenWrt 25.12 x86_64；扩展发布范围前需补对应 SDK 构建与验证。
+- 公开产物只覆盖 OpenWrt SNAPSHOT x86_64；扩展发布范围前需补对应 SDK 构建与验证。
 - rpcd ucode 外部命令参数必须引用；兼容字符串形式的布尔值和数字。
 - RPC 文件写入只允许明确路径，禁止目录穿越，单文件上限 16 MiB。
 - 长任务必须有限时、错误状态和 UI 恢复路径，不能无限占用 ubus。

@@ -70,24 +70,25 @@ assert_feed_target() {
 for script in feed.sh install.sh; do
 	grep -Fq 'set -eu' "$ROOT_DIR/$script"
 	grep -Fq '[ "$arch" = "x86_64" ]' "$ROOT_DIR/$script"
-	grep -Fq '*"25.12"*) branch="openwrt-25.12"' "$ROOT_DIR/$script"
-	if grep -Eq 'openwrt-(23[.]05|24[.]10)|"SNAPSHOT"' "$ROOT_DIR/$script"; then
-		echo "$script must match the published OpenWrt 25.12 x86_64 feed" >&2
+	grep -Fq '"SNAPSHOT") branch="SNAPSHOT"' "$ROOT_DIR/$script"
+	if grep -Eq 'openwrt-(23[.]05|24[.]10|25[.]12)' "$ROOT_DIR/$script"; then
+		echo "$script must match the published OpenWrt SNAPSHOT x86_64 feed" >&2
 		exit 1
 	fi
-	assert_feed_target "$script" 24.10 x86_64 1 'published feed: OpenWrt 25.12 only'
-	assert_feed_target "$script" 25.12.0 aarch64_cortex-a53 1 'published feed: x86_64 only'
-	assert_feed_target "$script" 25.12.0 x86_64 0 'success'
+	assert_feed_target "$script" 25.12.0 x86_64 1 'published feed: OpenWrt SNAPSHOT only'
+	assert_feed_target "$script" 24.10 x86_64 1 'published feed: OpenWrt SNAPSHOT only'
+	assert_feed_target "$script" SNAPSHOT aarch64_cortex-a53 1 'published feed: x86_64 only'
+	assert_feed_target "$script" SNAPSHOT x86_64 0 'success'
 done
 
-grep -Fq '使用公开安装脚本或 Feed：OpenWrt 25.12、`x86_64`' "$ROOT_DIR/README.md"
-grep -Fq '公开安装脚本、Feed 和 CI 产物只覆盖 OpenWrt 25.12 x86_64' "$ROOT_DIR/AGENTS.md"
+grep -Fq '使用公开安装脚本或 Feed：OpenWrt SNAPSHOT、`x86_64`' "$ROOT_DIR/README.md"
+grep -Fq '公开安装脚本、Feed 和 CI 产物只覆盖 OpenWrt SNAPSHOT x86_64' "$ROOT_DIR/AGENTS.md"
 for workflow in build-packages.yml release-packages.yml; do
 	workflow_path="$ROOT_DIR/.github/workflows/$workflow"
-	grep -Fq 'ARCH: x86_64-openwrt-25.12' "$workflow_path"
+	grep -Fq 'ARCH: x86_64-SNAPSHOT' "$workflow_path"
 	grep -Fq 'bin/packages/x86_64/mihomox' "$workflow_path"
-	if grep -Eq 'openwrt-(23[.]05|24[.]10)|SNAPSHOT|matrix[.](arch|branch)' "$workflow_path"; then
-		echo "$workflow must only build x86_64 for OpenWrt 25.12" >&2
+	if sed 's/#.*//' "$workflow_path" | grep -Eq 'openwrt-(23[.]05|24[.]10|25[.]12)|matrix[.](arch|branch)'; then
+		echo "$workflow must only build x86_64 for OpenWrt SNAPSHOT" >&2
 		exit 1
 	fi
 done

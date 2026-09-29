@@ -20,12 +20,12 @@ Mihomo 内核。
 
 ## 系统要求
 
-- 使用公开安装脚本或 Feed：OpenWrt 25.12、`x86_64`
+- 使用公开安装脚本或 Feed：OpenWrt SNAPSHOT、`x86_64`
 - `firewall4`
 - 从源码构建：源码/API 兼容下限为 OpenWrt 23.05，支持其 Go 工具链覆盖的目标架构；
   非公开产物目标需自行构建验证
 
-公开安装脚本和 Feed 会在下载前拒绝非 OpenWrt 25.12 或非 `x86_64` 设备，避免请求
+公开安装脚本和 Feed 会在下载前拒绝非 OpenWrt SNAPSHOT 或非 `x86_64` 设备，避免请求
 当前发布链未生成的路径。
 
 ## 安装
@@ -34,7 +34,7 @@ Mihomo 内核。
 wget -qO- https://raw.githubusercontent.com/FateLightX/MihomoX/main/install.sh | sh
 ```
 
-安装脚本同时支持使用 `opkg` 和 `apk` 的 OpenWrt 25.12 x86_64 设备。
+安装脚本同时支持使用 `opkg` 和 `apk` 的 OpenWrt SNAPSHOT x86_64 设备。
 
 ## 编译
 
@@ -46,7 +46,7 @@ make package/mihomox/compile V=s
 make package/luci-app-mihomox/compile V=s
 ```
 
-GitHub Actions 只构建 `x86_64-openwrt-25.12`。构建前会执行
+GitHub Actions 只构建 `x86_64-SNAPSHOT`。构建前会执行
 `mihomox/scripts/fetch_mihomo.sh`，解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、
 gzip 格式和 ELF 架构后直接打包；不会重新编译 Mihomo Go 源码。OpenWrt 工具链只编译
 MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源会缓存在 OpenWrt
@@ -59,7 +59,7 @@ Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 Ope
 
 手动运行 `release-packages` 时不需要填写版本号。工作流先执行 `tests/run.sh`，再由
 `scripts/release-version.sh` 从两个 `Makefile` 解析版本，生成日期式标签作为 GitHub
-Release 的标签和标题，并上传 `mihomox_x86_64-openwrt-25.12.tar.gz`。
+Release 的标签和标题，并上传 `mihomox_x86_64-SNAPSHOT.tar.gz`。
 
 `PKG_VERSION` 使用日期（如 `2026.9.18`），tag 为 `v2026.9.18`；同一天再次发布时把两个包的
 `PKG_RELEASE` 一起加一，tag 依次变成 `v2026.9.18.1`、`v2026.9.18.2`。目标 tag 已存在时

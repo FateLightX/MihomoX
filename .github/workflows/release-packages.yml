@@ -25,7 +25,7 @@ jobs:
 
   release:
     needs: validate
-    name: x86_64-openwrt-25.12 release
+    name: x86_64-SNAPSHOT release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -37,7 +37,8 @@ jobs:
       - name: build
         uses: openwrt/gh-action-sdk@f5813d30eeef3534b58ac7e79c5d8842b6035434 # main (2026-08-04)
         env:
-          ARCH: x86_64-openwrt-25.12
+          # x86_64-SNAPSHOT resolves to VERSION_PATH=snapshots (trunk).
+          ARCH: x86_64-SNAPSHOT
           FEEDNAME: mihomox
           PACKAGES: mihomox luci-app-mihomox
           INDEX: 1
@@ -47,10 +48,10 @@ jobs:
 
       - name: compress
         run: |
-          tar -c -z -f mihomox_x86_64-openwrt-25.12.tar.gz -C bin/packages/x86_64/mihomox .
-          mkdir -p public/openwrt-25.12/x86_64
-          mv bin/packages/x86_64/mihomox public/openwrt-25.12/x86_64
-          tar -c -z -f feed_mihomox_x86_64-openwrt-25.12.tar.gz public/openwrt-25.12/x86_64
+          tar -c -z -f mihomox_x86_64-SNAPSHOT.tar.gz -C bin/packages/x86_64/mihomox .
+          mkdir -p public/SNAPSHOT/x86_64
+          mv bin/packages/x86_64/mihomox public/SNAPSHOT/x86_64
+          tar -c -z -f feed_mihomox_x86_64-SNAPSHOT.tar.gz public/SNAPSHOT/x86_64
 
       - name: release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
@@ -67,7 +68,7 @@ jobs:
             | mihomox | ${{ needs.validate.outputs.release_version }} |
             | luci-app-mihomox | ${{ needs.validate.outputs.release_version }} |
 
-            **Target**: x86_64-openwrt-25.12
+            **Target**: x86_64-SNAPSHOT
 
             ### Install
 
@@ -78,13 +79,13 @@ jobs:
             See [README](https://github.com/FateLightX/MihomoX#readme) for full documentation.
           target_commitish: ${{ github.sha }}
           files: |
-            mihomox_x86_64-openwrt-25.12.tar.gz
+            mihomox_x86_64-SNAPSHOT.tar.gz
 
       - name: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: feed_mihomox_x86_64-openwrt-25.12
-          path: feed_mihomox_x86_64-openwrt-25.12.tar.gz
+          name: feed_mihomox_x86_64-SNAPSHOT
+          path: feed_mihomox_x86_64-SNAPSHOT.tar.gz
 
   feed:
     needs: release
