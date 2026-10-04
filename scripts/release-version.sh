@@ -10,11 +10,17 @@
 # the package revision published to the feed: PKG_RELEASE 1 -> v<version>,
 # PKG_RELEASE 2 -> v<version>.1, PKG_RELEASE 3 -> v<version>.2.
 #
-# usage: release-version.sh [--root DIR] [--check-remote]
-#   --root DIR      repository root (default: parent of this script's directory)
-#   --check-remote  also refuse a tag that already exists on origin, so a second
-#                   release of the same day must bump PKG_RELEASE instead of
-#                   silently appending to the previous GitHub Release
+# usage: release-version.sh [--root DIR] [--check-remote] [--pkg-release]
+#                            [--set-pkg-release N]
+#   --root DIR            repository root (default: parent of this script's directory)
+#   --check-remote        consult origin and roll the tag forward past every release
+#                         that already exists for this date, so a repeated run
+#                         publishes the next revision instead of failing on a
+#                         duplicate tag
+#   --pkg-release         print only the PKG_RELEASE that the resolved tag maps to
+#                         (requires --check-remote)
+#   --set-pkg-release N   write PKG_RELEASE=N into both Makefiles, so the built
+#                         packages carry exactly the revision the tag names
 #
 # Prints the tag on stdout. Exits non-zero, with a message on stderr, when the
 # version rules are not met.
@@ -24,12 +30,16 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 CHECK_REMOTE=0
+PRINT_PKG_RELEASE=0
+SET_PKG_RELEASE=
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		--root) ROOT_DIR=$2; shift 2 ;;
 		--check-remote) CHECK_REMOTE=1; shift ;;
-		*) echo "usage: $0 [--root DIR] [--check-remote]" >&2; exit 2 ;;
+		--pkg-release) PRINT_PKG_RELEASE=1; shift ;;
+		--set-pkg-release) SET_PKG_RELEASE=$2; shift 2 ;;
+		*) echo "usage: $0 [--root DIR] [--check-remote] [--pkg-release] [--set-pkg-release N]" >&2; exit 2 ;;
 	esac
 done
 
@@ -74,27 +84,78 @@ printf '%s\n' "$mihomox_release" | grep -Eq '^[0-9]+$' || \
 	fail "PKG_RELEASE must be a positive integer, got: $mihomox_release"
 [ "$mihomox_release" -ge 1 ] || fail "PKG_RELEASE must be at least 1"
 
-if [ "$mihomox_release" -eq 1 ]; then
-	tag="v${mihomox_version}"
-else
-	tag="v${mihomox_version}.$((mihomox_release - 1))"
+tag_for_release() {
+	if [ "$1" -eq 1 ]; then
+		printf 'v%s\n' "$mihomox_version"
+	else
+		printf 'v%s.%s\n' "$mihomox_version" "$(( $1 - 1 ))"
+	fi
+}
+
+check_tag_shape() {
+	printf '%s\n' "$1" | grep -Eq '^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]+)?$' || \
+		fail "derived tag is malformed: $1"
+}
+
+tag_exists_on_origin() {
+	tag=$1
+	existing=$(git -C "$ROOT_DIR" ls-remote --tags origin "refs/tags/$tag" 2>&1) || \
+		fail "could not query origin for tag $tag: $existing"
+	[ -n "$existing" ]
+}
+
+if [ -n "$SET_PKG_RELEASE" ]; then
+	printf '%s\n' "$SET_PKG_RELEASE" | grep -Eq '^[0-9]+$' || \
+		fail "PKG_RELEASE to set must be a positive integer, got: $SET_PKG_RELEASE"
+	[ "$SET_PKG_RELEASE" -ge 1 ] || fail "PKG_RELEASE to set must be at least 1"
+
+	for makefile in "$MIHOMOX_MAKEFILE" "$LUCI_MAKEFILE"; do
+		tmp="$makefile.tmp.$$"
+		if ! sed "s/^PKG_RELEASE:=.*$/PKG_RELEASE:=$SET_PKG_RELEASE/" "$makefile" > "$tmp"; then
+			rm -f "$tmp"
+			fail "could not rewrite $makefile"
+		fi
+		# Verify the rewrite before touching the tracked file, so a failed run
+		# never leaves a half-written Makefile behind.
+		if ! grep -q "^PKG_RELEASE:=$SET_PKG_RELEASE$" "$tmp"; then
+			rm -f "$tmp"
+			fail "rewriting $makefile did not produce PKG_RELEASE:=$SET_PKG_RELEASE"
+		fi
+		cat "$tmp" > "$makefile" || { rm -f "$tmp"; fail "could not write $makefile"; }
+		rm -f "$tmp"
+	done
+
+	written=$(read_makefile_var "$MIHOMOX_MAKEFILE" PKG_RELEASE)
+	luci_written=$(read_makefile_var "$LUCI_MAKEFILE" PKG_RELEASE)
+	[ "$written" = "$SET_PKG_RELEASE" ] || fail "mihomox/Makefile PKG_RELEASE is $written after write"
+	[ "$luci_written" = "$SET_PKG_RELEASE" ] || fail "luci-app-mihomox/Makefile PKG_RELEASE is $luci_written after write"
+
+	printf '%s\n' "PKG_RELEASE set to $SET_PKG_RELEASE in both packages" >&2
+	exit 0
 fi
 
-printf '%s\n' "$tag" | grep -Eq '^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]+)?$' || \
-	fail "derived tag is malformed: $tag"
+effective_release=$mihomox_release
 
 if [ "$CHECK_REMOTE" -eq 1 ]; then
-	# A tag that already exists would make action-gh-release append to the
-	# previous release instead of publishing this build, so treat it as an
-	# error and let the operator bump PKG_RELEASE.
-	if ! existing=$(git -C "$ROOT_DIR" ls-remote --tags origin "refs/tags/$tag" 2>&1); then
-		fail "could not query origin for tag $tag: $existing"
-	fi
-	if [ -n "$existing" ]; then
-		# Name both remedies: a new date bumps PKG_VERSION, another release of the
-		# same date bumps PKG_RELEASE.
-		fail "release tag $tag already exists on origin; bump PKG_VERSION for a new date, or PKG_RELEASE for another revision of the same version"
-	fi
+	# Every successful release publishes its tag, so a repeated run of the same
+	# dated version must move on to the next revision rather than reusing a tag
+	# that action-gh-release would then append to. Roll forward to the first
+	# revision whose tag is still free.
+	attempt=0
+	while tag_exists_on_origin "$(tag_for_release "$effective_release")"; do
+		effective_release=$(( effective_release + 1 ))
+		attempt=$(( attempt + 1 ))
+		[ "$attempt" -le 100 ] || fail "gave up after 100 taken revisions for $mihomox_version"
+	done
+fi
+
+tag=$(tag_for_release "$effective_release")
+check_tag_shape "$tag"
+
+if [ "$PRINT_PKG_RELEASE" -eq 1 ]; then
+	[ "$CHECK_REMOTE" -eq 1 ] || fail "--pkg-release requires --check-remote"
+	printf '%s\n' "$effective_release"
+	exit 0
 fi
 
 printf '%s\n' "$tag"

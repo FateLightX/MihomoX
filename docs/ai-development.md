@@ -66,7 +66,7 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 | --- | --- | --- |
 | Mihomo Alpha | `5019cc090ed7cafb76643f964a76b1e97aee2985` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
 | Zashboard | `v3.28.0`，`dist.zip` SHA256 `8d966a3b75292764d16a0e5796b6c6de0468bc71a7e9302f430f27b681f77b43` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
-| 包版本 | `2026.9.30`，两个包 release 均为 2 | 同日再发布时把两个包 release 一起加一；tag 见上文“修改版本和发布” |
+| 包版本 | `2026.10.5`，两个包 release 均为 1 | 同日再发布时把两个包 release 一起加一；tag 见上文“修改版本和发布” |
 
 重新查询：
 
@@ -266,7 +266,9 @@ cat "$verify_root/output/.version"
   使用日期式版本，例如 `2026.9.18`。
 - 更新 `PKG_VERSION` 时，两个包使用同一版本，并把对应 `PKG_RELEASE` 重置为 1。
 - 同一天需要再次发布时，不新建日期，而是把两个包的 `PKG_RELEASE` 一起加一。
-- `release-packages` 不需要手动填版本。
+- `release-packages` 不需要手动填版本，**重复运行也不需要手动改任何版本号**：解析阶段会
+  跳过本日期已占用的所有 tag 并自动加序号，再由 `sync` job 把解析出的 `PKG_RELEASE`
+  写回两个 `Makefile`、提交推送，最后用该提交构建。
 - Release tag 由 `scripts/release-version.sh` 生成，规则是“日期 + 递增序号”：
 
   | `PKG_VERSION` | `PKG_RELEASE` | Release tag |
@@ -279,8 +281,13 @@ cat "$verify_root/output/.version"
   即 `PKG_RELEASE` 为 1 时用纯日期 tag，之后按 `PKG_RELEASE - 1` 追加序号；换新日期并把
   `PKG_RELEASE` 重置为 1 后又回到纯日期 tag。两个包的 `PKG_RELEASE` 必须相等，否则脚本
   拒绝生成 tag。
-- 工作流调用 `scripts/release-version.sh --check-remote`：目标 tag 已存在于 origin 时直接
-  失败，避免 `action-gh-release` 把新构建追加到上一次 release。
+- 工作流调用 `scripts/release-version.sh --check-remote`：脚本查询 origin，跳过本日期
+  已经存在的 tag（`v<version>`、`v<version>.1`……），返回第一个空闲的 tag，因此重跑不会
+  撞 tag，也不会让 `action-gh-release` 把新构建追加到上一次 release。
+  `--pkg-release` 打印该 tag 对应的 `PKG_RELEASE`，`--set-pkg-release N` 把 N 写回两个
+  `Makefile`。
+- `release-packages` 的阶段顺序是 `validate`（测试 + 只读解析）→ `sync`（写回
+  `PKG_RELEASE` 并推送）→ `release`（按 `sync` 产出的提交构建并发布）→ `feed`。
 
 发布前必须运行 `./tests/run.sh`。`release-packages` 的 `validate` job 已内置测试；不要绕过。
 
@@ -299,9 +306,10 @@ cat "$verify_root/output/.version"
 
 ### `release-packages`
 
-- 手动触发。
-- `validate` 运行测试并校验两个包版本。
-- `release` 构建、签名索引、压缩、上传 GitHub Release 和 artifact。
+- 手动触发；重复运行会发布下一个 revision，不需要手动改版本号。
+- `validate` 运行测试，并解析出本次要用的 tag 与对应 `PKG_RELEASE`（只读）。
+- `sync` 把 `PKG_RELEASE` 写回两个 `Makefile` 并提交推送。
+- `release` 按 `sync` 的提交构建、签名索引、压缩、上传 GitHub Release 和 artifact。
 - `feed` 在配置 Cloudflare 凭据时部署 Pages；未配置时跳过，不影响 Release。
 
 ### 其他工作流

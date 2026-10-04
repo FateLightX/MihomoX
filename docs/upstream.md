@@ -26,6 +26,27 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
 
+## 2026-10-05：发布 tag 自动滚进
+
+- 反复出现的失败模式：每次成功发布都会占用一个 tag，之后重跑 `release-packages` 仍然
+  解析出同一个 tag，被拒绝。已连续发生四次（`v2026.9.18`、`v2026.9.21`、`v2026.9.30`、
+  `v2026.9.30.1`）。
+- 改为自动滚进：`scripts/release-version.sh --check-remote` 现在跳过本日期已占用的 tag，
+  返回第一个空闲 tag；新增 `--pkg-release`（打印对应 `PKG_RELEASE`）和
+  `--set-pkg-release N`（写回两个 Makefile）。
+- `release-packages` 新增 `sync` job，把 `PKG_RELEASE` 写回并提交推送，
+  `release` job 改用该提交，`target_commitish` 也指向它。
+- 未验证：新 job 编排需要真实 CI 运行确认（推送权限、job 输出传递）。
+
+## 2026-10-05：发布标签冲突（v2026.9.30.1 已占用）
+
+- `3e01ffc`（`PKG_RELEASE=2`）的发布已占用 `v2026.9.30.1`，产物为
+  `mihomox_x86_64-SNAPSHOT.tar.gz`。2026-10-03 重跑 `release-packages` 时再次在
+  “resolve release version” 被拦下，报 `release tag v2026.9.30.1 already exists on origin`。
+- 日期已推进，按日期式规则把两个包的 `PKG_VERSION` 更新为 `2026.10.5`，`PKG_RELEASE`
+  重置为 1，生成新 tag `v2026.10.5`。
+- 未验证：本轮不发公开构建。
+
 ## 2026-09-30：发布标签冲突（v2026.9.30 已占用）
 
 - `5cb9319` 的发布已占用 `v2026.9.30`；切到 OpenWrt SNAPSHOT 后重跑 `release-packages`

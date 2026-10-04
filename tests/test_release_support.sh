@@ -105,7 +105,22 @@ grep -Fq 'release_version=$(./scripts/release-version.sh --check-remote)' "$rele
 # An existing tag would make action-gh-release append to the previous release,
 # so CI must refuse it rather than publish a stale build.
 grep -Fq -- '--check-remote' "$version_script"
-grep -Fq 'already exists on origin' "$version_script"
+# A repeated release must roll forward to the next free revision instead of
+# failing on a duplicate tag, so the guard is an incrementing loop.
+grep -Fq 'tag_exists_on_origin' "$version_script"
+grep -Fq 'while tag_exists_on_origin' "$version_script"
+if grep -Fq 'already exists on origin; bump PKG_VERSION' "$version_script"; then
+	echo "release-version.sh must roll the tag forward, not refuse it" >&2
+	exit 1
+fi
+# The resolved revision has to reach the built packages, so the workflow must
+# both read it back and commit it before building.
+grep -Fq -- '--pkg-release' "$release_workflow"
+grep -Fq -- '--set-pkg-release' "$release_workflow"
+grep -Fq 'pkg_release: ${{ steps.version.outputs.pkg_release }}' "$release_workflow"
+grep -Fq 'name: sync package revision' "$release_workflow"
+grep -Fq 'needs: [validate, sync]' "$release_workflow"
+grep -Fq 'target_commitish: ${{ needs.sync.outputs.release_sha }}' "$release_workflow"
 grep -Fq 'tag_name: ${{ needs.validate.outputs.release_version }}' "$release_workflow"
 grep -Fq 'name: MihomoX ${{ needs.validate.outputs.release_version }}' "$release_workflow"
 grep -Fq "if: env.CLOUDFLARE_ACCOUNT_ID != '' && env.CLOUDFLARE_API_TOKEN != ''" "$release_workflow"
@@ -195,5 +210,118 @@ if grep -Eq 'release_version="v\$\{mihomox_version\}-' "$release_workflow"; then
 	echo "release tag must not embed PKG_RELEASE numbers" >&2
 	exit 1
 fi
+
+# --- forward-rolling tag resolution against a real origin -------------------
+#
+# Every published release consumes its tag, so the next run must pick up the
+# next revision automatically. This is exercised end to end with a throwaway
+# bare remote: no tag, first tag taken, first two tags taken.
+roll_fixture=$(mktemp -d)
+git init -q --bare "$roll_fixture/origin.git"
+git init -q "$roll_fixture/repo"
+mkdir -p "$roll_fixture/repo/mihomox" "$roll_fixture/repo/luci-app-mihomox" "$roll_fixture/repo/scripts"
+cp "$version_script" "$roll_fixture/repo/scripts/release-version.sh"
+chmod +x "$roll_fixture/repo/scripts/release-version.sh"
+printf 'PKG_NAME:=mihomox\nPKG_VERSION:=2026.10.5\nPKG_RELEASE:=1\n' > "$roll_fixture/repo/mihomox/Makefile"
+printf 'PKG_VERSION:=2026.10.5\nPKG_RELEASE:=1\n' > "$roll_fixture/repo/luci-app-mihomox/Makefile"
+(
+	cd "$roll_fixture/repo"
+	git config user.email test@example.invalid
+	git config user.name test
+	git add -A
+	git commit -qm init
+	git remote add origin "$roll_fixture/origin.git"
+	git push -q origin HEAD:main
+) || { echo "could not prepare forward-roll fixture" >&2; exit 1; }
+
+assert_roll() {
+	taken_tags="$1"
+	expected_tag="$2"
+	expected_release="$3"
+
+	for taken in $taken_tags; do
+		git -C "$roll_fixture/repo" tag "$taken"
+		git -C "$roll_fixture/repo" push -q origin "$taken"
+	done
+
+	set +e
+	rolled_tag=$("$roll_fixture/repo/scripts/release-version.sh" --check-remote 2>&1)
+	tag_status=$?
+	rolled_release=$("$roll_fixture/repo/scripts/release-version.sh" --check-remote --pkg-release 2>&1)
+	release_status=$?
+	set -e
+
+	[ "$tag_status" -eq 0 ] || {
+		echo "forward roll failed for taken='$taken_tags': $rolled_tag" >&2
+		exit 1
+	}
+	[ "$tag_status" -eq 0 ] && [ "$rolled_tag" = "$expected_tag" ] || {
+		echo "taken='$taken_tags' resolved '$rolled_tag', expected '$expected_tag'" >&2
+		exit 1
+	}
+	[ "$release_status" -eq 0 ] && [ "$rolled_release" = "$expected_release" ] || {
+		echo "taken='$taken_tags' resolved PKG_RELEASE '$rolled_release', expected '$expected_release'" >&2
+		exit 1
+	}
+}
+
+assert_roll ""                              v2026.10.5   1
+assert_roll "v2026.10.5"                    v2026.10.5.1 2
+assert_roll "v2026.10.5.1"                  v2026.10.5.2 3
+assert_roll "v2026.10.5.2 v2026.10.5.3"     v2026.10.5.4 5
+
+# A different date is unaffected by tags from earlier dates.
+printf 'PKG_NAME:=mihomox\nPKG_VERSION:=2026.11.1\nPKG_RELEASE:=1\n' > "$roll_fixture/repo/mihomox/Makefile"
+printf 'PKG_VERSION:=2026.11.1\nPKG_RELEASE:=1\n' > "$roll_fixture/repo/luci-app-mihomox/Makefile"
+assert_roll ""                              v2026.11.1   1
+
+# --pkg-release is only meaningful together with --check-remote.
+set +e
+"$roll_fixture/repo/scripts/release-version.sh" --pkg-release >/dev/null 2>&1
+pkg_only_status=$?
+set -e
+[ "$pkg_only_status" -eq 1 ] || {
+	echo "--pkg-release without --check-remote returned $pkg_only_status, expected 1" >&2
+	exit 1
+}
+
+# An unknown option is a usage error, not a silent pass.
+set +e
+"$roll_fixture/repo/scripts/release-version.sh" --nope >/dev/null 2>&1
+unknown_status=$?
+set -e
+[ "$unknown_status" -eq 2 ] || {
+	echo "unknown option returned $unknown_status, expected 2" >&2
+	exit 1
+}
+
+# --set-pkg-release writes both Makefiles and refuses non-integers.
+"$roll_fixture/repo/scripts/release-version.sh" --set-pkg-release 7 >/dev/null 2>&1 || {
+	echo "--set-pkg-release 7 failed" >&2
+	exit 1
+}
+[ "$(sed -n 's/^PKG_RELEASE:=//p' "$roll_fixture/repo/mihomox/Makefile" | head -n1)" = 7 ] || {
+	echo "mihomox/Makefile was not updated to PKG_RELEASE 7" >&2
+	exit 1
+}
+[ "$(sed -n 's/^PKG_RELEASE:=//p' "$roll_fixture/repo/luci-app-mihomox/Makefile" | head -n1)" = 7 ] || {
+	echo "luci-app-mihomox/Makefile was not updated to PKG_RELEASE 7" >&2
+	exit 1
+}
+set +e
+"$roll_fixture/repo/scripts/release-version.sh" --set-pkg-release abc >/dev/null 2>&1
+bad_release_status=$?
+set -e
+[ "$bad_release_status" -eq 1 ] || {
+	echo "--set-pkg-release abc returned $bad_release_status, expected 1" >&2
+	exit 1
+}
+# The failed write must not have changed the value.
+[ "$(sed -n 's/^PKG_RELEASE:=//p' "$roll_fixture/repo/mihomox/Makefile" | head -n1)" = 7 ] || {
+	echo "a rejected --set-pkg-release still modified the Makefile" >&2
+	exit 1
+}
+
+rm -rf "$roll_fixture"
 
 echo "release support tests passed"

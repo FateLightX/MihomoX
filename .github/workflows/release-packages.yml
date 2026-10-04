@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_version: ${{ steps.version.outputs.release_version }}
+      pkg_release: ${{ steps.version.outputs.pkg_release }}
     steps:
       - name: checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -20,11 +21,52 @@ jobs:
       - id: version
         name: resolve release version
         run: |
+          # Roll forward past every tag this date already published, so a repeated
+          # run keeps releasing instead of failing on a duplicate tag.
           release_version=$(./scripts/release-version.sh --check-remote)
+          pkg_release=$(./scripts/release-version.sh --check-remote --pkg-release)
           echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "pkg_release=$pkg_release" >> "$GITHUB_OUTPUT"
+
+  sync:
+    needs: validate
+    name: sync package revision
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: apply package revision
+        run: |
+          # The tag names a revision; make the built packages carry exactly that
+          # revision so the feed and the Release can never drift apart.
+          ./scripts/release-version.sh --set-pkg-release "${{ needs.validate.outputs.pkg_release }}"
+          ./scripts/release-version.sh --check-remote
+
+      - name: commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- mihomox/Makefile luci-app-mihomox/Makefile; then
+            echo "PKG_RELEASE already matches the resolved tag; nothing to push"
+          else
+            git add mihomox/Makefile luci-app-mihomox/Makefile
+            git commit -m "build: set PKG_RELEASE to ${{ needs.validate.outputs.pkg_release }} for ${{ needs.validate.outputs.release_version }}"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+          echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        id: push
+
+    outputs:
+      release_sha: ${{ steps.push.outputs.release_sha }}
 
   release:
-    needs: validate
+    needs: [validate, sync]
     name: x86_64-SNAPSHOT release
     runs-on: ubuntu-latest
     permissions:
@@ -33,6 +75,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.sync.outputs.release_sha }}
 
       - name: build
         uses: openwrt/gh-action-sdk@f5813d30eeef3534b58ac7e79c5d8842b6035434 # main (2026-08-04)
@@ -77,7 +121,7 @@ jobs:
             ```
 
             See [README](https://github.com/FateLightX/MihomoX#readme) for full documentation.
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.sync.outputs.release_sha }}
           files: |
             mihomox_x86_64-SNAPSHOT.tar.gz
 
@@ -88,7 +132,7 @@ jobs:
           path: feed_mihomox_x86_64-SNAPSHOT.tar.gz
 
   feed:
-    needs: release
+    needs: [validate, sync, release]
     name: feed
     runs-on: ubuntu-latest
     env:

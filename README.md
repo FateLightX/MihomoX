@@ -61,10 +61,14 @@ Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 Ope
 `scripts/release-version.sh` 从两个 `Makefile` 解析版本，生成日期式标签作为 GitHub
 Release 的标签和标题，并上传 `mihomox_x86_64-SNAPSHOT.tar.gz`。
 
-`PKG_VERSION` 使用日期（如 `2026.9.18`），tag 为 `v2026.9.18`；同一天再次发布时把两个包的
-`PKG_RELEASE` 一起加一，tag 依次变成 `v2026.9.18.1`、`v2026.9.18.2`。目标 tag 已存在时
-工作流会直接失败，不会把新构建追加到上一次 release。Cloudflare 凭据未配置时仅跳过 Feed
-部署，不影响 GitHub Release 成功。
+`PKG_VERSION` 使用日期（如 `2026.9.18`），tag 为 `v2026.9.18`；同一天再次发布时 tag
+依次变成 `v2026.9.18.1`、`v2026.9.18.2`。
+
+**重复运行不需要手动改版本号**：工作流解析 tag 时会跳过本日期已经发布过的所有 tag，
+自动落到下一个空闲 revision，并把解析出的 `PKG_RELEASE` 写回两个 `Makefile` 后提交推送，
+再用该提交构建。因此直接重跑 `release-packages` 永远发布新东西，不会撞 tag、也不会把
+新构建追加到上一次 release。Cloudflare 凭据未配置时仅跳过 Feed 部署，不影响 GitHub
+Release 成功。
 
 ## 使用
 
