@@ -84,6 +84,10 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 本轮从 Alpha 对齐 TUN 默认栈、从 Nikki 移植预检环境变量与 cron 重载行为；面板可选项集合未变。
 
+包版本：本轮改动 `mihomox` 包内容（`mihomox.conf`、`mihomox.init`），按日期式规则把
+`PKG_VERSION` 从 `2026.10.5` 更新为 `2026.10.15`，两个包保持一致并把 `PKG_RELEASE` 重置为 1，
+生成 tag `v2026.10.15`（解析实测未被占用）。
+
 ## 2026-10-05：发布 tag 自动滚进
 
 - 反复出现的失败模式：每次成功发布都会占用一个 tag，之后重跑 `release-packages` 仍然
