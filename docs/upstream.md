@@ -9,9 +9,9 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `5019cc090ed7cafb76643f964a76b1e97aee2985` |
-| [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.28.0` |
-| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `7b203f6` |
+| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `94b13aed49b8dc41973e4bb3f721c5fa2c5c5c1f` |
+| [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.29.1` |
+| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `78e1a75` |
 
 ## 同步流程
 
@@ -25,6 +25,64 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-10-15：Mihomo Alpha、Nikki 与 Zashboard
+
+- Mihomo：官方 `Alpha` 最新提交为 `94b13aed49b8dc41973e4bb3f721c5fa2c5c5c1f`（2026-10-13），
+  上一轮审计基线为 `5019cc09`（2026-09-19），范围共 22 个提交；稳定版为 `v1.19.32`
+  （2026-09-30）。
+- Zashboard：`latest` 从 `v3.28.0` 更新为 `v3.29.1`（2026-09-23）。实测 `dist.zip`
+  9,570,334 字节，SHA256 `4f16cce229e223bd07b5a3daccfbfb8bf349d7335572d412959284ab6c9bab50`，
+  与 GitHub 发布资产 `digest` 字段一致；该值仅作为审计证据，不写回默认 Makefile。
+- Nikki：`7b203f6` 到 `78e1a75`，范围 5 个提交。
+
+### Mihomo Alpha
+
+- 配置面：`config/config.go` 的 `yaml:` 键名集合与上一基线逐条比对，新增/删除/改名 **0 条**
+  （两版各 189 条）。该比对只覆盖键名，**同一键名新增到另一个结构体位置时不会显现**，
+  因此仍按结构体 diff 复核：
+  - 新增 `tun.congestion-controller`（string，取值 `cubic`/`reno`/`bbr`/`bbr3`，仅 mips 栈
+    生效），同时出现在 `listener/config/tun.go` 与 `hub/route/configs.go` 的 PATCH schema。
+  - `63bd52ec`、`88dcbf7f`：默认 TUN 栈由 `gvisor` 改为 **`mips`**，`tun` 与 tun `listener`
+    两条路径都改。
+- 决策 1（移植）：MihomoX 的出厂默认 `tun_stack` 由 `mixed` 改为 **`mips`**，与上游默认一致
+  （先例：`geodata-loader` 默认值同样对齐上游）。只改 `mihomox/files/mihomox.conf` 的新安装
+  默认值，迁移脚本不得覆盖已有安装的 UCI 选择。
+- 决策 2（不移植）：`tun.congestion-controller` 不暴露为 UCI/LuCI 字段。它是仅对 mips 栈生效
+  的调优项，上游默认不设置；MihomoX 的 TUN 面保持最小集合（enable/device/stack/mtu/gso/
+  gso-max-size/dns-hijack）。
+- 其余提交为内核内部修复，随内核升级自然获得，无配置面动作：mipstack 惰性接收缓冲与 RX 校验和
+  卸载、UDP/ICMP 错误对齐、`e4dd968d`（重载克隆 fake-ip 池时保留分配状态）、
+  `80101933`（限制 DoH 拨号堆积）、`df1b07af`（亚毫秒 URL 测试被误报为失败）、
+  `94b13aed`（dialer-proxy 环路检测的二次复杂度）、`349af191`（内置 shadowsocks 监听无法
+  关闭）、`3025efad`（load-balance 的 `hash-key`，节点级能力）、`3c947c76`（xhttp
+  `extra.headers`，节点级能力）。
+- 未新增 outbound 类型：`adapter/parser.go` 与 `constant/adapters.go` 本范围无改动。
+
+### OpenWrt-nikki
+
+- `bf032e5 chore: update mihomo-meta to v1.19.32`：Nikki 的独立核心包版本。MihomoX 不交付
+  独立核心包，无需移植。
+- `9d561a2 feat: support mips tun stack`：为 LuCI 增加 `mips` 选项。MihomoX 已在
+  `2026-09-18` 移植（`mixin.js` 的 `o.value('mips', 'Mips')`），无需重复。
+- `20b2abf fix: test profile execution with environment variables`：**需要移植**。Nikki 的
+  `-t` 预检改为带上与真实启动相同的环境变量。MihomoX 的 `test_profile` 原本直接执行
+  `$PROG -d "$RUN_DIR" -t`，而 procd 启动时注入 7 个环境变量（GOMAXPROCS、GOMEMLIMIT、
+  SAFE_PATHS、DISABLE_LOOPBACK_DETECTOR、QUIC_GO_DISABLE_GSO、QUIC_GO_DISABLE_ECN、
+  SKIP_SYSTEM_IPV6_CHECK）；预检与实际启动环境不一致时，配置可能在预检通过后于真实启动
+  失败。已按同样方式移植，并在 `tests/test_default_settings.sh` 增加断言。
+- `31339d5 chore: bump version to 1.26.2`：Nikki 自身版本号，无需移植。
+- `78e1a75 fix: do not restart cron service after crontab changed`：**需要移植**。Nikki 删除了
+  写入 crontab 后的 `/etc/init.d/cron restart`。核实 busybox crond 自身会在 crontab 目录
+  mtime 变化时重扫（`miscutils/crond.c` 的 `rescan_crontab_dir()`），因此重启共享的 cron
+  服务没有必要；而且 MihomoX 的 `reload_service()` 是 `cleanup` 加 `start`，每次重载都会
+  触发该重启。已移除 `start_service` 与 `cleanup` 两处重启以及 `reload_cron` 记账。
+  - 边界说明：busybox crond 只比对**目录** mtime，`echo >> crontab` 这类追加不改变目录
+    mtime，因此新追加的条目最迟在下一次强制重扫（约 60 分钟）生效；`sed -i` 经临时文件加改名
+    会改变目录 mtime，所以删除条目约 1 分钟内生效。定时重启、日志清理、China IP 更新的周期都
+    远大于该窗口，判定影响可忽略。
+
+本轮从 Alpha 对齐 TUN 默认栈、从 Nikki 移植预检环境变量与 cron 重载行为；面板可选项集合未变。
 
 ## 2026-10-05：发布 tag 自动滚进
 

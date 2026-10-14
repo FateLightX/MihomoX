@@ -14,6 +14,8 @@ grep -q "option 'unify_delay' '1'" "$CONFIG"
 grep -q "option 'tcp_concurrent' '1'" "$CONFIG"
 grep -q "option 'authentication' '1'" "$CONFIG"
 grep -q "option 'tun_enabled' '0'" "$CONFIG"
+# Upstream changed the default TUN stack to mips (Alpha 63bd52ec/88dcbf7f).
+grep -q "option 'tun_stack' 'mips'" "$CONFIG"
 grep -q "option 'tcp_mode' 'tproxy'" "$CONFIG"
 grep -q "option 'udp_mode' 'tproxy'" "$CONFIG"
 grep -q "option 'password' ''" "$CONFIG"
@@ -49,7 +51,33 @@ grep -q 'config_get_bool fast_reload "procd" "fast_reload" 1' "$INIT_SCRIPT"
 
 cron_guard_count=$(grep -c 'if grep -q "#mihomox" "/etc/crontabs/root"; then' "$INIT_SCRIPT")
 [ "$cron_guard_count" -eq 2 ]
-grep -A4 'log "App" "Clear cron\."' "$INIT_SCRIPT" | grep -q 'reload_cron=1'
+# crond rescans /etc/crontabs on its own, so MihomoX must not restart the shared
+# cron service; reload_service() re-runs this block on every reload.
+if grep -q '/etc/init.d/cron' "$INIT_SCRIPT"; then
+	echo "cron must not be restarted: crond rescans /etc/crontabs itself" >&2
+	exit 1
+fi
+
+# The pre-flight test must run with the same environment procd uses, otherwise a
+# profile can pass the test and still fail on the real start.
+awk '
+/if \[ "\$test_profile" = 1 \]; then/ { in_test = 1; next }
+in_test && /^\t\tif env \\$/ { has_env = 1; next }
+in_test && /-t >> "\$CORE_LOG_PATH"/ {
+	if (!has_env) {
+		print "test profile must run with the procd environment" > "/dev/stderr"
+		exit 1
+	}
+	found = 1
+	in_test = 0
+}
+END {
+	if (!found) {
+		print "test profile block not found" > "/dev/stderr"
+		exit 1
+	}
+}
+' "$INIT_SCRIPT"
 
 awk '
 function finish_block() {

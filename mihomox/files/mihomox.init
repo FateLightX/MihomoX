@@ -318,7 +318,17 @@ start_service() {
 	# test profile
 	if [ "$test_profile" = 1 ]; then
 		log "Profile" "Testing..."
-		if $PROG -d "$RUN_DIR" -t >> "$CORE_LOG_PATH" 2>&1; then
+		# Run the pre-flight test with the same environment procd will use,
+		# otherwise a profile can pass here and still fail on the real start.
+		if env \
+			GOMAXPROCS="$env_go_max_procs" \
+			GOMEMLIMIT="$env_go_mem_limit" \
+			SAFE_PATHS="$env_safe_paths" \
+			DISABLE_LOOPBACK_DETECTOR="$env_disable_loopback_detector" \
+			QUIC_GO_DISABLE_GSO="$env_disable_quic_go_gso" \
+			QUIC_GO_DISABLE_ECN="$env_disable_quic_go_ecn" \
+			SKIP_SYSTEM_IPV6_CHECK="$env_skip_system_ipv6_check" \
+			$PROG -d "$RUN_DIR" -t >> "$CORE_LOG_PATH" 2>&1; then
 			log "Profile" "Test passed."
 		else
 			log "Profile" "Test failed."
@@ -356,38 +366,30 @@ start_service() {
 
 	procd_close_instance
 	# cron
-	local reload_cron; reload_cron=0
+	# crond rescans /etc/crontabs by itself, so writing the file is enough.
+	# Restarting the shared cron service here would also disturb other packages,
+	# and reload_service() runs this on every reload.
 	if grep -q "#mihomox" "/etc/crontabs/root"; then
 		log "App" "Clear cron."
 		sed -i '/#mihomox/d' "/etc/crontabs/root" > /dev/null 2>&1
-		reload_cron=1
 	fi
 	if [ "$scheduled_restart" = 1 ] && is_valid_cron "$scheduled_restart_cron"; then
 		log "App" "Set scheduled restart."
 		echo "$scheduled_restart_cron /etc/init.d/mihomox restart #mihomox scheduled restart" >> "/etc/crontabs/root"
-		reload_cron=1
 	elif [ "$scheduled_restart" = 1 ] && [ -n "$scheduled_restart_cron" ]; then
 		log "App" "Invalid scheduled restart cron expression; skipped."
-		reload_cron=1
 	fi
 	if [ "$china_ip_update" = 1 ] && is_valid_cron "$china_ip_update_cron"; then
 		log "App" "Set scheduled China IP update."
 		echo "$china_ip_update_cron /etc/init.d/mihomox update_china_ip #mihomox china ip update" >> "/etc/crontabs/root"
-		reload_cron=1
 	elif [ "$china_ip_update" = 1 ] && [ -n "$china_ip_update_cron" ]; then
 		log "App" "Invalid China IP update cron expression; skipped."
-		reload_cron=1
 	fi
 	if [ "$log_scheduled_clear" = 1 ] && is_valid_cron "$log_scheduled_clear_cron"; then
 		log "App" "Set log scheduled clear."
 		echo "$log_scheduled_clear_cron /etc/init.d/mihomox clear_logs #mihomox log scheduled clear" >> "/etc/crontabs/root"
-		reload_cron=1
 	elif [ "$log_scheduled_clear" = 1 ] && [ -n "$log_scheduled_clear_cron" ]; then
 		log "App" "Invalid log scheduled clear cron expression; skipped."
-		reload_cron=1
-	fi
-	if [ "$reload_cron" = 1 ]; then
-		/etc/init.d/cron restart
 	fi
 	# set started flag
 	touch "$STARTED_FLAG_PATH"
@@ -760,7 +762,6 @@ cleanup() {
 	# delete cron
 	if grep -q "#mihomox" "/etc/crontabs/root"; then
 		sed -i "/#mihomox/d" "/etc/crontabs/root" > /dev/null 2>&1
-		/etc/init.d/cron restart
 	fi
 }
 
