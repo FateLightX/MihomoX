@@ -5,13 +5,13 @@
 # check mihomox.config.init
 init=$(uci -q get mihomox.config.init); [ -z "$init" ] && return
 
-# generate a cryptographically random API secret
-api_secret=$(generate_secret) || exit 1
+# keep the packaged API secret; only generate one when it is missing
+if [ -z "$(uci -q get mihomox.mixin.api_secret)" ]; then
+	api_secret=$(generate_secret) || exit 1
+	uci set mihomox.mixin.api_secret="$api_secret"
+fi
 
-# set mihomox.mixin.api_secret
-uci set mihomox.mixin.api_secret="$api_secret"
-
-# replace the intentionally empty packaged password on a fresh installation
+# generate a password only when the packaged one is missing
 for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@authentication\[[0-9][0-9]*\]\)=authentication$/\1/p'); do
 	auth_enabled=$(uci -q get "$auth_section.enabled")
 	auth_password=$(uci -q get "$auth_section.password")
