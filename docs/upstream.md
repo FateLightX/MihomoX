@@ -88,6 +88,20 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 `PKG_VERSION` 从 `2026.10.5` 更新为 `2026.10.15`，两个包保持一致并把 `PKG_RELEASE` 重置为 1，
 生成 tag `v2026.10.15`（解析实测未被占用）。
 
+## 2026-10-16：默认值调整与版本号补正
+
+- 按需求调整出厂默认值：`start_delay` 0→10、`api_secret` 空→`2333`、认证 `password`
+  空→`2333`、`tun_enabled` 0→1、`geodata_loader` `memconservative`→`standard`、
+  `udp_mode` `tproxy`→`tun`（`tun_stack` 原本已是 `mips`，`tcp_mode` 保持 `tproxy`）。
+- `uci-defaults/init.sh` 原本**无条件**重新生成 `api_secret`，会覆盖包内默认值，改为仅在为空时
+  生成；认证密码循环本就有判空，无需改动。`README.md` 的随机凭据声明同步为固定凭据。
+- 版本号补正：上述改动提交于 `2026-10-16`（UTC+8），但 `PKG_VERSION` 未同步，仍为
+  `2026.10.15`，导致 `release-packages` 只能往后滚出 `v2026.10.15.1`。按“版本号等于提交当天
+  UTC+8 日期”的既有惯例（历史 7 次提交逐一核对一致），把 `PKG_VERSION` 更正为 `2026.10.16`、
+  `PKG_RELEASE` 重置为 1，生成 tag `v2026.10.16`。
+- 同批修正：`tests/test_default_settings.sh` 的断言随新默认值同步（首次触发 `38826502071` 因
+  `validate` 的 `test` 步骤失败而中断，`sync`/`release`/`feed` 全部 skipped）。
+
 ## 2026-10-05：发布 tag 自动滚进
 
 - 反复出现的失败模式：每次成功发布都会占用一个 tag，之后重跑 `release-packages` 仍然
