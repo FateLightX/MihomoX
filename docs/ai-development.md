@@ -268,32 +268,33 @@ cat "$verify_root/output/.version"
 
 版本规则：
 
-- `mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 的 `PKG_VERSION` 必须一致，且必须
-  使用日期式版本，例如 `2026.9.18`。
-- 更新 `PKG_VERSION` 时，两个包使用同一版本，并把对应 `PKG_RELEASE` 重置为 1。
-- 同一天需要再次发布时，不新建日期，而是把两个包的 `PKG_RELEASE` 一起加一。
-- `release-packages` 不需要手动填版本，**重复运行也不需要手动改任何版本号**：解析阶段会
-  跳过本日期已占用的所有 tag 并自动加序号，再由 `sync` job 把解析出的 `PKG_RELEASE`
-  写回两个 `Makefile`、提交推送，最后用该提交构建。
-- Release tag 由 `scripts/release-version.sh` 生成，规则是“日期 + 递增序号”：
+- 版本号由**发版时的 UTC+8 日期**自动决定，例如 `2026.10.21`。不要依赖手工维护
+  `PKG_VERSION`：即使它陈旧，tag 也始终取当天日期。
+- `mihomox/Makefile` 和 `luci-app-mihomox/Makefile` 的两个 `PKG_VERSION` 必须相等，
+  两个 `PKG_RELEASE` 也必须相等，否则脚本拒绝生成 tag。
+- 同一天需要再次发布时，日期不变，序号自动递增。
+- `release-packages` 不需要手动改任何版本号：解析阶段按当天日期 + 跳过已占用 tag 算出
+  tag，`sync` job 把算出的 `PKG_VERSION` 与 `PKG_RELEASE` 一起写回两个 `Makefile`、
+  提交推送，最后用该提交构建。
+- Release tag 由 `scripts/release-version.sh` 生成，规则是“UTC+8 日期 + 递增序号”：
 
-  | `PKG_VERSION` | `PKG_RELEASE` | Release tag |
-  | --- | --- | --- |
-  | `2026.9.18` | 1 | `v2026.9.18` |
-  | `2026.9.18` | 2 | `v2026.9.18.1` |
-  | `2026.9.18` | 3 | `v2026.9.18.2` |
-  | `2026.9.19` | 1 | `v2026.9.19` |
+  | 发版日期（UTC+8） | 已占用 tag | 本次 tag | 写回的 `PKG_RELEASE` |
+  | --- | --- | --- | --- |
+  | `2026.10.21` | 无 | `v2026.10.21` | 1 |
+  | `2026.10.21` | `v2026.10.21` | `v2026.10.21.1` | 2 |
+  | `2026.10.21` | `v2026.10.21`、`v2026.10.21.1` | `v2026.10.21.2` | 3 |
+  | `2026.10.22` | 无 | `v2026.10.22` | 1 |
 
-  即 `PKG_RELEASE` 为 1 时用纯日期 tag，之后按 `PKG_RELEASE - 1` 追加序号；换新日期并把
-  `PKG_RELEASE` 重置为 1 后又回到纯日期 tag。两个包的 `PKG_RELEASE` 必须相等，否则脚本
-  拒绝生成 tag。
-- 工作流调用 `scripts/release-version.sh --check-remote`：脚本查询 origin，跳过本日期
-  已经存在的 tag（`v<version>`、`v<version>.1`……），返回第一个空闲的 tag，因此重跑不会
-  撞 tag，也不会让 `action-gh-release` 把新构建追加到上一次 release。
-  `--pkg-release` 打印该 tag 对应的 `PKG_RELEASE`，`--set-pkg-release N` 把 N 写回两个
-  `Makefile`。
+  序号来自 `--check-remote` 的滚动解析，不再从 `PKG_RELEASE` 反推。
+- 脚本选项：`--date YYYY.M.D` 覆盖日期（供测试使用）、`--check-remote` 查询 origin 并
+  滚动到第一个空闲 tag、`--emit` 输出 `release_version=` / `pkg_version=` /
+  `pkg_release=` 三行供 `$GITHUB_OUTPUT` 使用、`--set-pkg-version V` 与
+  `--set-pkg-release N` 分别写回两个 `Makefile`。
+- 因为版本号自动跟随日期，**忘记手动改 `PKG_VERSION` 不会再产出错误日期的 release**；
+  提交里残留的旧版本号会被 `sync` job 覆盖。
 - `release-packages` 的阶段顺序是 `validate`（测试 + 只读解析）→ `sync`（写回
-  `PKG_RELEASE` 并推送）→ `release`（按 `sync` 产出的提交构建并发布）→ `feed`。
+  `PKG_VERSION`/`PKG_RELEASE` 并推送）→ `release`（按 `sync` 产出的提交构建并发布）→
+  `feed`。
 
 发布前必须运行 `./tests/run.sh`。`release-packages` 的 `validate` job 已内置测试；不要绕过。
 

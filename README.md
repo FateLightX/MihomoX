@@ -57,15 +57,16 @@ MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源
 设备运行时依赖通过 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入 APK 元数据，不加入
 Action 的源码构建依赖图。安装时仍由 `apk` 或 `opkg` 从对应 OpenWrt 软件源解析依赖。
 
-手动运行 `release-packages` 时不需要填写版本号。工作流先执行 `tests/run.sh`，再由
-`scripts/release-version.sh` 从两个 `Makefile` 解析版本，生成日期式标签作为 GitHub
-Release 的标签和标题，并上传 `mihomox_x86_64-SNAPSHOT.tar.gz`。
+手动运行 `release-packages` 时不需要填写版本号，也不需要手动改 `PKG_VERSION`。工作流
+先执行 `tests/run.sh`，再由 `scripts/release-version.sh` 按**发版当天的 UTC+8 日期**
+生成标签作为 GitHub Release 的标签和标题，并上传 `mihomox_x86_64-SNAPSHOT.tar.gz`。
 
-`PKG_VERSION` 使用日期（如 `2026.9.18`），tag 为 `v2026.9.18`；同一天再次发布时 tag
-依次变成 `v2026.9.18.1`、`v2026.9.18.2`。
+当天首次发版 tag 为 `v2026.10.21`，之后再发依次是 `v2026.10.21.1`、`v2026.10.21.2`；
+日期变了又回到纯日期 tag（`v2026.10.22`）。
 
-**重复运行不需要手动改版本号**：工作流解析 tag 时会跳过本日期已经发布过的所有 tag，
-自动落到下一个空闲 revision，并把解析出的 `PKG_RELEASE` 写回两个 `Makefile` 后提交推送，
+**忘记改版本号不会出错**：tag 始终取当天日期，提交里残留的旧 `PKG_VERSION` 会被 `sync`
+job 覆盖。工作流解析 tag 时会跳过本日期已经发布过的所有 tag，自动落到下一个空闲
+revision，把解析出的 `PKG_VERSION` 与 `PKG_RELEASE` 一起写回两个 `Makefile` 后提交推送，
 再用该提交构建。因此直接重跑 `release-packages` 永远发布新东西，不会撞 tag、也不会把
 新构建追加到上一次 release。Cloudflare 凭据未配置时仅跳过 Feed 部署，不影响 GitHub
 Release 成功。

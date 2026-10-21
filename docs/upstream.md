@@ -26,6 +26,38 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
 
+## 2026-10-21：发版版本号改为自动跟随 UTC+8 日期
+
+- 背景：`PKG_VERSION` 一直靠人工跟日期。`2026-10-16` 那次改动漏了升版本号，发版只能
+  往后滚出 `v2026.10.15.1`；`2026-10-21` 的提交又漏了一次，滚出 `v2026.10.16.2`
+  （tag 日期与实际发版日期相差 5 天）。
+- 改法：`scripts/release-version.sh` 不再从 `Makefile` 取 `PKG_VERSION`，改为取发版时的
+  UTC+8 日期；`--check-remote` 仍负责跳过当天已占用的 tag 并滚动序号。新增 `--emit`
+  一次输出 `release_version` / `pkg_version` / `pkg_release` 三行供 `$GITHUB_OUTPUT`
+  使用，新增 `--set-pkg-version` 把算出的日期写回两个 `Makefile`。
+- 工作流：`validate` 用 `--check-remote --emit` 解析；`sync` job 先 `--set-pkg-version`
+  再 `--set-pkg-release`，然后提交推送，最后由该提交构建。因此提交里残留的旧
+  `PKG_VERSION` 会被覆盖，忘记改版本号不再产生错误日期的 release。
+- 实现细节：日期用 `TZ=Asia/Shanghai date` 分字段取值后手动去前导零，避免依赖 GNU 专有的
+  `%-m`/`%-d`。
+- 两个包的 `PKG_VERSION` 与 `PKG_RELEASE` 仍必须分别相等，否则脚本拒绝生成 tag。
+- 测试：`tests/test_release_support.sh` 改为用 `--date` 固定日期断言，并覆盖
+  `--emit`、`--set-pkg-version`、同日滚动以及“陈旧 `PKG_VERSION` 不得影响 tag”。
+
+## 2026-10-16：默认值调整与版本号补正
+
+- 按需求调整出厂默认值：`start_delay` 0→10、`api_secret` 空→`2333`、认证 `password`
+  空→`2333`、`tun_enabled` 0→1、`geodata_loader` `memconservative`→`standard`、
+  `udp_mode` `tproxy`→`tun`（`tun_stack` 原本已是 `mips`，`tcp_mode` 保持 `tproxy`）。
+- `uci-defaults/init.sh` 原本**无条件**重新生成 `api_secret`，会覆盖包内默认值，改为仅在为空时
+  生成；认证密码循环本就有判空，无需改动。`README.md` 的随机凭据声明同步为固定凭据。
+- 版本号补正：上述改动提交于 `2026-10-16`（UTC+8），但 `PKG_VERSION` 未同步，仍为
+  `2026.10.15`，导致 `release-packages` 只能往后滚出 `v2026.10.15.1`。按“版本号等于提交当天
+  UTC+8 日期”的既有惯例（历史 7 次提交逐一核对一致），把 `PKG_VERSION` 更正为 `2026.10.16`、
+  `PKG_RELEASE` 重置为 1，生成 tag `v2026.10.16`。
+- 同批修正：`tests/test_default_settings.sh` 的断言随新默认值同步（首次触发 `38826502071` 因
+  `validate` 的 `test` 步骤失败而中断，`sync`/`release`/`feed` 全部 skipped）。
+
 ## 2026-10-15：Mihomo Alpha、Nikki 与 Zashboard
 
 - Mihomo：官方 `Alpha` 最新提交为 `94b13aed49b8dc41973e4bb3f721c5fa2c5c5c1f`（2026-10-13），
@@ -87,20 +119,6 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 包版本：本轮改动 `mihomox` 包内容（`mihomox.conf`、`mihomox.init`），按日期式规则把
 `PKG_VERSION` 从 `2026.10.5` 更新为 `2026.10.15`，两个包保持一致并把 `PKG_RELEASE` 重置为 1，
 生成 tag `v2026.10.15`（解析实测未被占用）。
-
-## 2026-10-16：默认值调整与版本号补正
-
-- 按需求调整出厂默认值：`start_delay` 0→10、`api_secret` 空→`2333`、认证 `password`
-  空→`2333`、`tun_enabled` 0→1、`geodata_loader` `memconservative`→`standard`、
-  `udp_mode` `tproxy`→`tun`（`tun_stack` 原本已是 `mips`，`tcp_mode` 保持 `tproxy`）。
-- `uci-defaults/init.sh` 原本**无条件**重新生成 `api_secret`，会覆盖包内默认值，改为仅在为空时
-  生成；认证密码循环本就有判空，无需改动。`README.md` 的随机凭据声明同步为固定凭据。
-- 版本号补正：上述改动提交于 `2026-10-16`（UTC+8），但 `PKG_VERSION` 未同步，仍为
-  `2026.10.15`，导致 `release-packages` 只能往后滚出 `v2026.10.15.1`。按“版本号等于提交当天
-  UTC+8 日期”的既有惯例（历史 7 次提交逐一核对一致），把 `PKG_VERSION` 更正为 `2026.10.16`、
-  `PKG_RELEASE` 重置为 1，生成 tag `v2026.10.16`。
-- 同批修正：`tests/test_default_settings.sh` 的断言随新默认值同步（首次触发 `38826502071` 因
-  `validate` 的 `test` 步骤失败而中断，`sync`/`release`/`feed` 全部 skipped）。
 
 ## 2026-10-05：发布 tag 自动滚进
 

@@ -101,9 +101,9 @@ version_script="$ROOT_DIR/scripts/release-version.sh"
 # The workflow must derive the tag through the shared script, so the scheme is
 # testable outside CI instead of being an inline shell expression.
 grep -Fq 'run: ./tests/run.sh' "$release_workflow"
-grep -Fq 'release_version=$(./scripts/release-version.sh --check-remote)' "$release_workflow"
+grep -Fq './scripts/release-version.sh --check-remote --emit >> "$GITHUB_OUTPUT"' "$release_workflow"
 # An existing tag would make action-gh-release append to the previous release,
-# so CI must refuse it rather than publish a stale build.
+# so the resolver must consult origin rather than reuse a consumed tag.
 grep -Fq -- '--check-remote' "$version_script"
 # A repeated release must roll forward to the next free revision instead of
 # failing on a duplicate tag, so the guard is an incrementing loop.
@@ -113,10 +113,16 @@ if grep -Fq 'already exists on origin; bump PKG_VERSION' "$version_script"; then
 	echo "release-version.sh must roll the tag forward, not refuse it" >&2
 	exit 1
 fi
-# The resolved revision has to reach the built packages, so the workflow must
-# both read it back and commit it before building.
-grep -Fq -- '--pkg-release' "$release_workflow"
+# The version must come from the UTC+8 date, not from a hand-maintained
+# PKG_VERSION, so a forgotten bump cannot publish a stale date.
+grep -Fq 'today_utc8' "$version_script"
+grep -Fq "TZ=Asia/Shanghai date" "$version_script"
+grep -Fq -- '--date' "$version_script"
+# The resolved version and revision have to reach the built packages, so the
+# workflow must write both back and commit before building.
+grep -Fq -- '--set-pkg-version' "$release_workflow"
 grep -Fq -- '--set-pkg-release' "$release_workflow"
+grep -Fq 'pkg_version: ${{ steps.version.outputs.pkg_version }}' "$release_workflow"
 grep -Fq 'pkg_release: ${{ steps.version.outputs.pkg_release }}' "$release_workflow"
 grep -Fq 'name: sync package revision' "$release_workflow"
 grep -Fq 'needs: [validate, sync]' "$release_workflow"
@@ -129,10 +135,11 @@ if grep -Fq "github.event_name == 'push'" "$release_workflow"; then
 	exit 1
 fi
 
-# The tag is the dated PKG_VERSION; a further release of the same version appends
-# one incrementing number derived from PKG_RELEASE.
-assert_version_tag() {
-	version="$1"
+# The tag is derived from the UTC+8 date. --date pins it for the test, so the
+# assertions stay deterministic; the roll-forward behaviour is exercised with a
+# real origin further down.
+assert_release_tag() {
+	date_arg="$1"
 	release="$2"
 	luci_release="$3"
 	expected_status="$4"
@@ -143,67 +150,75 @@ assert_version_tag() {
 	cp "$version_script" "$fixture/scripts/release-version.sh"
 	{
 		printf 'PKG_NAME:=mihomox\n'
-		printf 'PKG_VERSION:=%s\n' "$version"
+		# Deliberately stale: the date must win over the value in the Makefile.
+		printf 'PKG_VERSION:=2026.1.1\n'
 		printf 'PKG_RELEASE:=%s\n' "$release"
 	} > "$fixture/mihomox/Makefile"
 	{
-		printf 'PKG_VERSION:=%s\n' "$version"
+		printf 'PKG_VERSION:=2026.1.1\n'
 		printf 'PKG_RELEASE:=%s\n' "$luci_release"
 	} > "$fixture/luci-app-mihomox/Makefile"
 
 	set +e
-	output=$("$fixture/scripts/release-version.sh" 2>&1)
+	output=$("$fixture/scripts/release-version.sh" --date "$date_arg" 2>&1)
 	status=$?
 	set -e
 	rm -rf "$fixture"
 
 	[ "$status" -eq "$expected_status" ] || {
-		echo "release-version.sh returned $status for version=$version release=$release, expected $expected_status" >&2
+		echo "release-version.sh returned $status for date=$date_arg release=$release, expected $expected_status" >&2
 		printf '%s\n' "$output" >&2
 		exit 1
 	}
 	if [ "$expected_status" -eq 0 ]; then
 		[ "$output" = "$expected_tag" ] || {
-			echo "version=$version release=$release produced '$output', expected '$expected_tag'" >&2
+			echo "date=$date_arg produced '$output', expected '$expected_tag'" >&2
 			exit 1
 		}
 	else
 		printf '%s\n' "$output" | grep -Fq "$expected_message" || {
-			echo "version=$version release=$release did not report: $expected_message" >&2
+			echo "date=$date_arg did not report: $expected_message" >&2
 			printf '%s\n' "$output" >&2
 			exit 1
 		}
 	fi
 }
 
-assert_version_tag 2026.9.18 1 1 0 v2026.9.18 ''
-assert_version_tag 2026.9.18 2 2 0 v2026.9.18.1 ''
-assert_version_tag 2026.9.18 3 3 0 v2026.9.18.2 ''
-assert_version_tag 2026.9.19 1 1 0 v2026.9.19 ''
-assert_version_tag 2026.10.1 1 1 0 v2026.10.1 ''
-assert_version_tag 2026.9.18 1 2 1 'package releases must match'
-assert_version_tag 2026.9.18 2 3 1 'package releases must match'
-assert_version_tag 1.26.1 1 1 1 'PKG_VERSION must be a dated version'
-assert_version_tag 2026-9-18 1 1 1 'PKG_VERSION must be a dated version'
-assert_version_tag 20260918 1 1 1 'PKG_VERSION must be a dated version'
-assert_version_tag 2026.9 1 1 1 'PKG_VERSION must be a dated version'
+assert_release_tag 2026.9.18 1 1 0 v2026.9.18 ''
+assert_release_tag 2026.10.1 1 1 0 v2026.10.1 ''
+assert_release_tag 2026.10.21 1 1 0 v2026.10.21 ''
 # A zero-padded date is accepted and echoed verbatim, never reformatted.
-assert_version_tag 2026.09.18 1 1 0 v2026.09.18 ''
-assert_version_tag 2026.09.18 2 2 0 v2026.09.18.1 ''
-assert_version_tag 2026.9.18 0 0 1 'PKG_RELEASE must be at least 1'
-assert_version_tag 2026.9.18 1 1 0 v2026.9.18 ''
+assert_release_tag 2026.09.18 1 1 0 v2026.09.18 ''
+# PKG_RELEASE only has to agree between the packages; the tag revision comes
+# from --check-remote rolling forward, not from this number.
+assert_release_tag 2026.9.18 2 2 0 v2026.9.18 ''
+assert_release_tag 2026.9.18 1 2 1 'package releases must match'
+assert_release_tag 2026.9.18 2 3 1 'package releases must match'
+assert_release_tag 1.26.1 1 1 1 'release version must be a dated version'
+assert_release_tag 2026-9-18 1 1 1 'release version must be a dated version'
+assert_release_tag 20260918 1 1 1 'release version must be a dated version'
+assert_release_tag 2026.9 1 1 1 'release version must be a dated version'
+assert_release_tag 2026.9.18 0 0 1 'PKG_RELEASE must be at least 1'
 
-# The current checkout must resolve to a valid dated tag.
+# The current checkout must resolve to the current UTC+8 date, even though the
+# committed PKG_VERSION may be stale.
 current_tag=$("$version_script")
 printf '%s\n' "$current_tag" | grep -Eq '^v[0-9]{4}[.][0-9]{1,2}[.][0-9]{1,2}([.][0-9]+)?$' || {
 	echo "current release tag is malformed: $current_tag" >&2
 	exit 1
 }
-current_version=$(sed -n 's/^PKG_VERSION:=//p' "$ROOT_DIR/mihomox/Makefile" | head -n1)
+today_version=$(TZ=Asia/Shanghai date '+%Y'):$(TZ=Asia/Shanghai date '+%m' | sed 's/^0*//'):$(TZ=Asia/Shanghai date '+%d' | sed 's/^0*//')
+today_version=$(printf '%s\n' "$today_version" | tr ':' '.')
 case "$current_tag" in
-	"v$current_version"|"v$current_version".*) ;;
-	*) echo "release tag $current_tag does not match PKG_VERSION $current_version" >&2; exit 1 ;;
+	"v$today_version"|"v$today_version".*) ;;
+	*)
+		echo "release tag $current_tag does not match the current UTC+8 date $today_version" >&2
+		exit 1
+		;;
 esac
+# A committed PKG_VERSION that lags the date must not influence the tag.
+committed_version=$(sed -n 's/^PKG_VERSION:=//p' "$ROOT_DIR/mihomox/Makefile" | head -n1)
+[ -n "$committed_version" ] || { echo "mihomox/Makefile has no PKG_VERSION" >&2; exit 1; }
 
 # The old scheme embedded package release numbers in the tag; it must not return.
 if grep -Eq 'release_version="v\$\{mihomox_version\}-' "$release_workflow"; then
@@ -235,9 +250,10 @@ printf 'PKG_VERSION:=2026.10.5\nPKG_RELEASE:=1\n' > "$roll_fixture/repo/luci-app
 ) || { echo "could not prepare forward-roll fixture" >&2; exit 1; }
 
 assert_roll() {
-	taken_tags="$1"
-	expected_tag="$2"
-	expected_release="$3"
+	roll_date="$1"
+	taken_tags="$2"
+	expected_tag="$3"
+	expected_release="$4"
 
 	for taken in $taken_tags; do
 		git -C "$roll_fixture/repo" tag "$taken"
@@ -245,9 +261,9 @@ assert_roll() {
 	done
 
 	set +e
-	rolled_tag=$("$roll_fixture/repo/scripts/release-version.sh" --check-remote 2>&1)
+	rolled_tag=$("$roll_fixture/repo/scripts/release-version.sh" --date "$roll_date" --check-remote 2>&1)
 	tag_status=$?
-	rolled_release=$("$roll_fixture/repo/scripts/release-version.sh" --check-remote --pkg-release 2>&1)
+	rolled_release=$("$roll_fixture/repo/scripts/release-version.sh" --date "$roll_date" --check-remote --pkg-release 2>&1)
 	release_status=$?
 	set -e
 
@@ -256,7 +272,7 @@ assert_roll() {
 		exit 1
 	}
 	[ "$tag_status" -eq 0 ] && [ "$rolled_tag" = "$expected_tag" ] || {
-		echo "taken='$taken_tags' resolved '$rolled_tag', expected '$expected_tag'" >&2
+		echo "date=$roll_date taken='$taken_tags' resolved '$rolled_tag', expected '$expected_tag'" >&2
 		exit 1
 	}
 	[ "$release_status" -eq 0 ] && [ "$rolled_release" = "$expected_release" ] || {
@@ -265,15 +281,14 @@ assert_roll() {
 	}
 }
 
-assert_roll ""                              v2026.10.5   1
-assert_roll "v2026.10.5"                    v2026.10.5.1 2
-assert_roll "v2026.10.5.1"                  v2026.10.5.2 3
-assert_roll "v2026.10.5.2 v2026.10.5.3"     v2026.10.5.4 5
+assert_roll 2026.10.5 ""                            v2026.10.5   1
+assert_roll 2026.10.5 "v2026.10.5"                   v2026.10.5.1 2
+assert_roll 2026.10.5 "v2026.10.5.1"                 v2026.10.5.2 3
+assert_roll 2026.10.5 "v2026.10.5.2 v2026.10.5.3"    v2026.10.5.4 5
 
-# A different date is unaffected by tags from earlier dates.
-printf 'PKG_NAME:=mihomox\nPKG_VERSION:=2026.11.1\nPKG_RELEASE:=1\n' > "$roll_fixture/repo/mihomox/Makefile"
-printf 'PKG_VERSION:=2026.11.1\nPKG_RELEASE:=1\n' > "$roll_fixture/repo/luci-app-mihomox/Makefile"
-assert_roll ""                              v2026.11.1   1
+# A different date is unaffected by tags from earlier dates, and the committed
+# PKG_VERSION (still 2026.10.5 in the fixture) must not leak into the tag.
+assert_roll 2026.11.1 ""                             v2026.11.1   1
 
 # --pkg-release is only meaningful together with --check-remote.
 set +e
@@ -292,6 +307,52 @@ unknown_status=$?
 set -e
 [ "$unknown_status" -eq 2 ] || {
 	echo "unknown option returned $unknown_status, expected 2" >&2
+	exit 1
+}
+
+# --emit prints every value the workflow needs, in $GITHUB_OUTPUT form.
+set +e
+emit_output=$("$roll_fixture/repo/scripts/release-version.sh" --date 2026.10.5 --check-remote --emit 2>&1)
+emit_status=$?
+set -e
+[ "$emit_status" -eq 0 ] || {
+	echo "--emit returned $emit_status" >&2
+	printf '%s\n' "$emit_output" >&2
+	exit 1
+}
+for expected_line in \
+	'release_version=v2026.10.5.4' \
+	'pkg_version=2026.10.5' \
+	'pkg_release=5'
+do
+	printf '%s\n' "$emit_output" | grep -Fxq "$expected_line" || {
+		echo "--emit is missing: $expected_line" >&2
+		printf '%s\n' "$emit_output" >&2
+		exit 1
+	}
+done
+
+# --set-pkg-version writes both Makefiles and refuses non-dates.
+"$roll_fixture/repo/scripts/release-version.sh" --set-pkg-version 2026.12.1 >/dev/null 2>&1 || {
+	echo "--set-pkg-version 2026.12.1 failed" >&2
+	exit 1
+}
+for pkg_makefile in mihomox/Makefile luci-app-mihomox/Makefile; do
+	[ "$(sed -n 's/^PKG_VERSION:=//p' "$roll_fixture/repo/$pkg_makefile" | head -n1)" = 2026.12.1 ] || {
+		echo "$pkg_makefile was not updated to PKG_VERSION 2026.12.1" >&2
+		exit 1
+	}
+done
+set +e
+"$roll_fixture/repo/scripts/release-version.sh" --set-pkg-version 1.26.1 >/dev/null 2>&1
+bad_version_status=$?
+set -e
+[ "$bad_version_status" -eq 1 ] || {
+	echo "--set-pkg-version 1.26.1 returned $bad_version_status, expected 1" >&2
+	exit 1
+}
+[ "$(sed -n 's/^PKG_VERSION:=//p' "$roll_fixture/repo/mihomox/Makefile" | head -n1)" = 2026.12.1 ] || {
+	echo "a rejected --set-pkg-version still modified the Makefile" >&2
 	exit 1
 }
 

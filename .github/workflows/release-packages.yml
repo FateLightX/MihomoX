@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_version: ${{ steps.version.outputs.release_version }}
+      pkg_version: ${{ steps.version.outputs.pkg_version }}
       pkg_release: ${{ steps.version.outputs.pkg_release }}
     steps:
       - name: checkout
@@ -21,12 +22,10 @@ jobs:
       - id: version
         name: resolve release version
         run: |
-          # Roll forward past every tag this date already published, so a repeated
-          # run keeps releasing instead of failing on a duplicate tag.
-          release_version=$(./scripts/release-version.sh --check-remote)
-          pkg_release=$(./scripts/release-version.sh --check-remote --pkg-release)
-          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
-          echo "pkg_release=$pkg_release" >> "$GITHUB_OUTPUT"
+          # The version is the current UTC+8 date and the revision rolls forward
+          # past every tag that date already published, so a release can never
+          # ship a stale date or fail on a duplicate tag.
+          ./scripts/release-version.sh --check-remote --emit >> "$GITHUB_OUTPUT"
 
   sync:
     needs: validate
@@ -41,10 +40,11 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
 
-      - name: apply package revision
+      - name: apply package version and revision
         run: |
-          # The tag names a revision; make the built packages carry exactly that
-          # revision so the feed and the Release can never drift apart.
+          # The tag names a date and a revision; make the built packages carry
+          # exactly those, so the feed and the Release can never drift apart.
+          ./scripts/release-version.sh --set-pkg-version "${{ needs.validate.outputs.pkg_version }}"
           ./scripts/release-version.sh --set-pkg-release "${{ needs.validate.outputs.pkg_release }}"
           ./scripts/release-version.sh --check-remote
 
@@ -53,10 +53,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --quiet -- mihomox/Makefile luci-app-mihomox/Makefile; then
-            echo "PKG_RELEASE already matches the resolved tag; nothing to push"
+            echo "PKG_VERSION and PKG_RELEASE already match the resolved tag; nothing to push"
           else
             git add mihomox/Makefile luci-app-mihomox/Makefile
-            git commit -m "build: set PKG_RELEASE to ${{ needs.validate.outputs.pkg_release }} for ${{ needs.validate.outputs.release_version }}"
+            git commit -m "build: set version to ${{ needs.validate.outputs.pkg_version }} (r${{ needs.validate.outputs.pkg_release }}) for ${{ needs.validate.outputs.release_version }}"
             git push origin HEAD:${{ github.ref_name }}
           fi
           echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
