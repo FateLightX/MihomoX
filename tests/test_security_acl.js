@@ -14,11 +14,14 @@ assert.deepStrictEqual(acl.read.ubus.rc, ['list']);
 assert.ok(!acl.read.ubus['luci.mihomox'].includes('*'));
 assert.ok(!acl.read.ubus['luci.mihomox'].includes('update_core'));
 assert.ok(acl.read.ubus['luci.mihomox'].includes('log'));
+assert.ok(acl.read.ubus['luci.mihomox'].includes('subscription_status'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('update_core'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('write_file'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('api'));
 assert.ok(acl.read.file['/var/log/mihomox/*.log'].includes('read'));
 assert.ok(acl.read.file['/tmp/log/mihomox/*.log'].includes('read'));
+assert.ok(acl.read.file['/var/run/mihomox/config.yaml'].includes('read'));
+assert.ok(acl.write.file['/var/run/mihomox/config.yaml'].includes('write'));
 assert.ok(acl.write.file['/var/log/mihomox/*.log'].includes('write'));
 assert.ok(acl.write.file['/tmp/log/mihomox/*.log'].includes('write'));
 
@@ -56,6 +59,7 @@ assert.ok(
     'core API may relax TLS verification only for the explicit local certificate/key configuration'
 );
 assert.ok(rpcSource.includes("match(section_id, /^[A-Za-z0-9_-]{1,64}$/)"));
+assert.ok(rpcSource.includes("running = result == 2"));
 
 const installSource = fs.readFileSync(path.join(root, 'install.sh'), 'utf8');
 assert.ok(!installSource.includes('eval "$(jsonfilter'));

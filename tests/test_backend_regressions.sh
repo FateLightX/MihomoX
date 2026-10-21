@@ -5,6 +5,7 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 INIT_SCRIPT="$ROOT_DIR/mihomox/files/mihomox.init"
 INCLUDE_SCRIPT="$ROOT_DIR/mihomox/files/scripts/include.sh"
+UPGRADE_SCRIPT="$ROOT_DIR/mihomox/files/mihomox.upgrade"
 
 # Subscription failures must preserve the last known metadata and return non-zero.
 awk '
@@ -33,6 +34,28 @@ fi
 
 grep -q '^validate_final_profile() {' "$INIT_SCRIPT"
 grep -q '^warn_legacy_profile() {' "$INIT_SCRIPT"
+grep -q 'RUN_PROFILE_PATH="$TEMP_DIR/config.yaml"' "$INCLUDE_SCRIPT"
+grep -q 'CACHE_DB_PATH="$TEMP_DIR/cache.db"' "$INCLUDE_SCRIPT"
+grep -q 'prepare_cache' "$INIT_SCRIPT"
+grep -q 'subscription_profile_valid' "$INIT_SCRIPT"
+grep -q 'SUBSCRIPTION_REFRESH_PENDING_PATH' "$INIT_SCRIPT"
+grep -q 'subscription_refresh_section="$subscription_section"' "$INIT_SCRIPT"
+grep -Fq 'SUBSCRIPTIONS_DIR/.$subscription_section.yaml.tmp.$$' "$INIT_SCRIPT"
+grep -q 'nohup /etc/init.d/mihomox refresh_subscription' "$INIT_SCRIPT"
+grep -q 'SUBSCRIPTION_REFRESH_STATUS_PATH' "$INIT_SCRIPT"
+grep -q 'persist_cache_snapshot' "$INIT_SCRIPT"
+grep -q 'local applied_section' "$INIT_SCRIPT"
+grep -q '^/etc/mihomox/run/cache\.db$' "$UPGRADE_SCRIPT"
+grep -q '^/etc/mihomox/cache\.snapshot$' "$UPGRADE_SCRIPT"
+grep -q '\[ -s "\$subscription_lock_dir/pid" \] || sleep 1' "$INIT_SCRIPT"
+grep -Fq 'applied_profile=$(uci -q get mihomox.config.profile)' "$INIT_SCRIPT"
+grep -q '2) : ;; # Another updater owns the status transition\.' "$INIT_SCRIPT"
+awk '
+/^service_started\(\)/ { in_fn = 1 }
+in_fn && /local applied_section/ { found = 1 }
+in_fn && /^}/ { exit }
+END { exit found ? 0 : 1 }
+' "$INIT_SCRIPT"
 grep -q '\."external-controller-tls" // ""' "$INIT_SCRIPT"
 grep -q 'API TLS requires listen address, certificate and private key together.' "$INIT_SCRIPT"
 grep -q 'DNS policy requires at least one proxy-server-nameserver.' "$INIT_SCRIPT"

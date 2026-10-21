@@ -13,13 +13,15 @@ const CORE_UPDATE_SCRIPT = '/etc/mihomox/scripts/update_core.sh';
 const CORE_STATUS_FILE = '/var/run/mihomox/core-update.status';
 const CORE_LOCK_DIR = '/var/run/mihomox/core-update.lock';
 const CORE_PENDING_FILE = '/var/run/mihomox/core-update.pending';
+const RUN_PROFILE_PATH = '/var/run/mihomox/config.yaml';
+const SUBSCRIPTION_STATUS_FILE = '/var/run/mihomox/subscription-refresh.status';
 const STUN_TEST_HELPER = '/usr/libexec/mihomox/stun-test';
 const APP_LOG_FILE = '/var/log/mihomox/app.log';
 const CORE_LOG_FILE = '/var/log/mihomox/core.log';
 const MAX_EDIT_FILE_SIZE = 16 * 1024 * 1024;
 const WRITABLE_PATHS = [
 	'/etc/mihomox/mixin.yaml',
-	'/etc/mihomox/run/config.yaml',
+	RUN_PROFILE_PATH,
 	APP_LOG_FILE,
 	CORE_LOG_FILE
 ];
@@ -468,7 +470,7 @@ const methods = {
 		call: function(req) {
 			let profile = {};
 			const defaults = req.args?.defaults ?? {};
-			const filepath = '/etc/mihomox/run/config.yaml';
+			const filepath = RUN_PROFILE_PATH;
 			const tmpFilepath = '/var/run/mihomox/profile.json';
 			if (access(filepath, 'r')) {
 				writefile(tmpFilepath, defaults);
@@ -487,6 +489,8 @@ const methods = {
 		args: { section_id: 'section_id' },
 		call: function(req) {
 			let success = false;
+			let running = false;
+			let message = 'failed';
 			const section_id = req.args?.section_id;
 			if (section_id && match(section_id, /^[A-Za-z0-9_-]{1,64}$/)) {
 				let uci = cursor();
@@ -494,9 +498,21 @@ const methods = {
 				const section = uci.get_all('mihomox', section_id);
 				if (section?.['.type'] != 'subscription')
 					return { success: false };
-				success = system(['service', 'mihomox', 'update_subscription', section_id]) == 0;
+				const result = system(['service', 'mihomox', 'update_subscription', section_id]);
+				running = result == 2;
+				success = result == 0 || running;
+				message = running ? 'update_already_running' : (result == 0 ? 'updated' : 'failed');
+				if (result == 0)
+					writefile(SUBSCRIPTION_STATUS_FILE, 'state=updated\nsection=' + section_id + '\nmessage=restart_required\n');
 			}
-			return { success: success };
+			return { success: success, running: running, message: message };
+		}
+	},
+	subscription_status: {
+		call: function() {
+			if (!access(SUBSCRIPTION_STATUS_FILE, 'r'))
+				return {};
+			return read_kv(SUBSCRIPTION_STATUS_FILE);
 		}
 	},
 	core_status: {
@@ -535,7 +551,7 @@ const methods = {
 		}
 	},
 	log: {
-		args: { name: 'name' },
+		args: { name: 'name', offset: 'offset', limit: 'limit' },
 		call: function(req) {
 			const paths = {
 				'app': APP_LOG_FILE,
@@ -548,12 +564,22 @@ const methods = {
 			// helpers, which made LuCI log tabs look empty on config errors.
 			let result = readfile(path);
 			if (result == null)
-				return { log: '' };
+				return { log: '', offset: 0, size: 0 };
 			result = '' + result;
+			const size = length(result);
 			const max_bytes = 65536;
-			if (length(result) > max_bytes)
-				result = substr(result, length(result) - max_bytes);
-			return { log: result };
+			let limit = int(req.args?.limit);
+			if (limit <= 0 || limit > max_bytes)
+				limit = max_bytes;
+			let start = int(req.args?.offset);
+			if (start < 0 || start > size)
+				start = 0;
+			if (start == 0 && size > limit)
+				start = size - limit;
+			let chunk = substr(result, start);
+			if (length(chunk) > limit)
+				chunk = substr(chunk, 0, limit);
+			return { log: chunk, offset: start, size: size, next: start + length(chunk) };
 		}
 	},
 	network_test: {

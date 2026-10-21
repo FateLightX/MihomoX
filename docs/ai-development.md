@@ -51,7 +51,7 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 /etc/config/mihomox
   -> /etc/init.d/mihomox
   -> /etc/mihomox/ucode/mixin.uc
-  -> /etc/mihomox/run/config.yaml
+  -> /var/run/mihomox/config.yaml
   -> /etc/mihomox/bin/mihomo
 ```
 

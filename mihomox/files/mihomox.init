@@ -9,9 +9,44 @@ USE_PROCD=1
 PROG="$CORE_PATH"
 
 extra_command 'update_subscription' 'Update subscription by section id'
+extra_command 'refresh_subscription' 'Refresh subscription with background status'
 extra_command 'update_core' 'Update Mihomo core'
 extra_command 'update_china_ip' 'Update China IP nft sets'
 extra_command 'clear_logs' 'Clear logs if size exceeds the limit'
+
+subscription_profile_valid() {
+	[ -s "$1" ] || return 1
+	yq -M -p yaml -o yaml -e 'has("proxies") or has("proxy-providers")' "$1" > /dev/null 2>&1
+}
+
+write_subscription_status() {
+	local status_state="$1" status_section="$2" status_message="$3"
+	local status_tmp="$SUBSCRIPTION_REFRESH_STATUS_PATH.$$"
+	{
+		printf 'state=%s\n' "$status_state"
+		printf 'section=%s\n' "$status_section"
+		printf 'message=%s\n' "$status_message"
+		printf 'updated_at=%s\n' "$(date "+%Y-%m-%d %H:%M:%S")"
+	} > "$status_tmp" && mv -f "$status_tmp" "$SUBSCRIPTION_REFRESH_STATUS_PATH"
+}
+
+refresh_subscription() {
+	local subscription_section="$1"
+	case "$subscription_section" in
+		''|*[!A-Za-z0-9_-]*) return 1 ;;
+	esac
+	prepare_files
+	write_subscription_status running "$subscription_section" updating
+	rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
+	update_subscription "$subscription_section"
+	local refresh_status=$?
+	case "$refresh_status" in
+		0) write_subscription_status updated "$subscription_section" restart_required ;;
+		2) : ;; # Another updater owns the status transition.
+		*) write_subscription_status failed "$subscription_section" failed ;;
+	esac
+	return "$refresh_status"
+}
 
 boot_func() {
 	# prepare files
@@ -46,6 +81,7 @@ update_china_ip() {
 start_service() {
 	# prepare files
 	prepare_files
+	rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
 	# ensure credentials exist before generating the core profile
 	local api_secret; api_secret=$(uci -q get mihomox.mixin.api_secret)
 	local credentials_changed; credentials_changed=0
@@ -78,6 +114,11 @@ start_service() {
 	config_get_bool enabled "config" "enabled" 0
 	if [ "$enabled" = 0 ]; then
 		log "App" "Disabled."
+		log "App" "Exit."
+		return
+	fi
+	if ! prepare_cache; then
+		log "Cache" "Unable to prepare runtime cache."
 		log "App" "Exit."
 		return
 	fi
@@ -170,6 +211,12 @@ start_service() {
 	# get profile
 	local profile_type; profile_type=$(echo "$profile" | cut -d ':' -f 1)
 	local profile_id; profile_id=$(echo "$profile" | cut -d ':' -f 2)
+	local subscription_refresh_section; subscription_refresh_section=''
+	: > "$RUN_PROFILE_PATH" || {
+		log "Profile" "Unable to create runtime profile."
+		log "App" "Exit."
+		return
+	}
 	if [ "$profile_type" = "file" ]; then
 		local profile_name; profile_name="$profile_id"
 		case "$profile_name" in
@@ -207,16 +254,27 @@ start_service() {
 			log "App" "Exit."
 			return
 		fi
-		local subscription_name subscription_prefer
+		local subscription_name subscription_prefer subscription_cache_valid
 		config_get subscription_name "$subscription_section" "name"
 		config_get subscription_prefer "$subscription_section" "prefer" "remote"
 		log "Profile" "Use subscription: $subscription_name."
 		local subscription_file; subscription_file="$SUBSCRIPTIONS_DIR/$subscription_section.yaml"
-		if [ "$subscription_prefer" = "remote" ] || [ ! -f "$subscription_file" ]; then
-			update_subscription "$subscription_section"
+		subscription_cache_valid=0
+		if [ -f "$subscription_file" ] && subscription_profile_valid "$subscription_file"; then
+			subscription_cache_valid=1
 		fi
-		if [ ! -f "$subscription_file" ]; then
-			log "Profile" "Subscription file not found."
+		if [ "$subscription_cache_valid" = 0 ]; then
+			if ! update_subscription "$subscription_section"; then
+				log "Profile" "Subscription refresh failed; profile cache is unavailable."
+			fi
+			if [ -f "$subscription_file" ] && subscription_profile_valid "$subscription_file"; then
+				subscription_cache_valid=1
+			fi
+		elif [ "$subscription_prefer" = "remote" ] && [ "$core_only" = 0 ]; then
+			subscription_refresh_section="$subscription_section"
+		fi
+		if [ "$subscription_cache_valid" = 0 ]; then
+			log "Profile" "Subscription profile is unavailable or invalid."
 			log "App" "Exit."
 			return
 		fi
@@ -229,49 +287,96 @@ start_service() {
 	# mixin
 	if [ "$core_only" = 0 ]; then
 		log "Mixin" "Mixin config."
+		local delete_filter prepared_profile generated_mixin merged_profile
+		delete_filter=''
 		if [ "$overwrite_authentication" = 1 ]; then
-			yq -M -i 'del(.authentication)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.authentication)"
 		fi
 		if [ "$overwrite_tun_dns_hijack" = 1 ]; then
-			yq -M -i 'del(.tun.dns-hijack)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.tun.dns-hijack)"
 		fi
 		if [ "$overwrite_fake_ip_filter" = 1 ]; then
-			yq -M -i 'del(.dns.fake-ip-filter)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.dns.fake-ip-filter)"
 		fi
 		if [ "$overwrite_hosts" = 1 ]; then
-			yq -M -i 'del(.hosts)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.hosts)"
 		fi
 		if [ "$overwrite_dns_nameserver" = 1 ]; then
-			yq -M -i 'del(.dns.default-nameserver) | del(.dns.proxy-server-nameserver) | del(.dns.direct-nameserver) | del(.dns.nameserver) | del(.dns.fallback) ' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.dns.default-nameserver) | del(.dns.proxy-server-nameserver) | del(.dns.direct-nameserver) | del(.dns.nameserver) | del(.dns.fallback)"
 		fi
 		if [ "$overwrite_dns_proxy_server_nameserver_policy" = 1 ]; then
-			yq -M -i 'del(.dns.proxy-server-nameserver-policy)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.dns.proxy-server-nameserver-policy)"
 		fi
 		if [ "$overwrite_dns_nameserver_policy" = 1 ]; then
-			yq -M -i 'del(.dns.nameserver-policy)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.dns.nameserver-policy)"
 		fi
 		if [ "$overwrite_sniffer_force_domain_name" = 1 ]; then
-			yq -M -i 'del(.sniffer.force-domain)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.sniffer.force-domain)"
 		fi
 		if [ "$overwrite_sniffer_ignore_domain_name" = 1 ]; then
-			yq -M -i 'del(.sniffer.skip-domain)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.sniffer.skip-domain)"
 		fi
 		if [ "$overwrite_sniffer_sniff" = 1 ]; then
-			yq -M -i 'del(.sniffer.sniff)' "$RUN_PROFILE_PATH"
+			delete_filter="${delete_filter:+$delete_filter | }del(.sniffer.sniff)"
+		fi
+		prepared_profile="$TEMP_DIR/profile.prepared.yaml"
+		generated_mixin="$TEMP_DIR/mixin.generated.yaml"
+		merged_profile="$TEMP_DIR/profile.merged.yaml"
+		if [ -n "$delete_filter" ]; then
+			yq -M eval-all "select(fi == 0) | $delete_filter" "$RUN_PROFILE_PATH" > "$prepared_profile" || {
+				log "Profile" "Unable to prepare runtime profile."
+				log "App" "Exit."
+				return
+			}
+		else
+			cp -f "$RUN_PROFILE_PATH" "$prepared_profile" || {
+				log "Profile" "Unable to copy runtime profile."
+				log "App" "Exit."
+				return
+			}
+		fi
+		ucode -S "$MIXIN_UC" | yq -M -p json -o yaml > "$generated_mixin" || {
+			log "Mixin" "Unable to generate mixin config."
+			log "App" "Exit."
+			return
+		}
+		if [ ! -s "$generated_mixin" ]; then
+			log "Mixin" "Generated mixin config is empty."
+			log "App" "Exit."
+			return
+		fi
+		if [ "$mixin_file_content" = 1 ] && [ ! -f "$MIXIN_FILE_PATH" ]; then
+			log "Mixin" "Mixin file not found."
+			log "App" "Exit."
+			return
 		fi
 		if [ "$mixin_file_content" = 0 ]; then
-			ucode -S "$MIXIN_UC" | yq -M -p json -o yaml | yq -M -i eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$RUN_PROFILE_PATH" -
+			yq -M -p yaml -o yaml eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$prepared_profile" "$generated_mixin" > "$merged_profile" || {
+				log "Mixin" "Unable to merge runtime profile."
+				log "App" "Exit."
+				return
+			}
 		elif [ "$mixin_file_content" = 1 ]; then
-			ucode -S "$MIXIN_UC" | yq -M -p json -o yaml | yq -M -i eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$RUN_PROFILE_PATH" "$MIXIN_FILE_PATH" -
+			yq -M -p yaml -o yaml eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$prepared_profile" "$MIXIN_FILE_PATH" "$generated_mixin" > "$merged_profile" || {
+				log "Mixin" "Unable to merge runtime profile."
+				log "App" "Exit."
+				return
+			}
 		fi
 		if [ "$proxy_enabled" = 1 ]; then
-			if yq -M -e 'has("tun")' "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
-				yq -M -i '(.tun) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$RUN_PROFILE_PATH"
+			if yq -M -e 'has("tun")' "$merged_profile" > /dev/null 2>&1; then
+				yq -M -i '(.tun) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$merged_profile"
 			fi
-			if yq -M -e 'has("listeners")' "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
-				yq -M -i '(.listeners[] | select(.type == "tun")) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$RUN_PROFILE_PATH"
+			if yq -M -e 'has("listeners")' "$merged_profile" > /dev/null 2>&1; then
+				yq -M -i '(.listeners[] | select(.type == "tun")) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$merged_profile"
 			fi
 		fi
+		mv -f "$merged_profile" "$RUN_PROFILE_PATH" || {
+			log "Profile" "Unable to install runtime profile."
+			log "App" "Exit."
+			return
+		}
+		rm -f "$prepared_profile" "$generated_mixin"
 	fi
 	if ! validate_final_profile; then
 		log "App" "Exit."
@@ -328,7 +433,7 @@ start_service() {
 			QUIC_GO_DISABLE_GSO="$env_disable_quic_go_gso" \
 			QUIC_GO_DISABLE_ECN="$env_disable_quic_go_ecn" \
 			SKIP_SYSTEM_IPV6_CHECK="$env_skip_system_ipv6_check" \
-			$PROG -d "$RUN_DIR" -t >> "$CORE_LOG_PATH" 2>&1; then
+			$PROG -d "$RUN_DIR" -f "$RUN_PROFILE_PATH" -t >> "$CORE_LOG_PATH" 2>&1; then
 			log "Profile" "Test passed."
 		else
 			log "Profile" "Test failed."
@@ -341,7 +446,7 @@ start_service() {
 	log "Core" "Start."
 	procd_open_instance mihomox
 
-	procd_set_param command /bin/sh -c "$PROG -d $RUN_DIR >> $CORE_LOG_PATH 2>&1"
+	procd_set_param command /bin/sh -c "$PROG -d $RUN_DIR -f $RUN_PROFILE_PATH >> $CORE_LOG_PATH 2>&1"
 	procd_set_param file "$RUN_PROFILE_PATH"
 	if [ "$fast_reload" = 1 ]; then
 		procd_set_param reload_signal HUP
@@ -393,6 +498,9 @@ start_service() {
 	fi
 	# set started flag
 	touch "$STARTED_FLAG_PATH"
+	if [ -n "$subscription_refresh_section" ]; then
+		printf '%s\n' "$subscription_refresh_section" > "$SUBSCRIPTION_REFRESH_PENDING_PATH"
+	fi
 }
 
 rollback_failed_start() {
@@ -473,11 +581,34 @@ service_started() {
 	if [ ! -f "$STARTED_FLAG_PATH" ]; then
 		return
 	fi
+	# The core is running now, so a previously refreshed cache is actually applied.
+	if [ -f "$SUBSCRIPTION_REFRESH_STATUS_PATH" ] && grep -q '^message=restart_required$' "$SUBSCRIPTION_REFRESH_STATUS_PATH" 2>/dev/null; then
+		local applied_section applied_profile
+		applied_section=$(sed -n 's/^section=//p' "$SUBSCRIPTION_REFRESH_STATUS_PATH" 2>/dev/null)
+		applied_profile=$(uci -q get mihomox.config.profile)
+		if [ -n "$applied_section" ] && [ "$applied_profile" = "subscription:$applied_section" ]; then
+			write_subscription_status updated "$applied_section" applied
+		else
+			rm -f "$SUBSCRIPTION_REFRESH_STATUS_PATH"
+		fi
+	fi
 	# load config
 	config_load mihomox
 	# check if proxy enabled
 	local proxy_enabled
 	config_get_bool proxy_enabled "proxy" "enabled" 0
+	if [ -f "$SUBSCRIPTION_REFRESH_PENDING_PATH" ] && [ -x /etc/init.d/mihomox ]; then
+		local refresh_section
+		refresh_section=$(cat "$SUBSCRIPTION_REFRESH_PENDING_PATH" 2>/dev/null || true)
+		rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
+		case "$refresh_section" in
+			''|*[!A-Za-z0-9_-]*) ;;
+			*)
+				log "Profile" "Start background subscription refresh."
+				nohup /etc/init.d/mihomox refresh_subscription "$refresh_section" >> "$APP_LOG_PATH" 2>&1 < /dev/null &
+				;;
+		esac
+	fi
 	if [ "$proxy_enabled" = 0 ]; then
 		log "Proxy" "Disabled."
 		return
@@ -646,6 +777,7 @@ service_started() {
 }
 
 service_stopped() {
+	persist_cache_snapshot
 	cleanup
 }
 
@@ -763,6 +895,8 @@ cleanup() {
 	if grep -q "#mihomox" "/etc/crontabs/root"; then
 		sed -i "/#mihomox/d" "/etc/crontabs/root" > /dev/null 2>&1
 	fi
+	rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
+	cleanup_cache
 }
 
 clear_logs() {
@@ -820,10 +954,25 @@ update_subscription() {
 		log "Profile" "Subscription section not found."
 		return 1
 	fi
-	if [ -z "$subscription_section" ]; then
-		return
+	prepare_files
+	local subscription_lock_dir="$TEMP_DIR/subscription-$subscription_section.lock"
+	local subscription_lock_pid
+	if ! mkdir "$subscription_lock_dir" 2>/dev/null; then
+		# The owner creates the directory before it can write its PID. Give that
+		# short window time to close before treating the lock as stale.
+		[ -s "$subscription_lock_dir/pid" ] || sleep 1
+		subscription_lock_pid=$(cat "$subscription_lock_dir/pid" 2>/dev/null || true)
+		if [ -n "$subscription_lock_pid" ] && kill -0 "$subscription_lock_pid" 2>/dev/null; then
+			log "Profile" "Subscription update already running."
+			return 2
+		fi
+		rm -rf "$subscription_lock_dir"
+		mkdir "$subscription_lock_dir" 2>/dev/null || {
+			log "Profile" "Unable to acquire subscription update lock."
+			return 1
+		}
 	fi
-	# load config
+	printf '%s\n' "$$" > "$subscription_lock_dir/pid"
 	config_load mihomox
 	# get subscription config
 	local subscription_name subscription_info_url subscription_url subscription_user_agent
@@ -835,6 +984,7 @@ update_subscription() {
 		http://*|https://*) ;;
 		*)
 			log "Profile" "Subscription URL must use HTTP or HTTPS."
+			rm -rf "$subscription_lock_dir"
 			return 1
 			;;
 	esac
@@ -842,31 +992,34 @@ update_subscription() {
 		''|http://*|https://*) ;;
 		*)
 			log "Profile" "Subscription info URL must use HTTP or HTTPS."
+			rm -rf "$subscription_lock_dir"
 			return 1
 			;;
 	esac
 	# update subscription
 	log "Profile" "Update subscription: $subscription_name."
-	local success
+	local success; success=0
+	local subscription_info_file; subscription_info_file=''
 	local subscription_info_header_tmpfile; subscription_info_header_tmpfile="$TEMP_DIR/$subscription_section.info.header"
 	local subscription_header_tmpfile; subscription_header_tmpfile="$TEMP_DIR/$subscription_section.header"
-	local subscription_tmpfile; subscription_tmpfile="$TEMP_DIR/$subscription_section.yaml"
-	local subscription_info_file
+	local subscription_tmpfile; subscription_tmpfile="$SUBSCRIPTIONS_DIR/.$subscription_section.yaml.tmp.$$"
 	local subscription_file; subscription_file="$SUBSCRIPTIONS_DIR/$subscription_section.yaml"
-	# fetch subscription info
-	if [ -n "$subscription_info_url" ]; then
+	log "Profile" "Download subscription."
+	# Capture subscription-userinfo from the main response when possible; info_url is only a fallback.
+	if ! curl -s -f -m 120 --connect-timeout 15 --retry 3 -L --proto '=http,https' --proto-redir '=http,https' -X GET -A "$subscription_user_agent" -D "$subscription_header_tmpfile" -o "$subscription_tmpfile" "$subscription_url" > /dev/null 2>&1; then
+		rm -f "$subscription_tmpfile"
+	fi
+	if [ -s "$subscription_tmpfile" ] && [ -n "$subscription_info_url" ] && ! grep -q -i "subscription-userinfo:" "$subscription_header_tmpfile" 2>/dev/null; then
 		log "Profile" "Fetch subscription info."
 		if curl -s -f -m 120 --connect-timeout 15 --retry 3 -L --proto '=http,https' --proto-redir '=http,https' -X GET -A "$subscription_user_agent" -D "$subscription_info_header_tmpfile" "$subscription_info_url" > /dev/null 2>&1; then
-			if [ ! -f "$subscription_info_file" ] && grep -q -i "subscription-userinfo:" "$subscription_info_header_tmpfile"; then
+			if grep -q -i "subscription-userinfo:" "$subscription_info_header_tmpfile"; then
 				subscription_info_file="$subscription_info_header_tmpfile"
 			fi
 		fi
 	fi
-	# download subscription
-	log "Profile" "Download subscription."
-	if curl -s -f -m 120 --connect-timeout 15 --retry 3 -L --proto '=http,https' --proto-redir '=http,https' -X GET -A "$subscription_user_agent" -D "$subscription_header_tmpfile" -o "$subscription_tmpfile" "$subscription_url" > /dev/null 2>&1; then
+	if [ -s "$subscription_tmpfile" ]; then
 		log "Profile" "Subscription download successful."
-		if [ ! -f "$subscription_info_file" ] && grep -q -i "subscription-userinfo:" "$subscription_header_tmpfile"; then
+		if [ -z "$subscription_info_file" ] && grep -q -i "subscription-userinfo:" "$subscription_header_tmpfile"; then
 			subscription_info_file="$subscription_header_tmpfile"
 		fi
 		if yq -M -p yaml -o yaml -e 'has("proxies") or has("proxy-providers")' "$subscription_tmpfile" > /dev/null 2>&1; then
@@ -883,6 +1036,13 @@ update_subscription() {
 	# check if success
 	if [ "$success" = 1 ]; then
 		log "Profile" "Subscription update successful."
+		if ! mv -f "$subscription_tmpfile" "$subscription_file"; then
+			log "Profile" "Subscription file update failed."
+			uci revert "mihomox.$subscription_section" > /dev/null 2>&1
+			rm -f "$subscription_info_header_tmpfile" "$subscription_header_tmpfile" "$subscription_tmpfile"
+			rm -rf "$subscription_lock_dir"
+			return 1
+		fi
 		# Replace metadata only after the new subscription has been validated.
 		uci_remove "mihomox" "$subscription_section" "expire" > /dev/null 2>&1
 		uci_remove "mihomox" "$subscription_section" "upload" > /dev/null 2>&1
@@ -922,14 +1082,8 @@ update_subscription() {
 				uci_set "mihomox" "$subscription_section" "avaliable" "$(format_filesize "$subscription_avaliable")"
 			fi
 		fi
-		# update subscription file
 		rm -f "$subscription_info_header_tmpfile"
 		rm -f "$subscription_header_tmpfile"
-		if ! mv -f "$subscription_tmpfile" "$subscription_file"; then
-			log "Profile" "Subscription file update failed."
-			uci revert "mihomox.$subscription_section" > /dev/null 2>&1
-			return 1
-		fi
 		uci_set "mihomox" "$subscription_section" "update" "$(date "+%Y-%m-%d %H:%M:%S")"
 		uci_set "mihomox" "$subscription_section" "success" "1"
 	elif [ "$success" = 0 ]; then
@@ -939,6 +1093,10 @@ update_subscription() {
 		rm -f "$subscription_header_tmpfile"
 		rm -f "$subscription_tmpfile"
 	fi
-	uci_commit "mihomox" || return 1
+	uci_commit "mihomox" || {
+		rm -rf "$subscription_lock_dir"
+		return 1
+	}
+	rm -rf "$subscription_lock_dir"
 	[ "$success" = 1 ]
 }

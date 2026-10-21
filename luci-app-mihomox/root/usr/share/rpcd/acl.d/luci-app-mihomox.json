@@ -5,7 +5,7 @@
             "uci": [ "mihomox" ],
             "ubus": {
                 "rc": [ "list" ],
-                "luci.mihomox": [ "version", "profile", "core_status", "log", "network_test", "get_identifiers" ]
+                "luci.mihomox": [ "version", "profile", "core_status", "subscription_status", "log", "network_test", "get_identifiers" ]
             },
             "file": {
                 "/etc/mihomox/profiles/*.yaml": ["read"],
@@ -13,7 +13,7 @@
                 "/etc/mihomox/subscriptions/*.yaml": ["read"],
                 "/etc/mihomox/subscriptions/*.yml": ["read"],
                 "/etc/mihomox/mixin.yaml": ["read"],
-                "/etc/mihomox/run/config.yaml": ["read"],
+                "/var/run/mihomox/config.yaml": ["read"],
                 "/etc/mihomox/run/providers/rule/*": ["read"],
                 "/etc/mihomox/run/providers/proxy/*": ["read"],
                 "/var/log/mihomox/*.log": ["read"],
@@ -32,7 +32,7 @@
                 "/etc/mihomox/subscriptions/*.yaml": ["write"],
                 "/etc/mihomox/subscriptions/*.yml": ["write"],
                 "/etc/mihomox/mixin.yaml": ["write"],
-                "/etc/mihomox/run/config.yaml": ["write"],
+                "/var/run/mihomox/config.yaml": ["write"],
                 "/etc/mihomox/run/providers/rule/*": ["write"],
                 "/etc/mihomox/run/providers/proxy/*": ["write"],
                 "/var/log/mihomox/*.log": ["write"],

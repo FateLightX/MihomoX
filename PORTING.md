@@ -36,7 +36,7 @@ MihomoX 是单 Mihomo 内核的 OpenWrt 透明代理服务：
 /etc/config/mihomox
   -> /etc/init.d/mihomox
   -> /etc/mihomox/ucode/mixin.uc
-  -> /etc/mihomox/run/config.yaml
+  -> /var/run/mihomox/config.yaml
   -> /etc/mihomox/bin/mihomo
 ```
 

@@ -2,6 +2,8 @@
 'require form';
 'require view';
 'require uci';
+'require ui';
+'require poll';
 'require tools.mihomox as mihomox';
 
 function validateURL(value) {
@@ -9,13 +11,30 @@ function validateURL(value) {
     return !value || /^https?:\/\/[^\s]+$/.test(value) ? true : _('Invalid URL');
 }
 
+function subscriptionStatusText(status) {
+    switch (status?.state) {
+    case 'updated':
+        return status.message === 'applied'
+            ? _('Updated and applied')
+            : _('Updated, restart to apply');
+    case 'running':
+        return _('Updating');
+    case 'failed':
+        return _('Update failed, cached profile remains active');
+    default:
+        return '-';
+    }
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
-            uci.load('mihomox')
+            uci.load('mihomox'),
+            L.resolveDefault(mihomox.subscriptionStatus(), {})
         ]);
     },
     render: function (data) {
+        let subscriptionStatus = data[1] || {};
         let m, s, o, so;
 
         m = new form.Map('mihomox');
@@ -35,6 +54,18 @@ return view.extend({
         s.anonymous = true;
         s.sortable = true;
         s.modaltitle = _('Edit Subscription');
+
+        let statusOption;
+
+        o = s.option(form.DummyValue, '_subscription_refresh_status', _('Update Status'));
+        o.modalonly = false;
+        o.optional = true;
+        statusOption = o;
+        statusOption.cfgvalue = function (section_id) {
+            if (subscriptionStatus.section && section_id && subscriptionStatus.section !== section_id)
+                return '-';
+            return subscriptionStatusText(subscriptionStatus);
+        };
 
         o = s.option(form.Value, 'name', _('Subscription Name'));
         o.rmempty = false;
@@ -68,6 +99,20 @@ return view.extend({
             return mihomox.updateSubscription(section_id).then(function (result) {
                 if (!result?.success)
                     return Promise.reject(new Error(_('Subscription') + ': ' + _('Failed')));
+
+                if (result.running) {
+                    subscriptionStatus = { state: 'running', section: section_id };
+                    const statusElement = statusOption.getUIElement(section_id);
+                    if (statusElement)
+                        statusElement.setValue(_('Updating'));
+                    ui.addNotification(null, E('p', {}, _('Subscription update already running')), 'info');
+                    return;
+                }
+
+                subscriptionStatus = { state: 'updated', message: 'restart_required', section: section_id };
+                const updatedElement = statusOption.getUIElement(section_id);
+                if (updatedElement)
+                    updatedElement.setValue(_('Updated, restart to apply'));
 
                 uci.unload('mihomox');
                 return uci.load('mihomox').then(function () {
@@ -108,6 +153,23 @@ return view.extend({
         o.rmempty = false;
         o.value('remote', _('Remote'));
         o.value('local', _('Local'));
+
+        poll.add(function () {
+            if (document.hidden)
+                return Promise.resolve();
+            return L.resolveDefault(mihomox.subscriptionStatus(), {}).then(function (status) {
+                const previous = subscriptionStatus;
+                subscriptionStatus = status || {};
+                const sectionId = subscriptionStatus.section || previous.section;
+                if (!sectionId)
+                    return;
+                if (previous.state === 'running' && subscriptionStatus.state === 'updated')
+                    ui.addNotification(null, E('p', {}, _('Updated, restart to apply')), 'info');
+                const element = statusOption.getUIElement(sectionId);
+                if (element)
+                    element.setValue(subscriptionStatusText(subscriptionStatus));
+            });
+        });
 
         return m.render();
     }

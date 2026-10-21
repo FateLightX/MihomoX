@@ -1193,6 +1193,18 @@ msgstr ""
 msgid "Updating"
 msgstr ""
 
+msgid "Updated and applied"
+msgstr ""
+
+msgid "Updated, restart to apply"
+msgstr ""
+
+msgid "Update failed, cached profile remains active"
+msgstr ""
+
+msgid "Subscription update already running"
+msgstr ""
+
 msgid "Custom Core SHA256"
 msgstr ""
 

@@ -1200,6 +1200,18 @@ msgstr "更新狀態"
 msgid "Updating"
 msgstr "更新中"
 
+msgid "Updated and applied"
+msgstr "已更新並生效"
+
+msgid "Updated, restart to apply"
+msgstr "已更新，重新啟動後生效"
+
+msgid "Update failed, cached profile remains active"
+msgstr "更新失敗，繼續使用快取設定"
+
+msgid "Subscription update already running"
+msgstr "訂閱正在更新"
+
 msgid "Custom Core SHA256"
 msgstr "自訂核心 SHA256"
 

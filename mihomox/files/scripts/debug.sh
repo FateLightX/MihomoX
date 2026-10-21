@@ -184,7 +184,7 @@ function desensitize_proxies(proxies) {
 
 function desensitize_profile() {
 	let profile = {};
-	const process = popen("yq -M -p yaml -o json /etc/mihomox/run/config.yaml");
+	const process = popen("yq -M -p yaml -o json /var/run/mihomox/config.yaml");
 	if (process) {
 		// Read fully: json() on a handle fails on 1024-byte chunk boundaries.
 		profile = json(process.read('all'));

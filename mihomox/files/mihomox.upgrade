@@ -1,6 +1,8 @@
 /etc/mihomox/profiles/
 /etc/mihomox/subscriptions/
 /etc/mihomox/mixin.yaml
+/etc/mihomox/run/cache.db
+/etc/mihomox/cache.snapshot
 /etc/mihomox/bin/
 /etc/mihomox/run/providers/rule/
 /etc/mihomox/run/providers/proxy/

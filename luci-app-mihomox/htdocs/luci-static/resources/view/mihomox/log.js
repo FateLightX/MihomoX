@@ -15,6 +15,38 @@ function validateCron(value) {
     return true;
 }
 
+function appendLog(option, state, result) {
+    result = result || {};
+    const size = Number(result.size) || 0;
+    const offset = Number(result.offset) || 0;
+    const chunk = String(result.log || '');
+    const next = Number(result.next);
+    // A truncation or rotation invalidates the old offset.
+    if (state.offset > 0 && (size < state.offset || (offset === 0 && size < state.offset + chunk.length))) {
+        state.text = '';
+        state.offset = 0;
+    }
+    if (!state.text)
+        state.text = chunk;
+    else if (chunk)
+        state.text += chunk;
+    state.offset = Number.isFinite(next) ? next : Math.max(state.offset, offset + chunk.length);
+    const element = option.getUIElement('log');
+    if (element)
+        element.setValue(state.text);
+}
+
+function isLogVisible(option) {
+    if (document.hidden)
+        return false;
+    const element = option.getUIElement('log');
+    if (!element)
+        return false;
+    if (element.offsetParent === null && element.getClientRects && element.getClientRects().length === 0)
+        return false;
+    return true;
+}
+
 return view.extend({
     load: function () {
         return Promise.all([
@@ -24,8 +56,12 @@ return view.extend({
         ]);
     },
     render: function (data) {
-        const appLog = data[1];
-        const coreLog = data[2];
+        const appResult = data[1] || {};
+        const coreResult = data[2] || {};
+        const appInitial = String(appResult.log || '');
+        const coreInitial = String(coreResult.log || '');
+        const appLogState = { offset: Number(appResult.size) || appInitial.length, text: appInitial };
+        const coreLogState = { offset: Number(coreResult.size) || coreInitial.length, text: coreInitial };
 
         let m, s, o;
 
@@ -70,6 +106,8 @@ return view.extend({
         o.inputtitle = _('Clear Log');
         o.onclick = function (_, section_id) {
             m.lookupOption('_app_log', section_id)[0].getUIElement(section_id).setValue('');
+            appLogState.offset = 0;
+            appLogState.text = '';
             return mihomox.clearAppLog();
         };
 
@@ -77,15 +115,17 @@ return view.extend({
         o.rows = 25;
         o.wrap = false;
         o.load = function (section_id) {
-            return appLog;
+            return appInitial;
         };
         o.write = function (section_id, formvalue) {
             return true;
         };
         poll.add(L.bind(function () {
             const option = this;
-            return L.resolveDefault(mihomox.getAppLog()).then(function (log) {
-                option.getUIElement('log').setValue(log);
+            if (!isLogVisible(option))
+                return Promise.resolve();
+            return L.resolveDefault(mihomox.getAppLog(appLogState.offset)).then(function (result) {
+                appendLog(option, appLogState, result);
             });
         }, o));
 
@@ -103,6 +143,8 @@ return view.extend({
         o.inputtitle = _('Clear Log');
         o.onclick = function (_, section_id) {
             m.lookupOption('_core_log', section_id)[0].getUIElement(section_id).setValue('');
+            coreLogState.offset = 0;
+            coreLogState.text = '';
             return mihomox.clearCoreLog();
         };
 
@@ -110,15 +152,17 @@ return view.extend({
         o.rows = 25;
         o.wrap = false;
         o.load = function (section_id) {
-            return coreLog;
+            return coreInitial;
         };
         o.write = function (section_id, formvalue) {
             return true;
         };
         poll.add(L.bind(function () {
             const option = this;
-            return L.resolveDefault(mihomox.getCoreLog()).then(function (log) {
-                option.getUIElement('log').setValue(log);
+            if (!isLogVisible(option))
+                return Promise.resolve();
+            return L.resolveDefault(mihomox.getCoreLog(coreLogState.offset)).then(function (result) {
+                appendLog(option, coreLogState, result);
             });
         }, o));
 

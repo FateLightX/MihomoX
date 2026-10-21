@@ -6,6 +6,7 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIG="$ROOT_DIR/mihomox/files/mihomox.conf"
 INIT_DEFAULTS="$ROOT_DIR/mihomox/files/uci-defaults/init.sh"
 INIT_SCRIPT="$ROOT_DIR/mihomox/files/mihomox.init"
+INCLUDE_SCRIPT="$ROOT_DIR/mihomox/files/scripts/include.sh"
 MIGRATE="$ROOT_DIR/mihomox/files/uci-defaults/migrate.sh"
 
 grep -q "option 'fast_reload' '1'" "$CONFIG"
@@ -24,6 +25,7 @@ grep -q "option 'start_delay' '10'" "$CONFIG"
 grep -q "option 'dns_cache_algorithm' 'arc'" "$CONFIG"
 grep -q "option 'fake_ip_filter' '1'" "$CONFIG"
 grep -q "option 'fake_ip_filter_mode' 'blacklist'" "$CONFIG"
+grep -q "option 'fake_ip_cache' '0'" "$CONFIG"
 grep -q "option 'fake_ip6_range' 'fc00::/18'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.gstatic.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.miwifi.com'" "$CONFIG"
@@ -50,6 +52,10 @@ grep -q "option 'china_ip_url' 'https://raw.githubusercontent.com/gaoyifan/china
 grep -q "option 'china_ip6_url' 'https://raw.githubusercontent.com/gaoyifan/china-operator-ip/refs/heads/ip-lists/china6.txt'" "$CONFIG"
 grep -q "option 'network_test_fw_mark' '0x82'" "$CONFIG"
 grep -q 'config_get_bool fast_reload "procd" "fast_reload" 1' "$INIT_SCRIPT"
+grep -q 'RUN_PROFILE_PATH="$TEMP_DIR/config.yaml"' "$INCLUDE_SCRIPT"
+grep -q 'CACHE_DB_PATH="$TEMP_DIR/cache.db"' "$INCLUDE_SCRIPT"
+grep -q -- '-f "$RUN_PROFILE_PATH"' "$INIT_SCRIPT"
+grep -q 'CACHE_SNAPSHOT_PATH="$HOME_DIR/cache.snapshot"' "$INCLUDE_SCRIPT"
 
 cron_guard_count=$(grep -c 'if grep -q "#mihomox" "/etc/crontabs/root"; then' "$INIT_SCRIPT")
 [ "$cron_guard_count" -eq 2 ]

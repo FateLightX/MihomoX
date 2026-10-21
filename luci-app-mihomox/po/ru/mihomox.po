@@ -1137,6 +1137,18 @@ msgstr "Настройки procd"
 msgid "Custom Core SHA256"
 msgstr ""
 
+msgid "Updated and applied"
+msgstr "Обновлено и применено"
+
+msgid "Updated, restart to apply"
+msgstr "Обновлено, перезапустите для применения"
+
+msgid "Update failed, cached profile remains active"
+msgstr "Ошибка обновления, используется кэшированный профиль"
+
+msgid "Subscription update already running"
+msgstr "Обновление подписки уже выполняется"
+
 msgid "Required when using Custom Core URL"
 msgstr ""
 

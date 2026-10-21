@@ -39,6 +39,12 @@ const callMihomoXUpdateSubscription = rpc.declare({
     expect: { '': {} }
 });
 
+const callMihomoXSubscriptionStatus = rpc.declare({
+    object: 'luci.mihomox',
+    method: 'subscription_status',
+    expect: { '': {} }
+});
+
 const callMihomoXAPI = rpc.declare({
     object: 'luci.mihomox',
     method: 'api',
@@ -67,7 +73,7 @@ const callMihomoXCoreStatus = rpc.declare({
 const callMihomoXLog = rpc.declare({
     object: 'luci.mihomox',
     method: 'log',
-    params: ['name'],
+    params: ['name', 'offset', 'limit'],
     expect: { '': {} }
 });
 
@@ -98,7 +104,7 @@ const profilesDir = `${homeDir}/profiles`;
 const subscriptionsDir = `${homeDir}/subscriptions`;
 const mixinFilePath = `${homeDir}/mixin.yaml`;
 const runDir = `${homeDir}/run`;
-const runProfilePath = `${runDir}/config.yaml`;
+const runProfilePath = '/var/run/mihomox/config.yaml';
 const providersDir = `${runDir}/providers`;
 const ruleProvidersDir = `${providersDir}/rule`;
 const proxyProvidersDir = `${providersDir}/proxy`;
@@ -187,6 +193,10 @@ return baseclass.extend({
         return callMihomoXUpdateSubscription(section_id);
     },
 
+    subscriptionStatus: function () {
+        return callMihomoXSubscriptionStatus();
+    },
+
     updateDashboard: function () {
         return callMihomoXAPI('POST', '/upgrade/ui').then(function (result) {
             if (!result?.success) {
@@ -257,16 +267,12 @@ return baseclass.extend({
         return L.resolveDefault(fs.list(this.proxyProvidersDir), []);
     },
 
-    getAppLog: function () {
-        return L.resolveDefault(callMihomoXLog('app'), { log: '' }).then(function (result) {
-            return result?.log || '';
-        });
+    getAppLog: function (offset) {
+        return L.resolveDefault(callMihomoXLog('app', offset ?? null, 65536), { log: '', offset: 0, size: 0 });
     },
 
-    getCoreLog: function () {
-        return L.resolveDefault(callMihomoXLog('core'), { log: '' }).then(function (result) {
-            return result?.log || '';
-        });
+    getCoreLog: function (offset) {
+        return L.resolveDefault(callMihomoXLog('core', offset ?? null, 65536), { log: '', offset: 0, size: 0 });
     },
 
     networkTest: function (test) {

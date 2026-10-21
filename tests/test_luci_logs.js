@@ -17,7 +17,12 @@ const rpc = {
         return (...args) => {
             rpcCalls.push({ method: definition.method, args });
             if (definition.method === 'log')
-                return Promise.resolve({ log: args[0] === 'app' ? 'app tail' : 'core tail' });
+                return Promise.resolve({
+                    log: args[0] === 'app' ? 'app tail' : 'core tail',
+                    offset: 0,
+                    size: args[0] === 'app' ? 8 : 9,
+                    next: args[0] === 'app' ? 8 : 9
+                });
             return Promise.resolve({});
         };
     }
@@ -37,11 +42,11 @@ const mihomox = new Function(
 
 async function testTools() {
     assert.ok(
-        declarations.some((definition) => definition.method === 'log' && definition.params[0] === 'name'),
+        declarations.some((definition) => definition.method === 'log' && definition.params[0] === 'name' && definition.params.length === 3),
         'tools must declare the bounded log RPC'
     );
-    assert.strictEqual(await mihomox.getAppLog(), 'app tail');
-    assert.strictEqual(await mihomox.getCoreLog(), 'core tail');
+    assert.deepStrictEqual(await mihomox.getAppLog(), { log: 'app tail', offset: 0, size: 8, next: 8 });
+    assert.deepStrictEqual(await mihomox.getCoreLog(), { log: 'core tail', offset: 0, size: 9, next: 9 });
     assert.deepStrictEqual(
         rpcCalls.filter((call) => call.method === 'log').map((call) => call.args[0]),
         ['app', 'core']
@@ -126,8 +131,8 @@ let readDebugLogResolve;
 const debugBlob = { type: 'blob' };
 const logMihomox = {
     debugLogPath: '/var/log/mihomox/debug.log',
-    getAppLog: () => Promise.resolve('app'),
-    getCoreLog: () => Promise.resolve('core'),
+    getAppLog: () => Promise.resolve({ log: 'app', offset: 0, size: 3, next: 3 }),
+    getCoreLog: () => Promise.resolve({ log: 'core', offset: 0, size: 4, next: 4 }),
     clearAppLog: () => Promise.resolve(),
     clearCoreLog: () => Promise.resolve(),
     debug: () => Promise.resolve(debugResult)
@@ -160,7 +165,8 @@ const document = {
     body: {
         appendChild: () => { },
         removeChild: () => { }
-    }
+    },
+    hidden: false
 };
 const poll = { add: (callback) => polls.push(callback) };
 const logL = {
@@ -174,7 +180,7 @@ const logView = new Function(
 
 async function testLogView() {
     await logView.load();
-    logView.render([null, 'app', 'core']);
+    logView.render([null, { log: 'app', size: 3 }, { log: 'core', size: 4 }]);
     assert.strictEqual(polls.length, 2);
     assert.strictEqual(rendered.scheduled_clear_cron.validate(null, '0 3 * * *'), true);
     assert.strictEqual(rendered.scheduled_clear_cron.validate(null, '* * * * *;reboot'), 'Invalid cron expression');

@@ -15,6 +15,7 @@ done
 "$ROOT_DIR/tests/test_update_core.sh"
 "$ROOT_DIR/tests/test_backend_regressions.sh"
 "$ROOT_DIR/tests/test_security_helpers.sh"
+"$ROOT_DIR/tests/test_cache_paths.sh"
 "$ROOT_DIR/tests/test_default_settings.sh"
 "$ROOT_DIR/tests/test_stun_helper.sh"
 node "$ROOT_DIR/tests/test_luci_core_update.js"

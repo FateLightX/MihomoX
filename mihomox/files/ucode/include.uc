@@ -93,7 +93,7 @@ export function get_cgroups() {
 
 export function load_profile() {
 	let result = {};
-	const process = popen('yq -M -p yaml -o json /etc/mihomox/run/config.yaml');
+	const process = popen('yq -M -p yaml -o json /var/run/mihomox/config.yaml');
 	if (process) {
 		// json() parses a handle in 1024-byte chunks and raises
 		// "Trailing garbage after JSON data" when the document ends on a chunk

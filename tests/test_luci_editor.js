@@ -80,7 +80,7 @@ const mihomox = {
     ruleProvidersDir: '/etc/mihomox/run/providers/rule',
     proxyProvidersDir: '/etc/mihomox/run/providers/proxy',
     mixinFilePath: '/etc/mihomox/mixin.yaml',
-    runProfilePath: '/etc/mihomox/run/config.yaml',
+    runProfilePath: '/var/run/mihomox/config.yaml',
     listProfiles: () => Promise.resolve(profiles),
     listRuleProviders: () => Promise.resolve(ruleProviders),
     listProxyProviders: () => Promise.resolve(proxyProviders),
