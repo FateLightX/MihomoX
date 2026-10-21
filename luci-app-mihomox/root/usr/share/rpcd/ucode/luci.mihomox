@@ -551,7 +551,7 @@ const methods = {
 		}
 	},
 	log: {
-		args: { name: 'name', offset: 'offset', limit: 'limit' },
+		args: { name: 'name', offset: 'offset', limit: 'limit', inode: 'inode' },
 		call: function(req) {
 			const paths = {
 				'app': APP_LOG_FILE,
@@ -560,26 +560,36 @@ const methods = {
 			const path = paths[req.args?.name];
 			if (!path)
 				return { log: '' };
-			// Read via fs, not popen/tail: rpcd sandbox often cannot exec
-			// helpers, which made LuCI log tabs look empty on config errors.
-			let result = readfile(path);
-			if (result == null)
-				return { log: '', offset: 0, size: 0 };
-			result = '' + result;
-			const size = length(result);
+			// Read via fs, not popen/tail: rpcd sandbox often cannot exec helpers.
+			const info = stat(path);
+			if (!info)
+				return { log: '', offset: 0, size: 0, next: 0, inode: null };
+			const size = int(info.size);
+			const inode = '' + info.inode;
 			const max_bytes = 65536;
 			let limit = int(req.args?.limit);
 			if (limit <= 0 || limit > max_bytes)
 				limit = max_bytes;
 			let start = int(req.args?.offset);
+			if (req.args?.inode != null && '' + req.args.inode != inode)
+				start = 0;
 			if (start < 0 || start > size)
 				start = 0;
 			if (start == 0 && size > limit)
 				start = size - limit;
-			let chunk = substr(result, start);
-			if (length(chunk) > limit)
-				chunk = substr(chunk, 0, limit);
-			return { log: chunk, offset: start, size: size, next: start + length(chunk) };
+			let read_length = size - start;
+			if (read_length > limit)
+				read_length = limit;
+			let chunk = '';
+			if (read_length > 0) {
+				const fp = open(path, 'r');
+				if (fp) {
+					if (fp.seek(start, 0))
+						chunk = '' + (fp.read(read_length) || '');
+					fp.close();
+				}
+			}
+			return { log: chunk, offset: start, size: size, next: start + length(chunk), inode: inode };
 		}
 	},
 	network_test: {

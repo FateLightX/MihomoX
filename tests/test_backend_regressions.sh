@@ -6,6 +6,7 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 INIT_SCRIPT="$ROOT_DIR/mihomox/files/mihomox.init"
 INCLUDE_SCRIPT="$ROOT_DIR/mihomox/files/scripts/include.sh"
 UPGRADE_SCRIPT="$ROOT_DIR/mihomox/files/mihomox.upgrade"
+RPC_SCRIPT="$ROOT_DIR/luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox"
 
 # Subscription failures must preserve the last known metadata and return non-zero.
 awk '
@@ -60,6 +61,21 @@ grep -q '\."external-controller-tls" // ""' "$INIT_SCRIPT"
 grep -q 'API TLS requires listen address, certificate and private key together.' "$INIT_SCRIPT"
 grep -q 'DNS policy requires at least one proxy-server-nameserver.' "$INIT_SCRIPT"
 grep -q 'Fake-IP rule mode requires complete domain rules ending with fake-ip or real-ip.' "$INIT_SCRIPT"
+awk '
+/^[[:space:]]*log: \{/ { in_fn = 1 }
+in_fn { block = block $0 "\n" }
+in_fn && /^[[:space:]]*network_test: \{/ { exit }
+END {
+	if (block !~ /stat\(path\)/)
+		exit 1
+	if (block !~ /open\(path, '\''r'\''\)/)
+		exit 1
+	if (block !~ /fp\.seek\(start, 0\)/)
+		exit 1
+	if (block ~ /readfile\(path\)/)
+		exit 1
+}
+' "$RPC_SCRIPT"
 
 # An unbalanced yq expression exits non-zero, which silently disables the check it
 # guards instead of reporting a failure.

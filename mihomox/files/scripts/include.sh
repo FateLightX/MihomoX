@@ -136,6 +136,9 @@ prepare_cache() {
 
 persist_cache_snapshot() {
 	[ -s "$CACHE_DB_PATH" ] || return 0
+	if [ -s "$CACHE_SNAPSHOT_PATH" ] && cmp -s "$CACHE_DB_PATH" "$CACHE_SNAPSHOT_PATH" 2>/dev/null; then
+		return 0
+	fi
 	local snapshot_tmp="$CACHE_SNAPSHOT_PATH.$$"
 	cp -p "$CACHE_DB_PATH" "$snapshot_tmp" 2>/dev/null || {
 		log "Cache" "Unable to save selection cache snapshot."

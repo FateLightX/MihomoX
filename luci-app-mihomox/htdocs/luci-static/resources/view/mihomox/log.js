@@ -21,11 +21,14 @@ function appendLog(option, state, result) {
     const offset = Number(result.offset) || 0;
     const chunk = String(result.log || '');
     const next = Number(result.next);
+    const inode = result.inode ?? state.inode;
+    const rotated = (state.inode != null && inode != null && String(state.inode) !== String(inode));
     // A truncation or rotation invalidates the old offset.
-    if (state.offset > 0 && (size < state.offset || (offset === 0 && size < state.offset + chunk.length))) {
+    if (rotated || (state.offset > 0 && (size < state.offset || (offset === 0 && size < state.offset + chunk.length)))) {
         state.text = '';
         state.offset = 0;
     }
+    state.inode = inode;
     if (!state.text)
         state.text = chunk;
     else if (chunk)
@@ -60,8 +63,18 @@ return view.extend({
         const coreResult = data[2] || {};
         const appInitial = String(appResult.log || '');
         const coreInitial = String(coreResult.log || '');
-        const appLogState = { offset: Number(appResult.size) || appInitial.length, text: appInitial };
-        const coreLogState = { offset: Number(coreResult.size) || coreInitial.length, text: coreInitial };
+        const appNext = Number(appResult.next);
+        const coreNext = Number(coreResult.next);
+        const appLogState = {
+            offset: Number.isFinite(appNext) ? appNext : (Number(appResult.size) || appInitial.length),
+            text: appInitial,
+            inode: appResult.inode ?? null
+        };
+        const coreLogState = {
+            offset: Number.isFinite(coreNext) ? coreNext : (Number(coreResult.size) || coreInitial.length),
+            text: coreInitial,
+            inode: coreResult.inode ?? null
+        };
 
         let m, s, o;
 
@@ -108,6 +121,7 @@ return view.extend({
             m.lookupOption('_app_log', section_id)[0].getUIElement(section_id).setValue('');
             appLogState.offset = 0;
             appLogState.text = '';
+            appLogState.inode = null;
             return mihomox.clearAppLog();
         };
 
@@ -124,7 +138,7 @@ return view.extend({
             const option = this;
             if (!isLogVisible(option))
                 return Promise.resolve();
-            return L.resolveDefault(mihomox.getAppLog(appLogState.offset)).then(function (result) {
+            return L.resolveDefault(mihomox.getAppLog(appLogState.offset, appLogState.inode)).then(function (result) {
                 appendLog(option, appLogState, result);
             });
         }, o));
@@ -145,6 +159,7 @@ return view.extend({
             m.lookupOption('_core_log', section_id)[0].getUIElement(section_id).setValue('');
             coreLogState.offset = 0;
             coreLogState.text = '';
+            coreLogState.inode = null;
             return mihomox.clearCoreLog();
         };
 
@@ -161,7 +176,7 @@ return view.extend({
             const option = this;
             if (!isLogVisible(option))
                 return Promise.resolve();
-            return L.resolveDefault(mihomox.getCoreLog(coreLogState.offset)).then(function (result) {
+            return L.resolveDefault(mihomox.getCoreLog(coreLogState.offset, coreLogState.inode)).then(function (result) {
                 appendLog(option, coreLogState, result);
             });
         }, o));

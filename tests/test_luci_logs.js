@@ -21,7 +21,8 @@ const rpc = {
                     log: args[0] === 'app' ? 'app tail' : 'core tail',
                     offset: 0,
                     size: args[0] === 'app' ? 8 : 9,
-                    next: args[0] === 'app' ? 8 : 9
+                    next: args[0] === 'app' ? 8 : 9,
+                    inode: args[0] === 'app' ? 101 : 102
                 });
             return Promise.resolve({});
         };
@@ -42,15 +43,17 @@ const mihomox = new Function(
 
 async function testTools() {
     assert.ok(
-        declarations.some((definition) => definition.method === 'log' && definition.params[0] === 'name' && definition.params.length === 3),
+        declarations.some((definition) => definition.method === 'log' && definition.params[0] === 'name' && definition.params[3] === 'inode' && definition.params.length === 4),
         'tools must declare the bounded log RPC'
     );
-    assert.deepStrictEqual(await mihomox.getAppLog(), { log: 'app tail', offset: 0, size: 8, next: 8 });
-    assert.deepStrictEqual(await mihomox.getCoreLog(), { log: 'core tail', offset: 0, size: 9, next: 9 });
+    assert.deepStrictEqual(await mihomox.getAppLog(), { log: 'app tail', offset: 0, size: 8, next: 8, inode: 101 });
+    assert.deepStrictEqual(await mihomox.getCoreLog(), { log: 'core tail', offset: 0, size: 9, next: 9, inode: 102 });
     assert.deepStrictEqual(
         rpcCalls.filter((call) => call.method === 'log').map((call) => call.args[0]),
         ['app', 'core']
     );
+    await mihomox.getAppLog(8, 101);
+    assert.deepStrictEqual(rpcCalls.at(-1).args, ['app', 8, 65536, 101]);
 
     const field = {
         classList: { contains: (name) => name === 'cbi-value-field' },
@@ -129,10 +132,15 @@ let debugResult = { success: false };
 let readDebugLog;
 let readDebugLogResolve;
 const debugBlob = { type: 'blob' };
+const appLogCalls = [];
+let appLogResult = { log: '', offset: 3, size: 3, next: 3, inode: 1 };
 const logMihomox = {
     debugLogPath: '/var/log/mihomox/debug.log',
-    getAppLog: () => Promise.resolve({ log: 'app', offset: 0, size: 3, next: 3 }),
-    getCoreLog: () => Promise.resolve({ log: 'core', offset: 0, size: 4, next: 4 }),
+    getAppLog: (offset, inode) => {
+        appLogCalls.push([offset, inode]);
+        return Promise.resolve(appLogResult);
+    },
+    getCoreLog: () => Promise.resolve({ log: '', offset: 4, size: 4, next: 4, inode: 2 }),
     clearAppLog: () => Promise.resolve(),
     clearCoreLog: () => Promise.resolve(),
     debug: () => Promise.resolve(debugResult)
@@ -180,10 +188,24 @@ const logView = new Function(
 
 async function testLogView() {
     await logView.load();
-    logView.render([null, { log: 'app', size: 3 }, { log: 'core', size: 4 }]);
+    logView.render([
+        null,
+        { log: 'app', size: 3, next: 3, inode: 1 },
+        { log: 'core', size: 4, next: 4, inode: 2 }
+    ]);
     assert.strictEqual(polls.length, 2);
     assert.strictEqual(rendered.scheduled_clear_cron.validate(null, '0 3 * * *'), true);
     assert.strictEqual(rendered.scheduled_clear_cron.validate(null, '* * * * *;reboot'), 'Invalid cron expression');
+
+    appLogResult = { log: 'rotated', offset: 0, size: 7, next: 7, inode: 3 };
+    await polls[0]();
+    assert.strictEqual(rendered._app_log.uiValue, 'rotated');
+    assert.deepStrictEqual(appLogCalls.at(-1), [3, 1]);
+
+    appLogResult = { log: '+more', offset: 7, size: 12, next: 12, inode: 3 };
+    await polls[0]();
+    assert.strictEqual(rendered._app_log.uiValue, 'rotated+more');
+    assert.deepStrictEqual(appLogCalls.at(-1), [7, 3]);
 
     await assert.rejects(
         rendered._generate_download_debug_log.onclick(),

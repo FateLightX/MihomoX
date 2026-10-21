@@ -73,7 +73,7 @@ const callMihomoXCoreStatus = rpc.declare({
 const callMihomoXLog = rpc.declare({
     object: 'luci.mihomox',
     method: 'log',
-    params: ['name', 'offset', 'limit'],
+    params: ['name', 'offset', 'limit', 'inode'],
     expect: { '': {} }
 });
 
@@ -267,12 +267,12 @@ return baseclass.extend({
         return L.resolveDefault(fs.list(this.proxyProvidersDir), []);
     },
 
-    getAppLog: function (offset) {
-        return L.resolveDefault(callMihomoXLog('app', offset ?? null, 65536), { log: '', offset: 0, size: 0 });
+    getAppLog: function (offset, inode) {
+        return L.resolveDefault(callMihomoXLog('app', offset ?? null, 65536, inode ?? null), { log: '', offset: 0, size: 0, next: 0, inode: null });
     },
 
-    getCoreLog: function (offset) {
-        return L.resolveDefault(callMihomoXLog('core', offset ?? null, 65536), { log: '', offset: 0, size: 0 });
+    getCoreLog: function (offset, inode) {
+        return L.resolveDefault(callMihomoXLog('core', offset ?? null, 65536, inode ?? null), { log: '', offset: 0, size: 0, next: 0, inode: null });
     },
 
     networkTest: function (test) {

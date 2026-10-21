@@ -24,7 +24,14 @@ printf 'legacy-cache\n' > "$TEST_DIR/run/cache.db"
 	[ "$(readlink "$CACHE_MOUNT_PATH" 2>/dev/null || true)" = "$CACHE_DB_PATH" ] || \
 		[ "$(cat "$CACHE_MOUNT_PATH")" = 'legacy-cache' ]
 	printf 'saved-selection\n' > "$CACHE_DB_PATH"
+	cp_calls=0
+	cp() {
+		cp_calls=$((cp_calls + 1))
+		command cp "$@"
+	}
 	persist_cache_snapshot
+	persist_cache_snapshot
+	[ "$cp_calls" -eq 1 ]
 	[ "$(cat "$CACHE_SNAPSHOT_PATH")" = 'saved-selection' ]
 	cleanup_cache
 	rm -f "$CACHE_MOUNT_PATH" "$CACHE_DB_PATH"
