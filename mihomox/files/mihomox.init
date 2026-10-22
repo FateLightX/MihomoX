@@ -79,16 +79,25 @@ update_china_ip() {
 }
 
 start_service() {
-	# prepare files
 	prepare_files
-	rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
+	local live_profile="$RUN_PROFILE_PATH" service_action="${1:-start}"
+	local profile_work_dir RUN_PROFILE_PATH result
+	profile_work_dir=$(mktemp -d "${live_profile%/*}/.profile.XXXXXX") || return 1
+	RUN_PROFILE_PATH="$profile_work_dir/config.yaml"
+	prepare_service
+	result=$?
+	rm -rf "$profile_work_dir"
+	return "$result"
+}
+
+prepare_service() {
 	# ensure credentials exist before generating the core profile
 	local api_secret; api_secret=$(uci -q get mihomox.mixin.api_secret)
 	local credentials_changed; credentials_changed=0
 	if [ -z "$api_secret" ]; then
 		api_secret=$(generate_secret) || {
 			log "Security" "Unable to generate API secret."
-			return
+			return 1
 		}
 		uci set mihomox.mixin.api_secret="$api_secret"
 		credentials_changed=1
@@ -100,7 +109,7 @@ start_service() {
 		if [ "$auth_enabled" = 1 ] && [ -z "$auth_password" ]; then
 			auth_password=$(generate_secret) || {
 				log "Security" "Unable to generate authentication password."
-				return
+				return 1
 			}
 			uci set "$auth_section.password=$auth_password"
 			credentials_changed=1
@@ -115,12 +124,12 @@ start_service() {
 	if [ "$enabled" = 0 ]; then
 		log "App" "Disabled."
 		log "App" "Exit."
-		return
+		return 0
 	fi
 	if ! prepare_cache; then
 		log "Cache" "Unable to prepare runtime cache."
 		log "App" "Exit."
-		return
+		return 1
 	fi
 	# start
 	log "App" "Enabled."
@@ -129,7 +138,7 @@ start_service() {
 	if [ ! -x $PROG ]; then
 		log "App" "Core is not executable."
 		log "App" "Exit."
-		return
+		return 1
 	fi
 	# get config
 	## app config
@@ -194,7 +203,7 @@ start_service() {
 		if ! is_safe_identifier "$listener_name"; then
 			log "Core" "Invalid listener name."
 			log "App" "Exit."
-			return
+			return 1
 		fi
 	done
 	## proxy config
@@ -212,24 +221,19 @@ start_service() {
 	local profile_type; profile_type=$(echo "$profile" | cut -d ':' -f 1)
 	local profile_id; profile_id=$(echo "$profile" | cut -d ':' -f 2)
 	local subscription_refresh_section; subscription_refresh_section=''
-	: > "$RUN_PROFILE_PATH" || {
-		log "Profile" "Unable to create runtime profile."
-		log "App" "Exit."
-		return
-	}
 	if [ "$profile_type" = "file" ]; then
 		local profile_name; profile_name="$profile_id"
 		case "$profile_name" in
 			''|*/*|*\\*|.|..)
 				log "Profile" "Invalid profile filename."
 				log "App" "Exit."
-				return
+				return 1
 				;;
 			*.yaml|*.yml) ;;
 			*)
 				log "Profile" "Profile must be a YAML file."
 				log "App" "Exit."
-				return
+				return 1
 				;;
 		esac
 		local profile_file; profile_file="$PROFILES_DIR/$profile_name"
@@ -237,22 +241,22 @@ start_service() {
 		if [ ! -f "$profile_file" ]; then
 			log "Profile" "File not found."
 			log "App" "Exit."
-			return
+			return 1
 		fi
-		cp -f "$profile_file" "$RUN_PROFILE_PATH"
+		cp -f "$profile_file" "$RUN_PROFILE_PATH" || return 1
 	elif [ "$profile_type" = "subscription" ]; then
 		local subscription_section; subscription_section="$profile_id"
 		case "$subscription_section" in
 			''|*[!A-Za-z0-9_-]*)
 				log "Profile" "Invalid subscription section."
 				log "App" "Exit."
-				return
+				return 1
 				;;
 		esac
 		if [ "$(uci -q get "mihomox.$subscription_section")" != "subscription" ]; then
 			log "Profile" "Subscription section not found."
 			log "App" "Exit."
-			return
+			return 1
 		fi
 		local subscription_name subscription_prefer subscription_cache_valid
 		config_get subscription_name "$subscription_section" "name"
@@ -276,13 +280,13 @@ start_service() {
 		if [ "$subscription_cache_valid" = 0 ]; then
 			log "Profile" "Subscription profile is unavailable or invalid."
 			log "App" "Exit."
-			return
+			return 1
 		fi
-		cp -f "$subscription_file" "$RUN_PROFILE_PATH"
+		cp -f "$subscription_file" "$RUN_PROFILE_PATH" || return 1
 	else
 		log "Profile" "No profile/subscription selected."
 		log "App" "Exit."
-		return
+		return 1
 	fi
 	# mixin
 	if [ "$core_only" = 0 ]; then
@@ -319,103 +323,107 @@ start_service() {
 		if [ "$overwrite_sniffer_sniff" = 1 ]; then
 			delete_filter="${delete_filter:+$delete_filter | }del(.sniffer.sniff)"
 		fi
-		prepared_profile="$TEMP_DIR/profile.prepared.yaml"
-		generated_mixin="$TEMP_DIR/mixin.generated.yaml"
-		merged_profile="$TEMP_DIR/profile.merged.yaml"
+		prepared_profile="$profile_work_dir/profile.prepared.yaml"
+		generated_mixin="$profile_work_dir/mixin.generated.yaml"
+		merged_profile="$profile_work_dir/profile.merged.yaml"
 		if [ -n "$delete_filter" ]; then
 			yq -M eval-all "select(fi == 0) | $delete_filter" "$RUN_PROFILE_PATH" > "$prepared_profile" || {
 				log "Profile" "Unable to prepare runtime profile."
 				log "App" "Exit."
-				return
+				return 1
 			}
 		else
 			cp -f "$RUN_PROFILE_PATH" "$prepared_profile" || {
 				log "Profile" "Unable to copy runtime profile."
 				log "App" "Exit."
-				return
+				return 1
 			}
 		fi
-		ucode -S "$MIXIN_UC" | yq -M -p json -o yaml > "$generated_mixin" || {
+		ucode -S "$MIXIN_UC" > "$profile_work_dir/mixin.generated.json" &&
+			yq -M -p json -o yaml "$profile_work_dir/mixin.generated.json" > "$generated_mixin" || {
 			log "Mixin" "Unable to generate mixin config."
 			log "App" "Exit."
-			return
+			return 1
 		}
 		if [ ! -s "$generated_mixin" ]; then
 			log "Mixin" "Generated mixin config is empty."
 			log "App" "Exit."
-			return
+			return 1
 		fi
 		if [ "$mixin_file_content" = 1 ] && [ ! -f "$MIXIN_FILE_PATH" ]; then
 			log "Mixin" "Mixin file not found."
 			log "App" "Exit."
-			return
+			return 1
 		fi
 		if [ "$mixin_file_content" = 0 ]; then
 			yq -M -p yaml -o yaml eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$prepared_profile" "$generated_mixin" > "$merged_profile" || {
 				log "Mixin" "Unable to merge runtime profile."
 				log "App" "Exit."
-				return
+				return 1
 			}
 		elif [ "$mixin_file_content" = 1 ]; then
 			yq -M -p yaml -o yaml eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$prepared_profile" "$MIXIN_FILE_PATH" "$generated_mixin" > "$merged_profile" || {
 				log "Mixin" "Unable to merge runtime profile."
 				log "App" "Exit."
-				return
+				return 1
 			}
 		fi
 		if [ "$proxy_enabled" = 1 ]; then
-			if yq -M -e 'has("tun")' "$merged_profile" > /dev/null 2>&1; then
-				yq -M -i '(.tun) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$merged_profile"
+			local has_tun has_listeners
+			has_tun=$(yq -M 'has("tun")' "$merged_profile") || return 1
+			has_listeners=$(yq -M 'has("listeners")' "$merged_profile") || return 1
+			if [ "$has_tun" = true ]; then
+				yq -M -i '(.tun) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$merged_profile" || return 1
 			fi
-			if yq -M -e 'has("listeners")' "$merged_profile" > /dev/null 2>&1; then
-				yq -M -i '(.listeners[] | select(.type == "tun")) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$merged_profile"
+			if [ "$has_listeners" = true ]; then
+				yq -M -i '(.listeners[] | select(.type == "tun")) |= (.auto-route = false | .auto-redirect = false | .auto-detect-interface = false | .disable-icmp-forwarding = true)' "$merged_profile" || return 1
 			fi
 		fi
 		mv -f "$merged_profile" "$RUN_PROFILE_PATH" || {
 			log "Profile" "Unable to install runtime profile."
 			log "App" "Exit."
-			return
+			return 1
 		}
-		rm -f "$prepared_profile" "$generated_mixin"
 	fi
 	if ! validate_final_profile; then
+		log "Profile" "Final profile validation failed."
 		log "App" "Exit."
-		return
+		return 1
 	fi
 	warn_legacy_profile
 	# check profile
 	if [ "$core_only" = 0 ] && [ "$proxy_enabled" = 1 ]; then
 		log "Profile" "Checking..."
 		if [ "$ipv4_dns_hijack" = 1 ] || [ "$ipv6_dns_hijack" = 1 ]; then
-			if yq -M -e '(has("dns") and (.dns | .enable) and (.dns | has("listen"))) | not' "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
+			if ! yq -M -e '(has("dns") and (.dns | .enable) and (.dns | has("listen")))' "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
 				log "Profile" "Check failed."
 				log "Profile" "DNS should be enabled and listen should be defined."
 				log "App" "Exit."
-				return
+				return 1
 			fi
 		fi
 		if [ "$tcp_mode" = "redirect" ]; then
-			if yq -M -e "(has(\"redir-port\") or (has(\"listeners\") and .listeners | any_c(.name == \"$redirect_listener_name\" and .type == \"redir\"))) | not" "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
+			if ! yq -M -e "(has(\"redir-port\") or (has(\"listeners\") and .listeners | any_c(.name == \"$redirect_listener_name\" and .type == \"redir\")))" "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
 				log "Profile" "Check failed."
 				log "Profile" "Redirect Port/Listener should be defined."
 				log "App" "Exit."
-				return
+				return 1
 			fi
 		fi
 		if [ "$tcp_mode" = "tproxy" ] || [ "$udp_mode" = "tproxy" ]; then
-			if yq -M -e "(has(\"tproxy-port\") or (has(\"listeners\") and .listeners | any_c(.name == \"$tproxy_listener_name\" and .type == \"tproxy\"))) | not" "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
+			if ! yq -M -e "(has(\"tproxy-port\") or (has(\"listeners\") and .listeners | any_c(.name == \"$tproxy_listener_name\" and .type == \"tproxy\")))" "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
 				log "Profile" "Check failed."
 				log "Profile" "TPROXY Port/Listener should be defined."
 				log "App" "Exit."
-				return
+				return 1
 			fi
 		fi
 		if [ "$tcp_mode" = "tun" ] || [ "$udp_mode" = "tun" ]; then
-			if yq -M -e "((has(\"tun\") and (.tun | .enable) and (.tun | has(\"device\"))) or (has(\"listeners\") and .listeners | any_c(.name == \"$tun_listener_name\" and .type == \"tun\" and has(\"device\")))) | not" "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
+			if ! yq -M -e "((has(\"tun\") and (.tun | .enable) and (.tun | has(\"device\"))) or (has(\"listeners\") and .listeners | any_c(.name == \"$tun_listener_name\" and .type == \"tun\" and has(\"device\"))))" "$RUN_PROFILE_PATH" > /dev/null 2>&1; then
 				log "Profile" "Check failed."
 				log "Profile" "TUN should be defined."
 				log "App" "Exit."
-				return
+				return 1
 			fi
 		fi
 		log "Profile" "Check passed."
@@ -439,37 +447,20 @@ start_service() {
 			log "Profile" "Test failed."
 			log "Profile" "Please check the core log to find out the problem."
 			log "App" "Exit."
-			return
+			return 1
 		fi
 	fi
-	# start core
-	log "Core" "Start."
-	procd_open_instance mihomox
-
-	procd_set_param command /bin/sh -c "$PROG -d $RUN_DIR -f $RUN_PROFILE_PATH >> $CORE_LOG_PATH 2>&1"
-	procd_set_param file "$RUN_PROFILE_PATH"
-	if [ "$fast_reload" = 1 ]; then
-		procd_set_param reload_signal HUP
+	# Only commit a fully checked candidate. Reload must not submit an empty
+	# procd definition or remove the current routes when preparation fails.
+	mv -f "$RUN_PROFILE_PATH" "$live_profile" || return 1
+	RUN_PROFILE_PATH="$live_profile"
+	rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
+	if [ "$service_action" = reload ]; then
+		cleanup keep_cache
+		rc_procd register_core
+	else
+		register_core
 	fi
-	procd_set_param pidfile "$PID_FILE_PATH"
-	procd_set_param respawn
-
-	procd_append_param limits nproc="${rlimit_nproc_soft} ${rlimit_nproc_hard}"
-	procd_append_param limits as="${rlimit_address_space_soft:-unlimited} ${rlimit_address_space_hard:-unlimited}"
-	procd_append_param limits data="${rlimit_data_soft:-unlimited} ${rlimit_data_hard:-unlimited}"
-	procd_append_param limits stack="${rlimit_stack_soft:-unlimited} ${rlimit_stack_hard:-unlimited}"
-	procd_append_param limits nofile="${rlimit_nofile_soft} ${rlimit_nofile_hard}"
-
-	procd_append_param env GOMAXPROCS="$env_go_max_procs"
-	procd_append_param env GOMEMLIMIT="$env_go_mem_limit"
-
-	procd_append_param env SAFE_PATHS="$env_safe_paths"
-	procd_append_param env DISABLE_LOOPBACK_DETECTOR="$env_disable_loopback_detector"
-	procd_append_param env QUIC_GO_DISABLE_GSO="$env_disable_quic_go_gso"
-	procd_append_param env QUIC_GO_DISABLE_ECN="$env_disable_quic_go_ecn"
-	procd_append_param env SKIP_SYSTEM_IPV6_CHECK="$env_skip_system_ipv6_check"
-
-	procd_close_instance
 	# cron
 	# crond rescans /etc/crontabs by itself, so writing the file is enough.
 	# Restarting the shared cron service here would also disturb other packages,
@@ -501,6 +492,38 @@ start_service() {
 	if [ -n "$subscription_refresh_section" ]; then
 		printf '%s\n' "$subscription_refresh_section" > "$SUBSCRIPTION_REFRESH_PENDING_PATH"
 	fi
+	return 0
+}
+
+register_core() {
+	# start core
+	log "Core" "Start."
+	procd_open_instance mihomox
+
+	procd_set_param command /bin/sh -c "$PROG -d $RUN_DIR -f $RUN_PROFILE_PATH >> $CORE_LOG_PATH 2>&1"
+	procd_set_param file "$RUN_PROFILE_PATH"
+	if [ "$fast_reload" = 1 ]; then
+		procd_set_param reload_signal HUP
+	fi
+	procd_set_param pidfile "$PID_FILE_PATH"
+	procd_set_param respawn
+
+	procd_append_param limits nproc="${rlimit_nproc_soft} ${rlimit_nproc_hard}"
+	procd_append_param limits as="${rlimit_address_space_soft:-unlimited} ${rlimit_address_space_hard:-unlimited}"
+	procd_append_param limits data="${rlimit_data_soft:-unlimited} ${rlimit_data_hard:-unlimited}"
+	procd_append_param limits stack="${rlimit_stack_soft:-unlimited} ${rlimit_stack_hard:-unlimited}"
+	procd_append_param limits nofile="${rlimit_nofile_soft} ${rlimit_nofile_hard}"
+
+	procd_append_param env GOMAXPROCS="$env_go_max_procs"
+	procd_append_param env GOMEMLIMIT="$env_go_mem_limit"
+
+	procd_append_param env SAFE_PATHS="$env_safe_paths"
+	procd_append_param env DISABLE_LOOPBACK_DETECTOR="$env_disable_loopback_detector"
+	procd_append_param env QUIC_GO_DISABLE_GSO="$env_disable_quic_go_gso"
+	procd_append_param env QUIC_GO_DISABLE_ECN="$env_disable_quic_go_ecn"
+	procd_append_param env SKIP_SYSTEM_IPV6_CHECK="$env_skip_system_ipv6_check"
+
+	procd_close_instance
 }
 
 rollback_failed_start() {
@@ -512,10 +535,10 @@ rollback_failed_start() {
 
 validate_final_profile() {
 	local tls_listen tls_cert tls_key tls_ech_key
-	tls_listen=$(yq -M '."external-controller-tls" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
-	tls_cert=$(yq -M '.tls.certificate // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
-	tls_key=$(yq -M '.tls."private-key" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
-	tls_ech_key=$(yq -M '.tls."ech-key" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
+	tls_listen=$(yq -M '."external-controller-tls" // ""' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
+	tls_cert=$(yq -M '.tls.certificate // ""' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
+	tls_key=$(yq -M '.tls."private-key" // ""' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
+	tls_ech_key=$(yq -M '.tls."ech-key" // ""' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
 	if [ -n "$tls_listen" ] || [ -n "$tls_cert" ] || [ -n "$tls_key" ] || [ -n "$tls_ech_key" ]; then
 		if [ -z "$tls_listen" ] || [ -z "$tls_cert" ] || [ -z "$tls_key" ]; then
 			log "Security" "API TLS requires listen address, certificate and private key together."
@@ -524,15 +547,15 @@ validate_final_profile() {
 	fi
 
 	local dns_respect_rules proxy_policy_count proxy_nameserver_count fake_ip_filter_mode fake_ip_rules invalid_fake_ip_rules
-	dns_respect_rules=$(yq -M '.dns."respect-rules" // false' "$RUN_PROFILE_PATH" 2>/dev/null || echo false)
-	proxy_policy_count=$(yq -M '((.dns."proxy-server-nameserver-policy" // {}) | length)' "$RUN_PROFILE_PATH" 2>/dev/null || echo 0)
-	proxy_nameserver_count=$(yq -M '((.dns."proxy-server-nameserver" // []) | length)' "$RUN_PROFILE_PATH" 2>/dev/null || echo 0)
+	dns_respect_rules=$(yq -M '.dns."respect-rules" // false' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
+	proxy_policy_count=$(yq -M '((.dns."proxy-server-nameserver-policy" // {}) | length)' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
+	proxy_nameserver_count=$(yq -M '((.dns."proxy-server-nameserver" // []) | length)' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
 	if { [ "$dns_respect_rules" = true ] || [ "$proxy_policy_count" -gt 0 ]; } && [ "$proxy_nameserver_count" -eq 0 ]; then
 		log "Profile" "DNS policy requires at least one proxy-server-nameserver."
 		return 1
 	fi
 
-	fake_ip_filter_mode=$(yq -M '.dns."fake-ip-filter-mode" // ""' "$RUN_PROFILE_PATH" 2>/dev/null || echo '')
+	fake_ip_filter_mode=$(yq -M '.dns."fake-ip-filter-mode" // ""' "$RUN_PROFILE_PATH" 2>/dev/null) || return 1
 	if [ "$fake_ip_filter_mode" = "rule" ]; then
 		if ! fake_ip_rules=$(yq -M '(.dns."fake-ip-filter" // [])[]' "$RUN_PROFILE_PATH" 2>/dev/null); then
 			log "Profile" "Unable to read Fake-IP rules from the final profile."
@@ -782,8 +805,15 @@ service_stopped() {
 }
 
 reload_service() {
-	cleanup
-	start
+	local enabled
+	config_load mihomox
+	config_get_bool enabled "config" "enabled" 0
+	if [ "$enabled" = 0 ]; then
+		stop
+		return $?
+	fi
+	start_service reload || return 1
+	service_started
 }
 
 service_triggers() {
@@ -896,7 +926,7 @@ cleanup() {
 		sed -i "/#mihomox/d" "/etc/crontabs/root" > /dev/null 2>&1
 	fi
 	rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
-	cleanup_cache
+	[ "${1:-}" = keep_cache ] || cleanup_cache
 }
 
 clear_logs() {

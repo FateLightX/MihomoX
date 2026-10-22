@@ -1578,3 +1578,6 @@ msgstr "UI 名称必须是本地相对路径。"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "Relative UI Path must stay within Mihomo home."
 msgstr "相对 UI 路径必须位于 Mihomo 主目录内。"
+
+msgid "Read failed"
+msgstr "读取失败"

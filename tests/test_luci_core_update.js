@@ -118,13 +118,15 @@ const coreStatus = {
     detected_architecture: 'linux-amd64-v3',
     updated_at: '2026-07-24 12:34:56'
 };
+let statusError = false;
+let coreStatusError = false;
 let updateCallCount = 0;
 let resolveUpdate;
 const mihomox = {
     inlineDescriptions: (node) => node,
     version: () => Promise.resolve({ app: '1.0', core: 'v1' }),
-    status: () => Promise.resolve(false),
-    coreStatus: () => Promise.resolve(coreStatus),
+    status: () => statusError ? Promise.reject(new Error("unavailable")) : Promise.resolve(true),
+    coreStatus: () => coreStatusError ? Promise.reject(new Error("unavailable")) : Promise.resolve(coreStatus),
     listProfiles: () => Promise.resolve([]),
     updateCore: (...args) => {
         updateArgs = args;
@@ -229,8 +231,27 @@ Promise.resolve()
         // The next click is accepted after the synchronous failure settles.
         return renderedMap.options._update_core.onclick({ type: 'click' }, 'core');
     })
-    .then(() => {
+    .then(async () => {
         assert.strictEqual(updateCallCount, 4);
+        coreStatus.state = 'restart_failed';
+        coreStatus.message = 'core installed but restart failed';
+        await pollCallbacks[1]();
+        assert.strictEqual(nodes.core_update_span.style.color, 'red');
+        assert.strictEqual(nodes.core_update_span.textContent, coreStatus.message);
+        statusError = true;
+        coreStatusError = true;
+        await pollCallbacks[0]();
+        await pollCallbacks[1]();
+        await pollCallbacks[0]();
+        assert.strictEqual(nodes.core_status.value, 'Running (Read failed)');
+        assert.strictEqual(nodes.core_update_time.value, coreStatus.updated_at + ' (Read failed)');
+        assert.strictEqual(nodes.core_update_span.textContent, coreStatus.message, 'RPC failure preserves the last update status');
+        statusError = false;
+        coreStatusError = false;
+        await pollCallbacks[0]();
+        await pollCallbacks[1]();
+        assert.strictEqual(nodes.core_status.value, 'Running');
+        assert.strictEqual(nodes.core_update_time.value, coreStatus.updated_at);
         console.log('LuCI core update tests passed');
     })
     .catch((error) => {

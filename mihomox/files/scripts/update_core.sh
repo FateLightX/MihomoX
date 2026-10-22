@@ -9,7 +9,6 @@ LOG_FILE="$LOG_DIR/core-update.log"
 STATUS_FILE="$RUN_DIR/core-update.status"
 LOCK_DIR="$RUN_DIR/core-update.lock"
 PENDING_FILE="$RUN_DIR/core-update.pending"
-STARTED_FLAG="${MIHOMOX_STARTED_FLAG:-$RUN_DIR/started.flag}"
 INIT_SCRIPT="${MIHOMOX_INIT_SCRIPT:-/etc/init.d/mihomox}"
 LATEST_URL="${MIHOMO_LATEST_URL:-https://github.com/MetaCubeX/mihomo/releases/latest}"
 API_URL="${MIHOMO_API_URL:-https://api.github.com/repos/MetaCubeX/mihomo/releases/latest}"
@@ -56,7 +55,7 @@ fail() {
 }
 
 cleanup() {
-	rm -f "$PENDING_FILE"
+	[ "$LOCK_HELD" -eq 1 ] && rm -f "$PENDING_FILE"
 	[ -n "$TMP_DIR" ] && rm -rf "$TMP_DIR"
 	[ "$LOCK_HELD" -eq 1 ] && rm -rf "$LOCK_DIR"
 }
@@ -156,12 +155,7 @@ map_release_arch() {
 }
 
 apply_mirror() {
-	url="$1"
-	if [ -n "$MIRROR_PREFIX" ]; then
-		printf '%s/%s\n' "${MIRROR_PREFIX%/}" "$url"
-	else
-		printf '%s\n' "$url"
-	fi
+	printf '%s/%s\n' "${MIRROR_PREFIX%/}" "$1"
 }
 
 curl_effective_url() {
@@ -180,7 +174,9 @@ extract_tag_from_url() {
 }
 
 resolve_latest_version() {
-	for latest in "$(apply_mirror "$LATEST_URL")" "$LATEST_URL"; do
+	set -- "$LATEST_URL"
+	[ -z "$MIRROR_PREFIX" ] || set -- "$(apply_mirror "$LATEST_URL")" "$@"
+	for latest in "$@"; do
 		final=$(curl_effective_url "$latest" 2>/dev/null) || continue
 		tag=$(extract_tag_from_url "$final" 2>/dev/null) || continue
 		echo "$tag"
@@ -188,7 +184,9 @@ resolve_latest_version() {
 	done
 
 	api_json="$TMP_DIR/release.json"
-	for api in "$(apply_mirror "$API_URL")" "$API_URL"; do
+	set -- "$API_URL"
+	[ -z "$MIRROR_PREFIX" ] || set -- "$(apply_mirror "$API_URL")" "$@"
+	for api in "$@"; do
 		curl -fsSL --retry 1 --connect-timeout 15 --max-time 60 \
 			-A "MihomoX/OpenWrt" -o "$api_json" "$api" 2>/dev/null || continue
 		tag=$(jsonfilter -q -i "$api_json" -e "@['tag_name']" 2>/dev/null)
@@ -201,7 +199,9 @@ resolve_latest_version() {
 
 resolve_alpha_asset() {
 	assets_html="$TMP_DIR/alpha-assets.html"
-	for page in "$(apply_mirror "$ALPHA_ASSETS_URL")" "$ALPHA_ASSETS_URL"; do
+	set -- "$ALPHA_ASSETS_URL"
+	[ -z "$MIRROR_PREFIX" ] || set -- "$(apply_mirror "$ALPHA_ASSETS_URL")" "$@"
+	for page in "$@"; do
 		curl -fsSL --retry 1 --connect-timeout 15 --max-time 60 \
 			-A "MihomoX/OpenWrt" -o "$assets_html" "$page" 2>/dev/null || continue
 		asset=$(sed -n 's/.*href="\([^"]*\)".*/\1/p' "$assets_html" | awk -v prefix="/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-${SELECTED_ARCH}-alpha-" '
@@ -215,7 +215,9 @@ resolve_alpha_asset() {
 download_url() {
 	url="$1"
 	out="$2"
-	for candidate in "$(apply_mirror "$url")" "$url"; do
+	set -- "$url"
+	[ -z "$MIRROR_PREFIX" ] || set -- "$(apply_mirror "$url")" "$@"
+	for candidate in "$@"; do
 		rm -f "$out"
 		curl -fsSL --retry 2 --connect-timeout 15 --max-time 600 \
 			-A "MihomoX/OpenWrt" -o "$out" "$candidate" && {
@@ -325,11 +327,11 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 LOCK_HELD=1
 echo $$ > "$LOCK_DIR/pid"
-rm -f "$PENDING_FILE"
 
 TMP_DIR=$(mktemp -d /tmp/mihomox-core.XXXXXX) || fail "无法创建临时目录"
 write_status "running" "正在检查最新版本"
 STATUS_STARTED=1
+rm -f "$PENDING_FILE"
 log_line "开始更新 Mihomo 内核"
 
 CHANNEL="${MIHOMOX_CHANNEL:-$(uci -q get mihomox.core.channel 2>/dev/null)}"
@@ -411,7 +413,7 @@ NEW_VERSION=$(binary_version "$NEW_BIN")
 [ "$LATEST_VERSION" = "custom" ] && LATEST_VERSION="$NEW_VERSION"
 
 was_running=0
-[ -f "$STARTED_FLAG" ] && was_running=1
+"$INIT_SCRIPT" running >/dev/null 2>&1 && was_running=1
 had_old=0
 had_old_version=0
 BACKUP_BIN="$CORE_DIR/.mihomo.backup.$$"
@@ -461,12 +463,21 @@ if ! mv -f "$CORE_TMP" "$CORE_PATH" || ! mv -f "$VERSION_TMP" "$VERSION_FILE" ||
 	fail "内核替换失败，已回滚"
 fi
 
-if [ "$was_running" -eq 1 ] && [ -x "$INIT_SCRIPT" ]; then
+if [ "$was_running" -eq 1 ]; then
 	log_line "重启 MihomoX 使新内核生效"
-	if ! "$INIT_SCRIPT" restart >/dev/null 2>&1; then
-		log_line "MihomoX 重启失败，请手动检查服务"
+	restarted=0
+	if "$INIT_SCRIPT" restart >/dev/null 2>&1; then
+		for attempt in 1 2 3 4 5; do
+			sleep 1
+			if "$INIT_SCRIPT" running >/dev/null 2>&1; then
+				restarted=1
+				break
+			fi
+		done
+	fi
+	if [ "$restarted" -ne 1 ]; then
+		log_line "MihomoX 重启失败，已保留旧内核备份，请手动检查服务"
 		write_status "restart_failed" "内核已更新，但 MihomoX 重启失败" "$NEW_VERSION" "$SELECTED_ARCH"
-		rm -f "$BACKUP_BIN" "$BACKUP_VERSION"
 		exit 1
 	fi
 fi

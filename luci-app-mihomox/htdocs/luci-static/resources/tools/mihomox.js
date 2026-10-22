@@ -96,7 +96,8 @@ const callMihomoXUpdateCore = rpc.declare({
     object: 'luci.mihomox',
     method: 'update_core',
     params: ['channel', 'architecture', 'mirror_prefix', 'download_url', 'download_sha256'],
-    expect: { '': {} }
+    expect: { '': {} },
+    nobatch: true
 });
 
 const homeDir = '/etc/mihomox';
@@ -268,11 +269,11 @@ return baseclass.extend({
     },
 
     getAppLog: function (offset, inode) {
-        return L.resolveDefault(callMihomoXLog('app', offset ?? null, 65536, inode ?? null), { log: '', offset: 0, size: 0, next: 0, inode: null });
+        return callMihomoXLog('app', offset ?? null, 65536, inode ?? null);
     },
 
     getCoreLog: function (offset, inode) {
-        return L.resolveDefault(callMihomoXLog('core', offset ?? null, 65536, inode ?? null), { log: '', offset: 0, size: 0, next: 0, inode: null });
+        return callMihomoXLog('core', offset ?? null, 65536, inode ?? null);
     },
 
     networkTest: function (test) {
@@ -311,7 +312,7 @@ return baseclass.extend({
     },
 
     coreStatus: function () {
-        return L.resolveDefault(callMihomoXCoreStatus(), {});
+        return callMihomoXCoreStatus();
     },
 
     updateCore: function (channel, architecture, mirrorPrefix, downloadUrl, downloadSha256) {

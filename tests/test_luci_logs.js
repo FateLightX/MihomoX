@@ -11,11 +11,13 @@ const toolsSource = fs.readFileSync(path.join(
 
 const rpcCalls = [];
 const declarations = [];
+let rpcError = false;
 const rpc = {
     declare: (definition) => {
         declarations.push(definition);
         return (...args) => {
             rpcCalls.push({ method: definition.method, args });
+            if (rpcError) return Promise.reject(new Error("rpc unavailable"));
             if (definition.method === 'log')
                 return Promise.resolve({
                     log: args[0] === 'app' ? 'app tail' : 'core tail',
@@ -55,6 +57,12 @@ async function testTools() {
     await mihomox.getAppLog(8, 101);
     assert.deepStrictEqual(rpcCalls.at(-1).args, ['app', 8, 65536, 101]);
 
+    rpcError = true;
+    await assert.rejects(mihomox.getAppLog(), /rpc unavailable/);
+    await assert.rejects(mihomox.getCoreLog(), /rpc unavailable/);
+    await assert.rejects(mihomox.coreStatus(), /rpc unavailable/);
+    rpcError = false;
+
     const field = {
         classList: { contains: (name) => name === 'cbi-value-field' },
         style: {},
@@ -92,6 +100,7 @@ class MockOption {
         return {
             setValue: (value) => {
                 this.uiValue = value;
+                this.writes = (this.writes || 0) + 1;
             },
             node: { firstChild: { scrollTop: 0, scrollHeight: 1 } }
         };
@@ -134,11 +143,15 @@ let readDebugLogResolve;
 const debugBlob = { type: 'blob' };
 const appLogCalls = [];
 let appLogResult = { log: '', offset: 3, size: 3, next: 3, inode: 1 };
+let logError = false;
+const notifications = [];
+const ui = { addNotification: (_, content) => notifications.push(content) };
+const E = (_, attrs, text) => text;
 const logMihomox = {
     debugLogPath: '/var/log/mihomox/debug.log',
     getAppLog: (offset, inode) => {
         appLogCalls.push([offset, inode]);
-        return Promise.resolve(appLogResult);
+        return logError ? Promise.reject(new Error("read failed")) : Promise.resolve(appLogResult);
     },
     getCoreLog: () => Promise.resolve({ log: '', offset: 4, size: 4, next: 4, inode: 2 }),
     clearAppLog: () => Promise.resolve(),
@@ -182,9 +195,9 @@ const logL = {
     bind: (fn, context, ...args) => fn.bind(context, ...args)
 };
 const logView = new Function(
-    'form', 'view', 'uci', 'fs', 'poll', 'mihomox', 'window', 'document', '_', 'L',
+    'form', 'view', 'uci', 'fs', 'poll', 'mihomox', 'window', 'document', '_', 'L', 'ui', 'E',
     logSource
-)(form, view, uci, fsModule, poll, logMihomox, window, document, (value) => value, logL);
+)(form, view, uci, fsModule, poll, logMihomox, window, document, (value) => value, logL, ui, E);
 
 async function testLogView() {
     await logView.load();
@@ -206,6 +219,29 @@ async function testLogView() {
     await polls[0]();
     assert.strictEqual(rendered._app_log.uiValue, 'rotated+more');
     assert.deepStrictEqual(appLogCalls.at(-1), [7, 3]);
+
+    appLogResult = { log: '', offset: 12, size: 12, next: 12, inode: 3 };
+    const writes = rendered._app_log.writes;
+    await polls[0]();
+    assert.strictEqual(rendered._app_log.writes, writes, 'unchanged log must not rewrite the text area');
+    logError = true;
+    await polls[0]();
+    await polls[0]();
+    assert.strictEqual(notifications.length, 1, 'repeated failures must not flood notifications');
+    assert.strictEqual(rendered._app_log.uiValue, 'rotated+more');
+    assert.deepStrictEqual(appLogCalls.at(-1), [12, 3], 'failed reads must retain the offset');
+    logError = false;
+    appLogResult = { log: 'short', offset: 0, size: 5, next: 5, inode: 3 };
+    await polls[0]();
+    assert.strictEqual(rendered._app_log.uiValue, 'short', 'truncation replaces the old text');
+    appLogResult = { log: '', offset: 0, size: 0, next: 0, inode: 4 };
+    await polls[0]();
+    assert.strictEqual(rendered._app_log.uiValue, '', 'rotation to an empty file must clear old text');
+
+    logError = true;
+    const initialFailure = await logView.load();
+    assert.strictEqual(initialFailure[1].readFailed, true, 'initial errors remain visible without blocking the page');
+    logError = false;
 
     await assert.rejects(
         rendered._generate_download_debug_log.onclick(),

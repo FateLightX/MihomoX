@@ -11,8 +11,8 @@ function renderStatus(running) {
 
 function updateStatus(element, running) {
     if (element) {
-        element.style.color = running ? 'green' : 'red';
-        element.value = running ? _('Running') : _('Not Running');
+        element.style.color = running == null ? '' : (running ? 'green' : 'red');
+        element.value = running == null ? _('Unknown') : (running ? _('Running') : _('Not Running'));
     }
     return element;
 }
@@ -29,6 +29,12 @@ function updateReadonlyText(element, value) {
     if (element)
         element.value = value || '-';
     return element;
+}
+
+function markReadFailed(element) {
+    const suffix = ' (' + _('Read failed') + ')';
+    if (element && !element.value.endsWith(suffix))
+        element.value = (element.value || '-') + suffix;
 }
 
 var coreUpdateSessionActive = false;
@@ -112,7 +118,7 @@ function updateCoreUpdateSpan(status) {
         span.style.color = '#b36b00';
         span.textContent = status.message || _('Updating');
         span.style.display = 'inline';
-    } else if (status.state === 'failed') {
+    } else if (status.state === 'failed' || status.state === 'restart_failed') {
         span.style.color = 'red';
         span.textContent = status.message || _('Failed');
         span.style.display = 'inline';
@@ -158,7 +164,7 @@ return view.extend({
         const profiles = data[1] || [];
         let appVersion = '';
         let coreVersion = '';
-        let running = false;
+        let running = null;
         let coreState = {};
 
         let m, s, o;
@@ -203,29 +209,40 @@ return view.extend({
         };
 
         // Populate slow fields after first paint so "Loading view" stays short.
-        L.resolveDefault(mihomox.version(), {}).then(function (version) {
+        mihomox.version().then(function (version) {
             appVersion = version.app || '';
             coreVersion = version.core || '';
             updateReadonlyText(document.getElementById('app_version'), appVersion || '-');
             updateReadonlyText(document.getElementById('core_version'), coreVersion || '-');
-        });
-        L.resolveDefault(mihomox.status()).then(function (isRunning) {
-            running = !!isRunning;
-            updateStatus(document.getElementById('core_status'), running);
-        });
-        L.resolveDefault(mihomox.coreStatus(), {}).then(function (status) {
-            coreState = status || {};
-            updateReadonlyText(document.getElementById('installed_architecture'), coreState.installed_architecture || _('Unknown'));
-            updateReadonlyText(document.getElementById('detected_architecture'), coreState.detected_architecture || _('Unknown'));
-            updateCoreUpdateTime(document.getElementById('core_update_time'), coreState.updated_at);
+        }).catch(function () {
+            markReadFailed(document.getElementById('app_version'));
+            markReadFailed(document.getElementById('core_version'));
         });
 
-        poll.add(function () {
-            return L.resolveDefault(mihomox.status()).then(function (isRunning) {
+        function refreshStatus() {
+            return mihomox.status().then(function (isRunning) {
                 running = !!isRunning;
                 updateStatus(document.getElementById('core_status'), running);
+            }).catch(function () {
+                markReadFailed(document.getElementById('core_status'));
             });
-        });
+        }
+
+        function refreshCoreStatus() {
+            return mihomox.coreStatus().then(function (status) {
+                coreState = status;
+                updateReadonlyText(document.getElementById('installed_architecture'), status.installed_architecture || _('Unknown'));
+                updateReadonlyText(document.getElementById('detected_architecture'), status.detected_architecture || _('Unknown'));
+                updateCoreUpdateTime(document.getElementById('core_update_time'), status.updated_at);
+                updateCoreUpdateSpan(status);
+            }).catch(function () {
+                markReadFailed(document.getElementById('core_update_time'));
+            });
+        }
+
+        refreshStatus();
+        refreshCoreStatus();
+        poll.add(refreshStatus);
 
         o = s.option(form.Button, 'reload');
         o.inputstyle = 'action';
@@ -313,17 +330,7 @@ return view.extend({
             return renderCoreUpdateTime(coreState.updated_at);
         };
 
-        poll.add(function () {
-            return L.resolveDefault(mihomox.coreStatus(), {}).then(function (status) {
-                updateCoreUpdateTime(document.getElementById('core_update_time'), status.updated_at);
-                if (!coreUpdateSessionActive)
-                    return;
-                if (status.updating || status.state === 'running')
-                    updateCoreUpdateSpan({ updating: true, message: status.message });
-                else
-                    updateCoreUpdateSpan(status);
-            });
-        });
+        poll.add(refreshCoreStatus);
 
         o = s.option(form.Button, '_update_core', _('Mihomo Core'));
         o.inputstyle = 'positive';

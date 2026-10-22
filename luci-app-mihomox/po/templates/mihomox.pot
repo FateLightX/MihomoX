@@ -1571,3 +1571,6 @@ msgstr ""
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "Relative UI Path must stay within Mihomo home."
 msgstr ""
+
+msgid "Read failed"
+msgstr ""

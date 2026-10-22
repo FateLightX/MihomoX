@@ -332,14 +332,16 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
 - LuCI：`luci.mihomox.update_core`
 - 命令行：`/etc/init.d/mihomox update_core`
 
-统一执行 `/etc/mihomox/scripts/update_core.sh`：
+统一执行 `/etc/mihomox/scripts/update_core.sh`。LuCI 使用 `nohup` 启动，最多等待 5 秒
+确认脚本已初始化，不能仅凭后台 shell 返回零判定启动成功：
 
 1. 建立带 PID 的互斥锁并清理失效锁。
 2. 解析通道、架构、镜像或自定义 URL。
 3. 下载并校验 SHA256、压缩格式、ELF 架构和可执行版本。
 4. 原子替换内核和元数据，先备份。
-5. 新内核失败时回滚。
-6. 只在更新前运行时重启；重启失败返回非零并写 `restart_failed`。
+5. 替换或安装后校验失败时回滚。
+6. 只在更新前实际运行时重启；重启后有限次数确认服务运行，失败返回非零、写
+   `restart_failed` 并保留旧内核和版本信息备份。
 7. HUP、INT、TERM 中断写失败状态，避免状态永久停在 `running`。
 8. 写状态文件并清理临时文件和锁。
 
@@ -370,6 +372,7 @@ MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版�
   更新上游资源时必须运行对应下载测试。
 - 当前兼容审计基线和有意未实现字段记录在本文“当前上游接续基线”；新一轮审计完成后同时
   更新该节和 `docs/upstream.md`，避免后续 AI 重复猜测。
+- reload 先生成并校验候选配置，通过后才替换运行配置并清理旧规则；失败保留现有服务。
 - 运行路由参数保存在 `/var/run/mihomox/routing.state`；reload/stop 必须用旧运行参数精确
   删除 MihomoX 创建的规则和路由，禁止恢复为整表 flush。
 - Core API HTTPS 默认校验证书；只有最终配置明确提供本地证书和私钥时才允许自签场景。

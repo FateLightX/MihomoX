@@ -1524,3 +1524,6 @@ msgstr "Имя UI должно быть локальным относитель�
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "Relative UI Path must stay within Mihomo home."
 msgstr "Относительный путь UI должен находиться в домашнем каталоге Mihomo."
+
+msgid "Read failed"
+msgstr "Ошибка чтения"

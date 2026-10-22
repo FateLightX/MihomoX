@@ -4,6 +4,7 @@
 'require uci';
 'require fs';
 'require poll';
+'require ui';
 'require tools.mihomox as mihomox';
 
 function validateCron(value) {
@@ -16,6 +17,7 @@ function validateCron(value) {
 }
 
 function appendLog(option, state, result) {
+    const previousText = state.text;
     result = result || {};
     const size = Number(result.size) || 0;
     const offset = Number(result.offset) || 0;
@@ -35,8 +37,15 @@ function appendLog(option, state, result) {
         state.text += chunk;
     state.offset = Number.isFinite(next) ? next : Math.max(state.offset, offset + chunk.length);
     const element = option.getUIElement('log');
-    if (element)
+    if (element && state.text !== previousText)
         element.setValue(state.text);
+}
+
+function reportLogError(label, state) {
+    if (!state.readFailed)
+        ui.addNotification(null, E('p', {}, label + ': ' + _('Read failed')), 'warning');
+    state.readFailed = true;
+    return state;
 }
 
 function isLogVisible(option) {
@@ -54,8 +63,8 @@ return view.extend({
     load: function () {
         return Promise.all([
             uci.load('mihomox'),
-            mihomox.getAppLog(),
-            mihomox.getCoreLog()
+            mihomox.getAppLog().catch(function () { return reportLogError(_('App Log'), {}); }),
+            mihomox.getCoreLog().catch(function () { return reportLogError(_('Core Log'), {}); })
         ]);
     },
     render: function (data) {
@@ -68,12 +77,14 @@ return view.extend({
         const appLogState = {
             offset: Number.isFinite(appNext) ? appNext : (Number(appResult.size) || appInitial.length),
             text: appInitial,
-            inode: appResult.inode ?? null
+            inode: appResult.inode ?? null,
+            readFailed: !!appResult.readFailed
         };
         const coreLogState = {
             offset: Number.isFinite(coreNext) ? coreNext : (Number(coreResult.size) || coreInitial.length),
             text: coreInitial,
-            inode: coreResult.inode ?? null
+            inode: coreResult.inode ?? null,
+            readFailed: !!coreResult.readFailed
         };
 
         let m, s, o;
@@ -138,8 +149,11 @@ return view.extend({
             const option = this;
             if (!isLogVisible(option))
                 return Promise.resolve();
-            return L.resolveDefault(mihomox.getAppLog(appLogState.offset, appLogState.inode)).then(function (result) {
+            return mihomox.getAppLog(appLogState.offset, appLogState.inode).then(function (result) {
                 appendLog(option, appLogState, result);
+                appLogState.readFailed = false;
+            }).catch(function () {
+                reportLogError(_('App Log'), appLogState);
             });
         }, o));
 
@@ -176,8 +190,11 @@ return view.extend({
             const option = this;
             if (!isLogVisible(option))
                 return Promise.resolve();
-            return L.resolveDefault(mihomox.getCoreLog(coreLogState.offset, coreLogState.inode)).then(function (result) {
+            return mihomox.getCoreLog(coreLogState.offset, coreLogState.inode).then(function (result) {
                 appendLog(option, coreLogState, result);
+                coreLogState.readFailed = false;
+            }).catch(function () {
+                reportLogError(_('Core Log'), coreLogState);
             });
         }, o));
 

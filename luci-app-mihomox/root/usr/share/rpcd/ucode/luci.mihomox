@@ -520,7 +520,6 @@ const methods = {
 			let metadata = {};
 			let state = {};
 			try { metadata = read_kv(CORE_VERSION_FILE) || {}; } catch (e) {}
-			try { state = read_kv(CORE_STATUS_FILE) || {}; } catch (e) {}
 			/* Keep this RPC side-effect free and compatible with older ucode builds. */
 			let configured = 'auto';
 			try {
@@ -535,6 +534,11 @@ const methods = {
 			}
 			let detected = detected_core_architecture;
 			let updating = core_update_running();
+			try { state = read_kv(CORE_STATUS_FILE) || {}; } catch (e) {}
+			if (!updating && state.state == 'running') {
+				state.state = 'failed';
+				state.message = '';
+			}
 			let installed_architecture = metadata.architecture || state.architecture || detected || '';
 			return {
 				installed: metadata.version || '',
@@ -742,23 +746,19 @@ const methods = {
 			if (writefile(CORE_PENDING_FILE, 'pending\n') === null)
 				return { success: false, error: 'lock_failed' };
 
-			let start_cmds = [
-				'setsid ' + CORE_UPDATE_SCRIPT + ' >>/var/log/mihomox/core-update.log 2>&1 </dev/null &',
-				'nohup ' + CORE_UPDATE_SCRIPT + ' >>/var/log/mihomox/core-update.log 2>&1 </dev/null &',
-				'nohup /etc/init.d/mihomox update_core >>/var/log/mihomox/core-update.log 2>&1 </dev/null &'
-			];
-			let started = false;
-			for (let cmd in start_cmds) {
-				if (system(cmd) == 0) {
-					started = true;
-					break;
-				}
-			}
-			if (!started) {
+			// Wait at most five seconds for the updater to publish its status.
+			// A background shell's exit code alone cannot confirm it started.
+			let command = 'nohup ' + shell_quote(CORE_UPDATE_SCRIPT) +
+				' >>/var/log/mihomox/core-update.log 2>&1 </dev/null & pid=$!; ' +
+				'for attempt in 1 2 3 4 5; do ' +
+				'[ ! -e ' + shell_quote(CORE_PENDING_FILE) + ' ] && exit 0; ' +
+				'kill -0 "$pid" 2>/dev/null || exit 1; sleep 1; done; exit 1';
+			if (system(command) != 0) {
 				unlink(CORE_PENDING_FILE);
+				writefile(CORE_STATUS_FILE, 'state=failed\n');
 				return { success: false, error: 'start_failed' };
 			}
-			return { success: true, started: true, running: true, channel: channel };
+			return { success: true, started: true, running: core_update_running(), channel: channel };
 		}
 	},
 	api: {
