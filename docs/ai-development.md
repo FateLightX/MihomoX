@@ -43,7 +43,7 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 - 编译期下载官方 Mihomo Alpha 二进制，验证 SHA256、gzip 和 ELF 架构后打包
 - 编译期同时准备 GeoSite、GeoIP、ASN 数据和 Zashboard
 - 运行时内核更新只替换 `/etc/mihomox/bin/mihomo`，不经过 `opkg`/`apk`
-- LuCI 通过 `luci.mihomox` rpcd 方法读写配置、更新订阅、编辑文件、执行网络测试
+- LuCI 通过 `luci.mihomox` rpcd 方法读写配置、更新订阅、编辑文件
 
 配置和运行链：
 
@@ -142,7 +142,6 @@ Zashboard 版本。
 | `mihomox/files/ucode/` | Mihomo 配置生成和 nftables 模板 |
 | `mihomox/files/scripts/` | 设备端更新、调试、防火墙脚本 |
 | `mihomox/scripts/` | 编译期下载脚本 |
-| `mihomox/src/` | 随主包交叉编译的 STUN C 辅助程序 |
 | `luci-app-mihomox/htdocs/` | LuCI 页面和前端工具 |
 | `luci-app-mihomox/root/` | 菜单、ACL 和 rpcd ucode 后端 |
 | `luci-app-mihomox/po/` | POT、简中、繁中、俄语翻译 |
@@ -212,25 +211,6 @@ make package/luci-app-mihomox/compile V=s
 - 长任务必须有设备端和浏览器端超时，页面不能永久加载。
 - 文件写入只允许明确路径，禁止 `..`，单文件上限 16 MiB。
 - ACL 只开放页面实际需要的方法和文件范围。
-
-### 修改网络测试
-
-涉及文件：
-
-- `luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js`
-- `luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox`
-- `luci-app-mihomox/htdocs/luci-static/resources/tools/mihomox.js`
-- `tests/test_luci_network.js`
-
-规则：
-
-- 目标必须固定写死在代码中，不接受 RPC 调用者传入 URL、命令或 STUN 地址。
-- 国内站点不显式指定代理；国际站点显式使用 Mihomo 本地 Mixed/HTTP 代理。
-- IPv4 国内通过绕过 cgroup 直连 `https://v4.ipgg.cn`。
-- IPv6 国内通过绕过 cgroup 和固定 DoH 直连 `https://v6.ipgg.cn`。
-- IPv4 国外经 Mihomo 本地代理访问 `ifconfig.co` 和 `ifconfig.co/country`。
-- 不增加“IPv6 国外”项目，除非能证明代理节点到目标使用 IPv6。
-- NAT 检测使用 STUN 辅助程序和固定目标，不得落入透明代理。
 
 ### 修改编译期资源
 

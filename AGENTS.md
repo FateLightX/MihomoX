@@ -27,7 +27,6 @@ git rev-list --left-right --count HEAD...@{upstream}
 | `mihomox/files/ucode/` | Mihomo 配置生成和 nftables 模板 |
 | `mihomox/files/scripts/` | 设备端脚本 |
 | `mihomox/scripts/` | 编译期资源下载脚本 |
-| `mihomox/src/` | 随主包交叉编译的小型本地辅助程序 |
 | `luci-app-mihomox/htdocs/` | LuCI 页面和前端工具 |
 | `luci-app-mihomox/root/` | 菜单、ACL 和 rpcd ucode 后端 |
 | `luci-app-mihomox/po/` | 翻译模板和语言文件 |
@@ -43,7 +42,6 @@ git rev-list --left-right --count HEAD...@{upstream}
 - 公开安装脚本、Feed 和 CI 产物只覆盖 OpenWrt SNAPSHOT x86_64；扩展发布目标前先补
   对应 SDK 构建和验证，不要只修改声明。
 - rpcd ucode 兼容旧实现：外部命令参数逐项引用；布尔值和数字可能以字符串传入。
-- C 辅助程序必须用 `$(TARGET_CC)` 构建，不引入设备端编译器或解释器依赖。
 - 用户可见字符串使用 `_()`，并同步 POT、简体中文、繁体中文和俄语 PO。
 - UCI 字段、Mihomo YAML 字段和 UI 名称不要凭语义猜测；先查生成链和上游格式。
 
@@ -64,30 +62,6 @@ mixin.tun_enabled=0
 覆盖已有用户选择。TPROXY 的 mark、rule preference 和 route table 同时检查
 `mihomox.conf`、`mihomox.init` 与 `ucode/hijack.ut`。
 
-### 网络测试契约
-
-涉及文件：
-
-- UI 与测试顺序：`luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js`
-- RPC 与探测实现：`luci-app-mihomox/root/usr/share/rpcd/ucode/luci.mihomox`
-- 前端 RPC 声明：`luci-app-mihomox/htdocs/luci-static/resources/tools/mihomox.js`
-- 回归测试：`tests/test_luci_network.js`
-
-当前固定语义：
-
-| 项目 | 访问路径 | 目标/结果 |
-| --- | --- | --- |
-| 国内连接、百度、网易云 | 不显式指定代理 | 固定站点 HTTP(S) 可达性和延迟 |
-| 国际代理、Google、YouTube | Mihomo 本地 Mixed/HTTP 代理 | 固定站点可达性和延迟 |
-| IPv4 国内 | 绕过 cgroup 直连 | `v4.ipgg.cn` 返回路由器公网 IPv4 |
-| IPv6 国内 | 绕过 cgroup 直连并使用固定 DoH | `v6.ipgg.cn` 返回路由器公网 IPv6 |
-| IPv4 国外 | Mihomo 本地代理 | `ifconfig.co` 返回出口 IPv4，`ifconfig.co/country` 返回国家 |
-| NAT | 绕过透明代理的 STUN 辅助程序 | NAT 类型 |
-
-没有“IPv6 国外”项目。不要仅靠 `curl -6` 加回：经过 HTTP 代理时，它不能证明代理
-节点到目标使用 IPv6。新增或替换目标必须是代码内固定 URL，不接受 RPC 调用者输入。
-IPv4 国外的 IP 或国家任一请求失败时，整项失败，避免展示不完整结果。
-
 ## 4. 验证
 
 最小检查：
@@ -107,7 +81,6 @@ make package/luci-app-mihomox/compile V=s
 ```
 
 本地测试不能替代 OpenWrt SDK 交叉编译、真机 rpcd/LuCI、网络条件和浏览器缓存验证。
-网络测试页改动至少检查：正常返回、DNS/HTTP/STUN 超时、RPC 不存在及按钮恢复。
 测试行增删还必须同步 RPC `case`、UI 顺序、四份 PO/POT、模拟结果数量与调用顺序断言。
 
 ## 5. 提交 GitHub

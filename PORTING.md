@@ -41,31 +41,13 @@ MihomoX 是单 Mihomo 内核的 OpenWrt 透明代理服务：
 ```
 
 防火墙配置由 `hijack.ut` 生成并引用随包安装的 nftables 数据。LuCI 通过
-`luci.mihomox` RPC 读取状态、更新订阅、编辑允许路径内的文件和执行网络检测。
+`luci.mihomox` RPC 读取状态、更新订阅和编辑允许路径内的文件。
 
 默认值以 `mihomox/files/mihomox.conf` 为准。LuCI 默认显示、UCI 默认值和生成后的
 Mihomo YAML 必须保持一致；修改字段时应沿完整链路验证。
 
 新安装默认启用透明代理，TCP 和 UDP 均使用 TPROXY，TUN 默认关闭；路由器自身与 LAN
 设备代理默认启用。该文件只定义新安装默认值，升级不得覆盖已有 UCI 选择。
-
-### 网络诊断链
-
-LuCI `network.js` 按行调用 `luci.mihomox.network_test`，rpcd 实现在
-`root/usr/share/rpcd/ucode/luci.mihomox`。请求必须逐项执行并绕过 RPC 批处理，设备端和
-浏览器端都必须有超时。
-
-- 国内站点检测不显式指定代理；国际站点检测显式使用 Mihomo 本地 Mixed/HTTP 代理。
-- IPv4 国内通过绕过 cgroup 直连 `https://v4.ipgg.cn`。
-- IPv6 国内通过绕过 cgroup 和固定 DoH 直连 `https://v6.ipgg.cn`。
-- IPv4 国外经 Mihomo 本地代理访问 `https://ifconfig.co` 和
-  `https://ifconfig.co/country`，分别返回出口 IPv4 和国家。
-- 不提供“IPv6 国外”检测；它只能反映代理节点访问 IPv6-only 目标的能力，不能代表
-  路由器或 LAN 的原生 IPv6 状态。
-- NAT 检测使用独立辅助程序、固定 STUN 目标和 `network_test_fw_mark`，不得落入透明代理。
-
-`curl -4/-6` 在显式 HTTP 代理场景主要约束客户端到本地代理的连接族，不能单独证明
-代理节点到目标使用相同地址族。网络检测的 UI 名称和文档不得扩大其语义。
 
 ## 4. 编译期交付
 
@@ -78,7 +60,7 @@ GitHub Actions 使用 `x86_64-SNAPSHOT` SDK（VERSION_PATH=snapshots，即 trunk
 3. `fetch_zashboard.sh`：解析最新发布版本准备离线面板，并强制校验 SHA256。
 
 内核和资源缓存在 OpenWrt `DL_DIR`。Mihomo 使用官方预编译二进制，不经过 OpenWrt Go
-工具链；工具链只编译 MihomoX 的 STUN C 辅助程序。解析、下载或校验失败必须终止构建，
+工具链。解析、下载或校验失败必须终止构建，
 未知架构由 `fetch_mihomo.sh` 拒绝。
 
 设备运行时依赖使用 `EXTRA_DEPENDS` / `LUCI_EXTRA_DEPENDS` 写入包元数据，不作为当前
@@ -128,7 +110,6 @@ Nikki，并保持 MihomoX 默认禁用，避免服务冲突。
 - reload/stop 只删除 MihomoX 实际安装的路由规则和路由，不 flush 可能共享的路由表。
 - HTTPS Core API 默认校验证书；仅在最终配置明确提供本地证书和私钥时兼容自签证书。
 - 订阅文件和对应 UCI 元数据必须在完整校验成功后一起切换，失败时保留上一份有效状态。
-- 网络测试只能访问代码内固定目标，不接受用户传入 URL、命令或 STUN 地址。
 - 分块文本使用流式 `TextDecoder`，避免 UTF-8 跨块损坏。
 - ACL 只开放页面实际需要的方法和文件范围。
 - 内核枚举必须与 LuCI 选项保持同集：TUN `stack`、`dns.fake-ip-filter-mode` 和 sniffer 协议
@@ -148,8 +129,7 @@ git diff --check
 
 - OpenWrt SDK 能交叉编译 `mihomox` 和 `luci-app-mihomox`。
 - 首次启动、Redirect/TPROXY/TUN、IPv4/IPv6 和防火墙规则正常；TUN 的每种协议栈至少各测一次。
-- LuCI 菜单、RPC、编辑器、日志和网络测试在真机工作。
-- 网络失败或 RPC 缺失时页面会超时恢复，不永久显示加载状态。
+- LuCI 菜单、RPC、编辑器和日志在真机工作。
 - 内核更新失败会回滚，停止状态更新后仍保持停止。
 - 包升级和 sysupgrade 后配置、订阅、规则及用户内核按预期保留。
 - Nikki 与 MihomoX 同时安装时不会默认同时启用。

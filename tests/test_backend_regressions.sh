@@ -64,7 +64,7 @@ grep -q 'Fake-IP rule mode requires complete domain rules ending with fake-ip or
 awk '
 /^[[:space:]]*log: \{/ { in_fn = 1 }
 in_fn { block = block $0 "\n" }
-in_fn && /^[[:space:]]*network_test: \{/ { exit }
+in_fn && /^[[:space:]]*write_file: \{/ { exit }
 END {
 	if (block !~ /stat\(path\)/)
 		exit 1

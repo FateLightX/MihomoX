@@ -212,6 +212,9 @@ section_procd=$(uci -q get mihomox.procd); [ -z "$section_procd" ] && {
 
 routing_dummy_device=$(uci -q get mihomox.routing.dummy_device); [ -z "$routing_dummy_device" ] && uci set mihomox.routing.dummy_device=mihomox-dummy
 
+# the built-in network test was removed; drop its obsolete firewall mark
+uci -q delete mihomox.routing.network_test_fw_mark
+
 # since v1.25.2
 
 section_core=$(uci -q get mihomox.core); [ -z "$section_core" ] && {

@@ -15,6 +15,7 @@ assert.ok(!acl.read.ubus['luci.mihomox'].includes('*'));
 assert.ok(!acl.read.ubus['luci.mihomox'].includes('update_core'));
 assert.ok(acl.read.ubus['luci.mihomox'].includes('log'));
 assert.ok(acl.read.ubus['luci.mihomox'].includes('subscription_status'));
+assert.ok(!acl.read.ubus['luci.mihomox'].includes('network_test'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('update_core'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('write_file'));
 assert.ok(acl.write.ubus['luci.mihomox'].includes('api'));

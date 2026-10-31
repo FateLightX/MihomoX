@@ -1179,18 +1179,6 @@ msgstr "正式版"
 msgid "Unknown"
 msgstr "未知"
 
-msgid "IPv4 Domestic"
-msgstr "IPv4 國內"
-
-msgid "IPv4 Overseas"
-msgstr "IPv4 國外"
-
-msgid "IPv6 Domestic"
-msgstr "IPv6 國內"
-
-msgid "Test"
-msgstr "測試"
-
 msgid "Update Core"
 msgstr "更新核心"
 
@@ -1362,90 +1350,6 @@ msgstr "最終設定還必須定義 proxy-server-nameserver。"
 msgid "Time to wait for an AAAA response during dual-stack DNS queries."
 msgstr "雙棧 DNS 查詢時等待 AAAA 回應的時間。"
 
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Network Test"
-msgstr "網路測試"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Start Test"
-msgstr "開始測試"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "System DNS"
-msgstr "系統 DNS"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Mihomo DNS"
-msgstr "Mihomo DNS"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Domestic Connection"
-msgstr "國內連線"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Baidu"
-msgstr "百度"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "NetEase Cloud"
-msgstr "網易雲"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "International Proxy"
-msgstr "國際代理"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Google"
-msgstr "Google"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "YouTube"
-msgstr "YouTube"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "NAT Type"
-msgstr "NAT 類型"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Normal"
-msgstr "正常"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Unavailable"
-msgstr "不可用"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Not Tested"
-msgstr "未測試"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Testing"
-msgstr "測試中"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Full Cone"
-msgstr "完全錐形"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Restricted Cone"
-msgstr "受限錐形"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Port Restricted Cone"
-msgstr "連接埠受限錐形"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Symmetric NAT"
-msgstr "對稱型 NAT"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Cone/Restricted"
-msgstr "錐形/受限型"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Open Internet"
-msgstr "公網直連"
-
 msgid "Collapse"
 msgstr "收起"
 
@@ -1479,82 +1383,9 @@ msgstr "正在儲存"
 msgid "Starting Update"
 msgstr "正在啟動更新"
 
-msgid "Test Timeout"
-msgstr "測試逾時"
-
 msgid "Update Started"
 msgstr "更新已啟動"
 
-msgid "No IPv6 Connectivity"
-msgstr "無 IPv6 連線"
-
-msgid "UDP Timeout"
-msgstr "UDP 逾時"
-
-msgid "DNS Resolution Failed"
-msgstr "DNS 解析失敗"
-
-msgid "NAT Helper Missing"
-msgstr "缺少 NAT 檢測程式"
-
-msgid "Test Start Failed"
-msgstr "測試啟動失敗"
-
-msgid "Invalid Test Result"
-msgstr "測試結果無效"
-
-msgid "Not Configured"
-msgstr "未設定"
-
-msgid "Request Failed"
-msgstr "請求失敗"
-
-msgid "Direct Test Isolation Unavailable"
-msgstr "直連測試隔離不可用"
-
-msgid "Direct Test Mark Failed"
-msgstr "直連測試標記失敗"
-
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Check the current network path"
-msgstr "檢查目前網路路徑"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Progress"
-msgstr "進度"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Core and DNS"
-msgstr "核心與 DNS"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Network Detection"
-msgstr "網路檢測"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Detailed Site Tests"
-msgstr "詳細網站檢測"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Domestic Sites"
-msgstr "國內網站"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "International Sites"
-msgstr "國外網站"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "All Tests Normal"
-msgstr "全部測試正常"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Some Tests Unavailable"
-msgstr "部分測試不可用"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Network Status"
-msgstr "網路狀態"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "API TLS requires listen address, certificate and private key together."
 msgstr "API TLS 監聽、憑證和私鑰必須同時設定。"

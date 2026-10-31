@@ -1293,104 +1293,8 @@ msgid "Time to wait for an AAAA response during dual-stack DNS queries."
 msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Network Test"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Start Test"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
 msgid "Mihomo Core"
 msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "System DNS"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Mihomo DNS"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Domestic Connection"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Baidu"
-msgstr "Baidu"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "NetEase Cloud"
-msgstr "NetEase Cloud"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "International Proxy"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Google"
-msgstr "Google"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "YouTube"
-msgstr "YouTube"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "NAT Type"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Normal"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Unavailable"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Not Tested"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Testing"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Full Cone"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Restricted Cone"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Port Restricted Cone"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Symmetric NAT"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Cone/Restricted"
-msgstr ""
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Open Internet"
-msgstr ""
-
-msgid "IPv4 Domestic"
-msgstr "IPv4 внутри Китая"
-
-msgid "IPv4 Overseas"
-msgstr "IPv4 за пределами Китая"
-
-msgid "IPv6 Domestic"
-msgstr "IPv6 внутри Китая"
-
-msgid "Test"
-msgstr "Тест"
 
 msgid "Collapse"
 msgstr "Свернуть"
@@ -1425,82 +1329,9 @@ msgstr "Сохранение"
 msgid "Starting Update"
 msgstr "Запуск обновления"
 
-msgid "Test Timeout"
-msgstr "Тайм-аут проверки"
-
 msgid "Update Started"
 msgstr "Обновление запущено"
 
-msgid "No IPv6 Connectivity"
-msgstr "Нет подключения IPv6"
-
-msgid "UDP Timeout"
-msgstr "Тайм-аут UDP"
-
-msgid "DNS Resolution Failed"
-msgstr "Ошибка разрешения DNS"
-
-msgid "NAT Helper Missing"
-msgstr "Отсутствует модуль проверки NAT"
-
-msgid "Test Start Failed"
-msgstr "Не удалось запустить проверку"
-
-msgid "Invalid Test Result"
-msgstr "Недопустимый результат проверки"
-
-msgid "Not Configured"
-msgstr "Не настроено"
-
-msgid "Request Failed"
-msgstr "Ошибка запроса"
-
-msgid "Direct Test Isolation Unavailable"
-msgstr "Изоляция прямой проверки недоступна"
-
-msgid "Direct Test Mark Failed"
-msgstr "Не удалось установить метку прямой проверки"
-
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Check the current network path"
-msgstr "Проверить текущий сетевой путь"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Progress"
-msgstr "Прогресс"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Core and DNS"
-msgstr "Ядро и DNS"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Network Detection"
-msgstr "Диагностика сети"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Detailed Site Tests"
-msgstr "Подробная проверка сайтов"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Domestic Sites"
-msgstr "Внутренние сайты"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "International Sites"
-msgstr "Зарубежные сайты"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "All Tests Normal"
-msgstr "Все проверки пройдены"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Some Tests Unavailable"
-msgstr "Некоторые проверки недоступны"
-
-#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/network.js
-msgid "Network Status"
-msgstr "Состояние сети"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "API TLS requires listen address, certificate and private key together."
 msgstr "Прослушивание API TLS, сертификат и закрытый ключ должны быть настроены вместе."

@@ -48,8 +48,7 @@ make package/luci-app-mihomox/compile V=s
 
 GitHub Actions 只构建 `x86_64-SNAPSHOT`。构建前会执行
 `mihomox/scripts/fetch_mihomo.sh`，解析并下载官方最新 Alpha 二进制，验证发布资产 SHA256、
-gzip 格式和 ELF 架构后直接打包；不会重新编译 Mihomo Go 源码。OpenWrt 工具链只编译
-MihomoX 自带的轻量 STUN 辅助程序。内核、规则数据和面板资源会缓存在 OpenWrt
+gzip 格式和 ELF 架构后直接打包；不会重新编译 Mihomo Go 源码。内核、规则数据和面板资源会缓存在 OpenWrt
 `DL_DIR`。GeoData 使用带提交版本的原始文件 URL 和 Makefile 固定 SHA256；Zashboard
 默认跟随最新发布版本，并在构建时解析上游 SHA256。下载或校验失败时构建直接停止。
 更新资源时必须同时验证 URL 和摘要。
@@ -79,8 +78,6 @@ LuCI 页面位于 `服务 → MihomoX`：
 - `配置文件`：本地配置文件和订阅
 - `混入配置`：Mihomo 混入及 DNS 设置
 - `代理配置`：透明代理和访问控制
-- `网络测试`：核心、DNS、国内/国际站点、IPv4、IPv6 和 NAT 类型检测；IPv4 国内与
-  IPv6 国内检查路由器直连公网地址，IPv4 国外通过 Mihomo 本地代理显示出口 IP 和国家
 - `编辑器`：配置文件、混入文件和规则提供者文件
 - `日志`：插件、内核和调试日志
 
@@ -136,7 +133,7 @@ cron 表达式自定义时间，也可以手动执行：
 ```
 
 测试覆盖 Shell 语法、架构映射、资源摘要、内核更新及重启失败、订阅原子更新、运行路由
-清理、China IP 锁恢复、LuCI 请求流程、文件编辑、网络检测/STUN 以及 RPC/ACL 安全检查。
+清理、China IP 锁恢复、LuCI 请求流程、文件编辑以及 RPC/ACL 安全检查。
 
 ## 设计与上游审计
 

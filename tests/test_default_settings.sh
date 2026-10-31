@@ -50,7 +50,11 @@ grep -q "option 'china_ip_update' '1'" "$CONFIG"
 grep -q "option 'china_ip_update_cron' '0 4 \* \* 1'" "$CONFIG"
 grep -q "option 'china_ip_url' 'https://raw.githubusercontent.com/gaoyifan/china-operator-ip/refs/heads/ip-lists/china.txt'" "$CONFIG"
 grep -q "option 'china_ip6_url' 'https://raw.githubusercontent.com/gaoyifan/china-operator-ip/refs/heads/ip-lists/china6.txt'" "$CONFIG"
-grep -q "option 'network_test_fw_mark' '0x82'" "$CONFIG"
+if grep -q "network_test_fw_mark" "$CONFIG"; then
+	echo "network test fwmark must not remain in default config" >&2
+	exit 1
+fi
+grep -q 'uci -q delete mihomox.routing.network_test_fw_mark' "$MIGRATE"
 grep -q 'config_get_bool fast_reload "procd" "fast_reload" 1' "$INIT_SCRIPT"
 grep -q 'RUN_PROFILE_PATH="$TEMP_DIR/config.yaml"' "$INCLUDE_SCRIPT"
 grep -q 'CACHE_DB_PATH="$TEMP_DIR/cache.db"' "$INCLUDE_SCRIPT"
