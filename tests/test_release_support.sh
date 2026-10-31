@@ -83,15 +83,13 @@ done
 
 grep -Fq '使用公开安装脚本或 Feed：OpenWrt SNAPSHOT、`x86_64`' "$ROOT_DIR/README.md"
 grep -Fq '公开安装脚本、Feed 和 CI 产物只覆盖 OpenWrt SNAPSHOT x86_64' "$ROOT_DIR/AGENTS.md"
-for workflow in build-packages.yml release-packages.yml; do
-	workflow_path="$ROOT_DIR/.github/workflows/$workflow"
-	grep -Fq 'ARCH: x86_64-SNAPSHOT' "$workflow_path"
-	grep -Fq 'bin/packages/x86_64/mihomox' "$workflow_path"
-	if sed 's/#.*//' "$workflow_path" | grep -Eq 'openwrt-(23[.]05|24[.]10|25[.]12)|matrix[.](arch|branch)'; then
-		echo "$workflow must only build x86_64 for OpenWrt SNAPSHOT" >&2
-		exit 1
-	fi
-done
+workflow_path="$ROOT_DIR/.github/workflows/release-packages.yml"
+grep -Fq 'ARCH: x86_64-SNAPSHOT' "$workflow_path"
+grep -Fq 'bin/packages/x86_64/mihomox' "$workflow_path"
+if sed 's/#.*//' "$workflow_path" | grep -Eq 'openwrt-(23[.]05|24[.]10|25[.]12)|matrix[.](arch|branch)'; then
+	echo "release-packages.yml must only build x86_64 for OpenWrt SNAPSHOT" >&2
+	exit 1
+fi
 
 release_workflow="$ROOT_DIR/.github/workflows/release-packages.yml"
 version_script="$ROOT_DIR/scripts/release-version.sh"

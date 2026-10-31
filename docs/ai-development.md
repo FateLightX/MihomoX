@@ -284,13 +284,6 @@ cat "$verify_root/output/.version"
 
 ## 6. GitHub Actions
 
-### `build-packages`
-
-- 手动触发。
-- `check` 运行 `./tests/run.sh`。
-- `build` 构建 `x86_64-SNAPSHOT` 并上传产物。
-- 不生成 Release，不部署 Feed。
-
 ### `release-packages`
 
 - 手动触发；重复运行会发布下一个 revision，不需要手动改版本号。
@@ -298,10 +291,6 @@ cat "$verify_root/output/.version"
 - `sync` 把 `PKG_RELEASE` 写回两个 `Makefile` 并提交推送。
 - `release` 按 `sync` 的提交构建、签名索引、压缩、上传 GitHub Release 和 artifact。
 - `feed` 在配置 Cloudflare 凭据时部署 Pages；未配置时跳过，不影响 Release。
-
-### 其他工作流
-
-- `delete-workflow-runs.yml`：手动清理旧的 workflow run。
 
 MihomoX 的 Actions 引用已固定到 commit SHA；新增引用也应固定版本并加注释。
 
