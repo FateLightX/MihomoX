@@ -17,6 +17,8 @@ PROXY_PROVIDERS_DIR="$PROVIDERS_DIR/proxy"
 LOG_DIR="/var/log/mihomox"
 APP_LOG_PATH="$LOG_DIR/app.log"
 CORE_LOG_PATH="$LOG_DIR/core.log"
+RUNTIME_LOG_HARD_MAX_BYTES=16777216
+RUNTIME_LOG_HARD_KEEP_BYTES=1048576
 
 # temp
 TEMP_DIR="/var/run/mihomox"
@@ -44,6 +46,7 @@ INCLUDE_SH="$SH_DIR/include.sh"
 FIREWALL_INCLUDE_SH="$SH_DIR/firewall_include.sh"
 CORE_UPDATE_SH="$SH_DIR/update_core.sh"
 CHINA_IP_UPDATE_SH="$SH_DIR/update_china_ip.sh"
+TRIM_LOGS_SH="$SH_DIR/trim_logs.sh"
 
 # nftables
 NFT_DIR="$HOME_DIR/nftables"
@@ -92,6 +95,78 @@ prepare_files() {
 	if [ ! -d "$RUN_DIR" ]; then
 		mkdir -p "$RUN_DIR"
 	fi
+}
+
+trim_log_file() {
+	local path="$1" max_bytes="$2" keep_bytes="$3"
+	local size trim_tmp
+	[ -f "$path" ] || return 0
+	case "$max_bytes:$keep_bytes" in
+		''|*[!0-9:]*|*:*[!0-9]*) return 1 ;;
+	esac
+	[ "$max_bytes" -gt 0 ] && [ "$keep_bytes" -gt 0 ] && [ "$keep_bytes" -lt "$max_bytes" ] || return 1
+	size=$(wc -c < "$path" 2>/dev/null | tr -d '[:space:]') || return 1
+	case "$size" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$size" -gt "$max_bytes" ] || return 0
+	trim_tmp="$path.trim.$$"
+	tail -c "$keep_bytes" "$path" > "$trim_tmp" 2>/dev/null || {
+		rm -f "$trim_tmp"
+		return 1
+	}
+	# The core keeps the original file open with O_APPEND. Rewriting the same
+	# inode avoids a stale descriptor writing into an unlinked file.
+	cat "$trim_tmp" > "$path" 2>/dev/null || {
+		rm -f "$trim_tmp"
+		return 1
+	}
+	rm -f "$trim_tmp"
+}
+
+trim_runtime_logs() {
+	trim_log_file "$APP_LOG_PATH" "$RUNTIME_LOG_HARD_MAX_BYTES" "$RUNTIME_LOG_HARD_KEEP_BYTES" || \
+		log "Log" "Unable to trim app log to the hard size limit."
+	trim_log_file "$CORE_LOG_PATH" "$RUNTIME_LOG_HARD_MAX_BYTES" "$RUNTIME_LOG_HARD_KEEP_BYTES" || \
+		log "Log" "Unable to trim core log to the hard size limit."
+}
+
+prune_missing_fake_ip_rule_sets() {
+	local profile="$1"
+	local providers_file entries_file entry name
+	[ -s "$profile" ] || return 0
+	command -v yq >/dev/null 2>&1 || return 0
+
+	providers_file="$TEMP_DIR/fake-ip-providers.$$"
+	entries_file="$TEMP_DIR/fake-ip-entries.$$"
+	if ! yq -M e -r '(.rule-providers // {}) | keys | .[]' "$profile" > "$providers_file" 2>/dev/null; then
+		rm -f "$providers_file" "$entries_file"
+		return 1
+	fi
+	if ! yq -M e -r '(.dns."fake-ip-filter" // [])[]' "$profile" > "$entries_file" 2>/dev/null; then
+		rm -f "$providers_file" "$entries_file"
+		return 1
+	fi
+
+	while IFS= read -r entry; do
+		case "$entry" in
+			RULE-SET,*|rule-set:*) ;;
+			*) continue ;;
+		esac
+		name="${entry#RULE-SET,}"
+		name="${name#rule-set:}"
+		name="${name%%,*}"
+		[ -n "$name" ] || continue
+		grep -Fxq "$name" "$providers_file" && continue
+		MIHOMOX_DROP_ENTRY="$entry" yq -M e -i \
+			'.dns."fake-ip-filter" = [.dns."fake-ip-filter"[] | select(. != strenv(MIHOMOX_DROP_ENTRY))]' \
+			"$profile" 2>/dev/null || {
+				rm -f "$providers_file" "$entries_file"
+				return 1
+			}
+		log "Profile" "Removed fake-ip-filter entry for missing rule-set: $entry"
+	done < "$entries_file"
+
+	rm -f "$providers_file" "$entries_file"
+	return 0
 }
 
 cache_mounted() {

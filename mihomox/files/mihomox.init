@@ -13,6 +13,7 @@ extra_command 'refresh_subscription' 'Refresh subscription with background statu
 extra_command 'update_core' 'Update Mihomo core'
 extra_command 'update_china_ip' 'Update China IP nft sets'
 extra_command 'clear_logs' 'Clear logs if size exceeds the limit'
+extra_command 'trim_logs' 'Enforce the hard runtime log size limit'
 
 subscription_profile_valid() {
 	[ -s "$1" ] || return 1
@@ -80,6 +81,7 @@ update_china_ip() {
 
 start_service() {
 	prepare_files
+	trim_runtime_logs
 	local live_profile="$RUN_PROFILE_PATH" service_action="${1:-start}"
 	local profile_work_dir RUN_PROFILE_PATH result
 	profile_work_dir=$(mktemp -d "${live_profile%/*}/.profile.XXXXXX") || return 1
@@ -385,6 +387,11 @@ prepare_service() {
 			return 1
 		}
 	fi
+	if ! prune_missing_fake_ip_rule_sets "$RUN_PROFILE_PATH"; then
+		log "Profile" "Unable to prune fake-ip-filter entries with missing rule-sets."
+		log "App" "Exit."
+		return 1
+	fi
 	if ! validate_final_profile; then
 		log "Profile" "Final profile validation failed."
 		log "App" "Exit."
@@ -467,7 +474,7 @@ prepare_service() {
 	# and reload_service() runs this on every reload.
 	if grep -q "#mihomox" "/etc/crontabs/root"; then
 		log "App" "Clear cron."
-		sed -i '/#mihomox/d' "/etc/crontabs/root" > /dev/null 2>&1
+		sed -i '/#mihomox/d' "/etc/crontabs/root" > /dev/null 2>&1 || true
 	fi
 	if [ "$scheduled_restart" = 1 ] && is_valid_cron "$scheduled_restart_cron"; then
 		log "App" "Set scheduled restart."
@@ -487,6 +494,7 @@ prepare_service() {
 	elif [ "$log_scheduled_clear" = 1 ] && [ -n "$log_scheduled_clear_cron" ]; then
 		log "App" "Invalid log scheduled clear cron expression; skipped."
 	fi
+	echo "* * * * * $TRIM_LOGS_SH #mihomox runtime log cap" >> "/etc/crontabs/root"
 	# set started flag
 	touch "$STARTED_FLAG_PATH"
 	if [ -n "$subscription_refresh_section" ]; then
@@ -923,7 +931,7 @@ cleanup() {
 	fi
 	# delete cron
 	if grep -q "#mihomox" "/etc/crontabs/root"; then
-		sed -i "/#mihomox/d" "/etc/crontabs/root" > /dev/null 2>&1
+		sed -i "/#mihomox/d" "/etc/crontabs/root" > /dev/null 2>&1 || true
 	fi
 	rm -f "$SUBSCRIPTION_REFRESH_PENDING_PATH"
 	[ "${1:-}" = keep_cache ] || cleanup_cache
@@ -970,6 +978,10 @@ clear_logs() {
 		echo -n > "$CORE_LOG_PATH"
 		log "Log" "Core log is cleared due to scheduled clear and exceeding size limits."
 	fi
+}
+
+trim_logs() {
+	trim_runtime_logs
 }
 
 update_subscription() {

@@ -18,6 +18,8 @@ done
 "$ROOT_DIR/tests/test_backend_regressions.sh"
 "$ROOT_DIR/tests/test_security_helpers.sh"
 "$ROOT_DIR/tests/test_cache_paths.sh"
+"$ROOT_DIR/tests/test_log_trim.sh"
+"$ROOT_DIR/tests/test_fakeip_prune.sh"
 "$ROOT_DIR/tests/test_default_settings.sh"
 node "$ROOT_DIR/tests/test_core_launch.js"
 node "$ROOT_DIR/tests/test_luci_core_update.js"

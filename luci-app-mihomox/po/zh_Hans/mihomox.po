@@ -1362,6 +1362,21 @@ msgstr "不支持"
 msgid "Disabled"
 msgstr "已关闭"
 
+msgid "TUN DNS Mode"
+msgstr "TUN DNS 模式"
+
+msgid "Empty follows the core default. Hijack also captures DNS sent to other interfaces."
+msgstr "留空时沿用内核默认行为；劫持模式还会接管发往其他网卡的 DNS。"
+
+msgid "Automatic (core default)"
+msgstr "自动（内核默认）"
+
+msgid "Native"
+msgstr "原生"
+
+msgid "Hijack"
+msgstr "劫持"
+
 msgid "Enabled"
 msgstr "已开启"
 

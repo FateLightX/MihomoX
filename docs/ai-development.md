@@ -58,15 +58,15 @@ MihomoX 是运行在 OpenWrt 上的 Mihomo 透明代理 LuCI 服务：
 防火墙规则由 `mihomox/files/ucode/hijack.ut` 生成。默认值以
 `mihomox/files/mihomox.conf` 为准，不得只改 LuCI 页面默认值。
 
-### 当前上游接续基线（2026-10-15）
+### 当前上游接续基线（2026-11-05）
 
 以下只是已验证检查点，开始新一轮适配前必须重新查询，不得假定仍是最新：
 
 | 项目 | 已验证版本 | 本地处理 |
 | --- | --- | --- |
-| Mihomo Alpha | `94b13aed49b8dc41973e4bb3f721c5fa2c5c5c1f` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
-| Zashboard | `v3.29.1`，`dist.zip` SHA256 `4f16cce229e223bd07b5a3daccfbfb8bf349d7335572d412959284ab6c9bab50` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
-| 包版本 | `2026.10.16`，两个包 release 均为 1 | 同日再发布时把两个包 release 一起加一；tag 见上文“修改版本和发布” |
+| Mihomo Alpha | `69c16319b12d10ec1ed05eefca3a482357f5ffbb` | `fetch_mihomo.sh` 构建时动态解析最新 Alpha；配置/API 审计以官方源码为准 |
+| Zashboard | `v3.30.0`，`dist.zip` SHA256 `1f91c014e61e768240a86ad0a9bd565b247ec5a0e26b125fb5d19076682905b7` | 默认跟随 `releases/latest/download/dist.zip`，构建时解析并校验发布资产 SHA256 |
+| 包版本 | `2026.10.31`，两个包 release 均为 1 | 发布日期变化时由 release workflow 自动写回；同日再发布时 release 加一 |
 
 重新查询：
 
@@ -99,6 +99,13 @@ Mihomo 兼容审计优先读取官方源码：
   `mixin.js` 的 `tun_stack` 选项和 `tests/test_luci_mixin.js` 的栈断言。
 - TUN 出厂默认栈跟随上游：Alpha `63bd52ec`/`88dcbf7f` 把核心默认从 `gvisor` 改为 `mips`，
   `mihomox.conf` 的 `tun_stack` 同步改为 `mips`（`tests/test_default_settings.sh` 有断言）。
+- TUN `dns-mode` 的 UCI 包装为 `tun_dns_mode`，只允许 `disabled`/`native`/`hijack`；
+  默认留空表示沿用内核对 `auto-route` 等条件的旧行为，不能擅自写成 `hijack`。
+- 最终配置合并后、`mihomo -t` 前会移除引用不存在 `rule-provider` 的
+  Fake-IP `RULE-SET`/`rule-set` 条目；有效 provider 原样保留。回归测试为
+  `tests/test_fakeip_prune.sh`。
+- `app.log`/`core.log` 有固定 16 MiB 硬上限，超限原地保留尾部 1 MiB；启动前和每分钟由
+  `trim_logs.sh` 检查。该保护独立于用户可配置的 5 分钟日志清理。
 - 预检与实际启动必须同环境：`test_profile` 的 `-t` 要与 procd 注入的 7 个环境变量一致，
   否则会出现预检通过、真实启动失败。
 - crontab 变更后不重启 cron 服务：busybox crond 自身会重扫，且 `reload_service()` 每次都跑

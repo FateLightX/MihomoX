@@ -74,5 +74,9 @@ for (const stack of ['system', 'gvisor', 'mixed', 'mips']) {
         `TUN stack option is missing: ${stack}`
     );
 }
+assert.ok(
+    /'tun_dns_mode'[\s\S]{0,700}o\.value\('disabled'[\s\S]{0,300}o\.value\('native'[\s\S]{0,300}o\.value\('hijack'/.test(source),
+    'TUN DNS mode must expose disabled, native and hijack'
+);
 
 console.log('LuCI mixin tests passed');

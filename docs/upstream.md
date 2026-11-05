@@ -9,8 +9,8 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `94b13aed49b8dc41973e4bb3f721c5fa2c5c5c1f` |
-| [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.29.1` |
+| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `69c16319b12d10ec1ed05eefca3a482357f5ffbb` |
+| [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.30.0` |
 | [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `78e1a75` |
 
 ## 同步流程
@@ -25,6 +25,23 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-11-05：Mihomo Alpha、Zashboard 与必要防护
+
+- Mihomo：`94b13aed..69c16319`，共 11 个提交。需要跟随的运行时修复包括
+  `CVE-2026-97031`（crypto/tls）、SOCKS 域名长度整数溢出、HTTP CONNECT 响应粘包、
+  TFO 兼容性和上游缓存读取。构建与运行时本就跟随 Alpha，无需固定版本；设备已从
+  `alpha-6780eee` 升级到 `alpha-69c1631`，最终配置预检通过。
+- 配置面新增 `tun.dns-mode`，只接受 `disabled` / `native` / `hijack`；留空保持旧行为。
+  MihomoX 新增同名 UCI 选项并默认留空，不改变现有安装。
+- Zashboard：`v3.29.1..v3.30.0`，共 10 个提交。包含 axios/dompurify/Vue 更新、Clash API
+  版本响应校验、后台标签页连接历史上限和连接页改进。默认 `latest` 构建会自动使用该版本；
+  设备已核对为 `v3.30.0`。
+- OpenWrt-nikki：`main` 仍为 `78e1a75`，本轮无更新。
+- 参考 `openwrt-clashoo`：`65acfca..2d264af`，共 36 个提交。采用其中两类必要防护：
+  启动前移除引用不存在 `rule-provider` 的 Fake-IP filter 条目；运行日志增加固定
+  16 MiB 硬上限，超限时原地保留最后 1 MiB。MihomoX 通过每分钟轻量脚本和启动前检查执行，
+  不依赖用户配置的 5 分钟定时清理。
 
 ## 2026-10-21：发版版本号改为自动跟随 UTC+8 日期
 

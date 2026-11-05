@@ -18,6 +18,7 @@ const expectedMappings = [
     "config['dns']['cache-max-size'] = uci_int(uci.get('mihomox', 'mixin', 'dns_cache_max_size'));",
     "config['dns']['ipv6-timeout'] = uci_int(uci.get('mihomox', 'mixin', 'dns_ipv6_timeout'));",
     "config['dns']['fallback-lazy-query'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_fallback_lazy_query'));",
+    "config['tun']['dns-mode'] = tun_dns_mode;",
     "config['sniffer']['skip-src-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_src_addresses'));",
     "config['sniffer']['skip-dst-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_dst_addresses'));",
     "'size-limit': section.file_size_limit,",

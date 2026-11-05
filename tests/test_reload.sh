@@ -24,6 +24,7 @@ PROFILES_DIR="$TEST_DIR/profiles"
 SUBSCRIPTIONS_DIR="$TEST_DIR/subscriptions"
 CORE_LOG_PATH="$TEST_DIR/core.log"
 MIXIN_UC="$TEST_DIR/mixin.uc"
+TRIM_LOGS_SH="$TEST_DIR/trim_logs.sh"
 mkdir -p "$RUN_DIR" "$TEMP_DIR" "$PROFILES_DIR" "$SUBSCRIPTIONS_DIR"
 : > "$TEST_DIR/crontab"
 printf 'new profile\n' > "$PROFILES_DIR/test.yaml"
@@ -38,6 +39,8 @@ EOF
 chmod +x "$CORE_PATH"
 
 prepare_files() { :; }
+trim_runtime_logs() { :; }
+prune_missing_fake_ip_rule_sets() { :; }
 prepare_cache() { return 0; }
 log() { :; }
 uci() {

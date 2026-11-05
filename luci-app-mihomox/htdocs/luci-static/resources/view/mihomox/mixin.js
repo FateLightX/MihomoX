@@ -382,6 +382,16 @@ return view.extend({
         // on memory-constrained routers, no with_gvisor build tag required.
         o.value('mips', 'Mips');
 
+        o = s.taboption('tun', form.ListValue, 'tun_dns_mode', _('TUN DNS Mode'));
+        o.optional = true;
+        o.rmempty = false;
+        o.default = '';
+        o.description = _('Empty follows the core default. Hijack also captures DNS sent to other interfaces.');
+        o.value('', _('Automatic (core default)'));
+        o.value('disabled', _('Disabled'));
+        o.value('native', _('Native'));
+        o.value('hijack', _('Hijack'));
+
         o = s.taboption('tun', form.Value, 'tun_mtu', _('MTU'));
         o.datatype = 'uinteger';
         o.placeholder = _('Unmodified');

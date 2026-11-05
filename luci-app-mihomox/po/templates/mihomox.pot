@@ -1355,6 +1355,21 @@ msgstr ""
 msgid "Disabled"
 msgstr ""
 
+msgid "TUN DNS Mode"
+msgstr ""
+
+msgid "Empty follows the core default. Hijack also captures DNS sent to other interfaces."
+msgstr ""
+
+msgid "Automatic (core default)"
+msgstr ""
+
+msgid "Native"
+msgstr ""
+
+msgid "Hijack"
+msgstr ""
+
 msgid "Enabled"
 msgstr ""
 

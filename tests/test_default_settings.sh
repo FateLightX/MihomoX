@@ -17,6 +17,7 @@ grep -q "option 'authentication' '1'" "$CONFIG"
 grep -q "option 'tun_enabled' '1'" "$CONFIG"
 # Upstream changed the default TUN stack to mips (Alpha 63bd52ec/88dcbf7f).
 grep -q "option 'tun_stack' 'mips'" "$CONFIG"
+grep -q "option 'tun_dns_mode' ''" "$CONFIG"
 grep -q "option 'tcp_mode' 'tproxy'" "$CONFIG"
 grep -q "option 'udp_mode' 'tun'" "$CONFIG"
 grep -q "option 'password' '2333'" "$CONFIG"
@@ -60,6 +61,9 @@ grep -q 'RUN_PROFILE_PATH="$TEMP_DIR/config.yaml"' "$INCLUDE_SCRIPT"
 grep -q 'CACHE_DB_PATH="$TEMP_DIR/cache.db"' "$INCLUDE_SCRIPT"
 grep -q -- '-f "$RUN_PROFILE_PATH"' "$INIT_SCRIPT"
 grep -q 'CACHE_SNAPSHOT_PATH="$HOME_DIR/cache.snapshot"' "$INCLUDE_SCRIPT"
+grep -q 'RUNTIME_LOG_HARD_MAX_BYTES=16777216' "$INCLUDE_SCRIPT"
+grep -q 'trim_runtime_logs' "$INIT_SCRIPT"
+grep -q '#mihomox runtime log cap' "$INIT_SCRIPT"
 
 cron_guard_count=$(grep -c 'if grep -q "#mihomox" "/etc/crontabs/root"; then' "$INIT_SCRIPT")
 [ "$cron_guard_count" -eq 2 ]
@@ -106,5 +110,8 @@ grep -q 'auth_password=$(generate_secret)' "$MIGRATE"
 grep -q 'auth_password=$(generate_secret)' "$INIT_DEFAULTS"
 grep -q 'mihomox.mixin.fake_ip6_range=fc00::/18' "$MIGRATE"
 grep -q 'uci set mihomox.procd.env_disable_quic_go_ecn=1' "$MIGRATE"
+grep -q 'prune_missing_fake_ip_rule_sets' "$INIT_SCRIPT"
+grep -q 'TRIM_LOGS_SH="$SH_DIR/trim_logs.sh"' "$INCLUDE_SCRIPT"
+grep -q 'files/scripts/trim_logs.sh' "$ROOT_DIR/mihomox/Makefile"
 
 echo "default settings tests passed"

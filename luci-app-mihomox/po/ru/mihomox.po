@@ -1308,6 +1308,21 @@ msgstr "Не поддерживается"
 msgid "Disabled"
 msgstr "Отключено"
 
+msgid "TUN DNS Mode"
+msgstr "Режим DNS TUN"
+
+msgid "Empty follows the core default. Hijack also captures DNS sent to other interfaces."
+msgstr "Пустое значение использует настройку ядра по умолчанию; режим Hijack также перехватывает DNS, отправляемый через другие интерфейсы."
+
+msgid "Automatic (core default)"
+msgstr "Автоматически (по умолчанию ядра)"
+
+msgid "Native"
+msgstr "Собственный"
+
+msgid "Hijack"
+msgstr "Перехват"
+
 msgid "Enabled"
 msgstr "Включено"
 

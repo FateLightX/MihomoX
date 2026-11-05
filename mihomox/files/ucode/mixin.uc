@@ -61,6 +61,10 @@ config['tun'] = {};
 config['tun']['enable'] = uci_bool(uci.get('mihomox', 'mixin', 'tun_enabled'));
 config['tun']['device'] = uci.get('mihomox', 'mixin', 'tun_device');
 config['tun']['stack'] = uci.get('mihomox', 'mixin', 'tun_stack');
+const tun_dns_mode = uci.get('mihomox', 'mixin', 'tun_dns_mode');
+if (tun_dns_mode == 'disabled' || tun_dns_mode == 'native' || tun_dns_mode == 'hijack') {
+	config['tun']['dns-mode'] = tun_dns_mode;
+}
 config['tun']['mtu'] = uci_int(uci.get('mihomox', 'mixin', 'tun_mtu'));
 config['tun']['gso'] = uci_bool(uci.get('mihomox', 'mixin', 'tun_gso'));
 config['tun']['gso-max-size'] = uci_int(uci.get('mihomox', 'mixin', 'tun_gso_max_size'));
