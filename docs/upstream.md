@@ -111,9 +111,10 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 - 同批修正：`tests/test_default_settings.sh` 的断言随新默认值同步（首次触发 `38826502071` 因
   `validate` 的 `test` 步骤失败而中断，`sync`/`release`/`feed` 全部 skipped）。
 
-> 2026-11-22 后续：公开固定凭据已撤销，新安装和升级时若仍为历史默认值 `2333`，会生成
-> 随机 API Secret 与认证密码。Fake-IP 默认列表同时补入 Windows NCSI 域名，并接入
-> `dns.fake-ip-disable-mapping`；绝对 UI Path 校验与 Alpha 的 home/`SAFE_PATHS` 语义一致。
+> 2026-11-23 后续：按用户要求恢复固定默认凭据 `2333`。新安装直接写入 `2333`；升级只把
+> 空白字段补为 `2333`，已有 `2333` 或自定义值保持不变。Fake-IP 默认列表同时补入 Windows NCSI
+> 域名，并接入 `dns.fake-ip-disable-mapping`；绝对 UI Path 校验与 Alpha 的
+> home/`SAFE_PATHS` 语义一致。
 
 ## 2026-10-15：Mihomo Alpha、Nikki 与 Zashboard
 

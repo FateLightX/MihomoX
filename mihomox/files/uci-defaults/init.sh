@@ -5,7 +5,7 @@
 # check mihomox.config.init
 init=$(uci -q get mihomox.config.init); [ -z "$init" ] && return
 
-# rotate the historical public default and generate missing credentials
+# fill missing credentials with the fixed default
 ensure_credentials || exit 1
 
 # initialize custom core checksum field for older configurations

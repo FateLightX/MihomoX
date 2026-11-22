@@ -316,17 +316,16 @@ generate_secret() {
 	printf '%s\n' "$secret"
 }
 
-# Generate missing credentials and rotate the historical public default. A
-# disabled authentication section still gets a new value when it contains that
-# known password, so later enabling it cannot expose the shared default.
+# Fill missing credentials with the fixed default while preserving all existing
+# values, including user-selected 2333 credentials. Disabled authentication
+# sections may intentionally have no password and stay empty.
 ensure_credentials() {
 	local api_secret index auth_section auth_enabled auth_password
 
 	MIHOMOX_CREDENTIALS_CHANGED=0
 	api_secret=$(uci -q get mihomox.mixin.api_secret)
-	if [ -z "$api_secret" ] || [ "$api_secret" = "2333" ]; then
-		api_secret=$(generate_secret) || return 1
-		uci set mihomox.mixin.api_secret="$api_secret" || return 1
+	if [ -z "$api_secret" ]; then
+		uci set mihomox.mixin.api_secret=2333 || return 1
 		MIHOMOX_CREDENTIALS_CHANGED=1
 	fi
 
@@ -336,10 +335,8 @@ ensure_credentials() {
 		auth_section="mihomox.@authentication[$index]"
 		auth_enabled=$(uci -q get "$auth_section.enabled")
 		auth_password=$(uci -q get "$auth_section.password")
-		if [ "$auth_password" = "2333" ] || \
-			{ [ "$auth_enabled" = "1" ] && [ -z "$auth_password" ]; }; then
-			auth_password=$(generate_secret) || return 1
-			uci set "$auth_section.password=$auth_password" || return 1
+		if [ "$auth_enabled" = "1" ] && [ -z "$auth_password" ]; then
+			uci set "$auth_section.password=2333" || return 1
 			MIHOMOX_CREDENTIALS_CHANGED=1
 		fi
 		index=$((index + 1))

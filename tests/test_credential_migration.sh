@@ -3,8 +3,6 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/mihomox-credentials.XXXXXX")
-trap 'rm -rf "$TEST_DIR"' EXIT HUP INT TERM
 . "$ROOT_DIR/mihomox/files/scripts/include.sh"
 
 # Exercise the real migration helpers against a small stateful UCI stub.
@@ -22,7 +20,6 @@ FAKE_FILTER_MODE=blacklist
 FAKE_FILTERS=
 UCI_SET_COUNT=0
 ADD_LIST_COUNT=0
-printf '0\n' > "$TEST_DIR/secret-counter"
 
 fixture_get() {
 	case "$1" in
@@ -89,48 +86,19 @@ EOF
 	esac
 }
 
-# A failed or malformed generator must stop migration before any UCI write.
-for failure in error short nonhex; do
-	(
-		hexdump() {
-			case "$failure" in
-				error) printf '%064d' 0; return 1 ;;
-				short) printf 'abc' ;;
-				nonhex) printf '%063dx' 0 ;;
-			esac
-		}
-		if ensure_credentials; then exit 1; fi
-		[ "$UCI_SET_COUNT" -eq 0 ]
-	)
-done
-
-generate_secret() {
-	local count
-	count=$(cat "$TEST_DIR/secret-counter")
-	count=$((count + 1))
-	printf '%s\n' "$count" > "$TEST_DIR/secret-counter"
-	printf '%064d\n' "$count"
-}
-
-assert_generated() {
-	local value="$1" label="$2"
-	[ "${#value}" -eq 64 ] || {
-		echo "$label was not replaced with a generated secret" >&2
-		exit 1
-	}
-	case "$value" in *[!0-9]*) echo "$label is not deterministic test output" >&2; exit 1 ;; esac
-}
-
 ensure_credentials
-assert_generated "$API_SECRET" "API secret"
-assert_generated "$AUTH0_PASSWORD" "enabled 2333 password"
-assert_generated "$AUTH1_PASSWORD" "disabled 2333 password"
-assert_generated "$AUTH2_PASSWORD" "empty enabled password"
+[ "$API_SECRET" = 2333 ]
+[ "$AUTH0_PASSWORD" = 2333 ]
+[ "$AUTH1_PASSWORD" = 2333 ]
+[ "$AUTH2_PASSWORD" = 2333 ]
 [ -z "$AUTH3_PASSWORD" ] || {
 	echo "an empty disabled password must remain unset" >&2
 	exit 1
 }
-[ "$UCI_SET_COUNT" -eq 4 ]
+[ "$UCI_SET_COUNT" -eq 1 ] || {
+	echo "only the empty enabled authentication password should be filled" >&2
+	exit 1
+}
 [ "$MIHOMOX_CREDENTIALS_CHANGED" -eq 1 ]
 
 # User-chosen and intentionally absent disabled credentials must not be touched.
@@ -149,10 +117,10 @@ ensure_credentials
 [ "$UCI_SET_COUNT" -eq 0 ]
 [ "$MIHOMOX_CREDENTIALS_CHANGED" -eq 0 ]
 
-# A missing API secret is still generated without changing auth sections.
+# A missing API secret is filled with the fixed default without changing auth sections.
 API_SECRET=
 ensure_credentials
-assert_generated "$API_SECRET" "empty API secret"
+[ "$API_SECRET" = 2333 ]
 [ "$AUTH0_PASSWORD" = custom-auth-password ]
 [ "$AUTH2_PASSWORD" = custom-second-password ]
 [ "$UCI_SET_COUNT" -eq 1 ] || {
