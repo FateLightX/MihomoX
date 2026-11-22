@@ -98,7 +98,9 @@ prepare_service() {
 		log "Security" "Unable to generate missing credentials."
 		return 1
 	fi
-	[ "$MIHOMOX_CREDENTIALS_CHANGED" = 1 ] && uci commit mihomox
+	if [ "$MIHOMOX_CREDENTIALS_CHANGED" = 1 ]; then
+		uci commit mihomox || return 1
+	fi
 	# load config
 	config_load mihomox
 	# check if enabled
@@ -156,14 +158,14 @@ prepare_service() {
 	config_get env_safe_paths "procd" "env_safe_paths"
 	config_get_bool env_disable_loopback_detector "procd" "env_disable_loopback_detector" 0
 	config_get_bool env_disable_quic_go_gso "procd" "env_disable_quic_go_gso" 0
-	config_get_bool env_disable_quic_go_ecn "procd" "env_disable_quic_go_ecn" 0
+	config_get_bool env_disable_quic_go_ecn "procd" "env_disable_quic_go_ecn" 1
 	config_get_bool env_skip_system_ipv6_check "procd" "env_skip_system_ipv6_check" 0
 	## mixin config
 	### overwrite
 	local overwrite_authentication overwrite_tun_dns_hijack overwrite_fake_ip_filter overwrite_hosts overwrite_dns_nameserver overwrite_dns_proxy_server_nameserver_policy overwrite_dns_nameserver_policy overwrite_sniffer_sniff overwrite_sniffer_force_domain_name overwrite_sniffer_ignore_domain_name
 	config_get_bool overwrite_authentication "mixin" "authentication" 0
 	config_get_bool overwrite_tun_dns_hijack "mixin" "tun_dns_hijack" 0
-	config_get_bool overwrite_fake_ip_filter "mixin" "fake_ip_filter" 0
+	config_get overwrite_fake_ip_filter "mixin" "fake_ip_filter" 0
 	config_get_bool overwrite_hosts "mixin" "hosts" 0
 	config_get_bool overwrite_dns_nameserver "mixin" "dns_nameserver" 0
 	config_get_bool overwrite_dns_proxy_server_nameserver_policy "mixin" "dns_proxy_server_nameserver_policy" 0
@@ -322,7 +324,17 @@ prepare_service() {
 				return 1
 			}
 		fi
-		ucode -S "$MIXIN_UC" > "$profile_work_dir/mixin.generated.json" &&
+		set -- "$prepared_profile"
+		if [ "$mixin_file_content" = 1 ]; then
+			[ -f "$MIXIN_FILE_PATH" ] || { log "Mixin" "Mixin file not found."; return 1; }
+			set -- "$@" "$MIXIN_FILE_PATH"
+		fi
+		local use_fake_ip_defaults=0 filter_count
+		if [ "$overwrite_fake_ip_filter" = auto ]; then
+			filter_count=$(yq -M eval-all '[explode(.) | .dns | select(has("fake-ip-filter") or has("fake-ip-filter-mode"))] | length' "$@") || return 1
+			[ "$filter_count" = 0 ] && use_fake_ip_defaults=1
+		fi
+		MIHOMOX_USE_FAKE_IP_DEFAULTS="$use_fake_ip_defaults" ucode -S "$MIXIN_UC" > "$profile_work_dir/mixin.generated.json" &&
 			yq -M -p json -o yaml "$profile_work_dir/mixin.generated.json" > "$generated_mixin" || {
 			log "Mixin" "Unable to generate mixin config."
 			log "App" "Exit."
@@ -333,24 +345,11 @@ prepare_service() {
 			log "App" "Exit."
 			return 1
 		fi
-		if [ "$mixin_file_content" = 1 ] && [ ! -f "$MIXIN_FILE_PATH" ]; then
-			log "Mixin" "Mixin file not found."
+		yq -M -p yaml -o yaml eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$@" "$generated_mixin" > "$merged_profile" || {
+			log "Mixin" "Unable to merge runtime profile."
 			log "App" "Exit."
 			return 1
-		fi
-		if [ "$mixin_file_content" = 0 ]; then
-			yq -M -p yaml -o yaml eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$prepared_profile" "$generated_mixin" > "$merged_profile" || {
-				log "Mixin" "Unable to merge runtime profile."
-				log "App" "Exit."
-				return 1
-			}
-		elif [ "$mixin_file_content" = 1 ]; then
-			yq -M -p yaml -o yaml eval-all '... comments="" | . as $item ireduce ({}; . * $item ) | .proxies = .mihomox-proxies + .proxies | del(.mihomox-proxies) | .proxy-groups = .mihomox-proxy-groups + .proxy-groups | del(.mihomox-proxy-groups) | .rules = .mihomox-rules + .rules | del(.mihomox-rules) | explode(.)' "$prepared_profile" "$MIXIN_FILE_PATH" "$generated_mixin" > "$merged_profile" || {
-				log "Mixin" "Unable to merge runtime profile."
-				log "App" "Exit."
-				return 1
-			}
-		fi
+		}
 		if [ "$proxy_enabled" = 1 ]; then
 			local has_tun has_listeners
 			has_tun=$(yq -M 'has("tun")' "$merged_profile") || return 1

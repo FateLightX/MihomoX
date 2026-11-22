@@ -680,6 +680,9 @@ msgid "Overwrite Destination"
 msgstr "將嗅探結果作為連線目標"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:270
+msgid "Only when the profile has no filter settings"
+msgstr "僅當設定檔未設定過濾清單和模式時"
+
 msgid "Overwrite Fake-IP Filter"
 msgstr "覆寫 Fake-IP 過濾清單"
 

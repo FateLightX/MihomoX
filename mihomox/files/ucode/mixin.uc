@@ -84,10 +84,11 @@ config['dns']['enhanced-mode'] = uci.get('mihomox', 'mixin', 'dns_mode');
 config['dns']['fake-ip-range'] = uci.get('mihomox', 'mixin', 'fake_ip_range');
 config['dns']['fake-ip-range6'] = uci.get('mihomox', 'mixin', 'fake_ip6_range');
 config['dns']['fake-ip-ttl'] = uci_int(uci.get('mihomox', 'mixin', 'fake_ip_ttl'));
-if (uci_bool(uci.get('mihomox', 'mixin', 'fake_ip_filter'))) {
+const fake_ip_filter = uci.get('mihomox', 'mixin', 'fake_ip_filter');
+if (fake_ip_filter == '1' || (fake_ip_filter == 'auto' && getenv('MIHOMOX_USE_FAKE_IP_DEFAULTS') == '1')) {
 	config['dns']['fake-ip-filter'] = uci_array(uci.get('mihomox', 'mixin', 'fake_ip_filters'));
+	config['dns']['fake-ip-filter-mode'] = uci.get('mihomox', 'mixin', 'fake_ip_filter_mode');
 }
-config['dns']['fake-ip-filter-mode'] = uci.get('mihomox', 'mixin', 'fake_ip_filter_mode');
 const fake_ip_disable_mapping = uci.get('mihomox', 'mixin', 'fake_ip_disable_mapping');
 if (fake_ip_disable_mapping == '0' || fake_ip_disable_mapping == '1') {
 	config['dns']['fake-ip-disable-mapping'] = fake_ip_disable_mapping == '1';
@@ -128,7 +129,10 @@ if (uci_bool(uci.get('mihomox', 'mixin', 'dns_proxy_server_nameserver_policy')))
 		config['dns']['proxy-server-nameserver-policy'][section.matcher] = uci_array(section.nameserver);
 	});
 }
-config['dns']['direct-nameserver-follow-policy'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_direct_nameserver_follow_policy'));
+const direct_follow_policy = uci.get('mihomox', 'mixin', 'dns_direct_nameserver_follow_policy');
+if (direct_follow_policy == '0' || direct_follow_policy == '1') {
+	config['dns']['direct-nameserver-follow-policy'] = direct_follow_policy == '1';
+}
 if (uci_bool(uci.get('mihomox', 'mixin', 'dns_nameserver_policy'))) {
 	config['dns']['nameserver-policy'] = {};
 	uci.foreach('mihomox', 'nameserver_policy', (section) => {

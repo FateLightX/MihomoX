@@ -27,6 +27,7 @@ printf '0\n' > "$TEST_DIR/secret-counter"
 fixture_get() {
 	case "$1" in
 		mihomox.mixin.api_secret) printf '%s\n' "$API_SECRET" ;;
+		'mihomox.@authentication[0]'|'mihomox.@authentication[1]'|'mihomox.@authentication[2]'|'mihomox.@authentication[3]') echo authentication ;;
 		'mihomox.@authentication[0].enabled') printf '%s\n' "$AUTH0_ENABLED" ;;
 		'mihomox.@authentication[0].password') printf '%s\n' "$AUTH0_PASSWORD" ;;
 		'mihomox.@authentication[1].enabled') printf '%s\n' "$AUTH1_ENABLED" ;;
@@ -76,7 +77,7 @@ uci() {
 		show)
 			[ "${1:-}" = mihomox ] || return 1
 			cat <<'EOF'
-mihomox.@authentication[0]=authentication
+mihomox.named_account=authentication
 mihomox.@authentication[1]=authentication
 mihomox.@authentication[2]=authentication
 mihomox.@authentication[3]=authentication
@@ -87,6 +88,21 @@ EOF
 		*) echo "unsupported UCI command: $command $*" >&2; return 1 ;;
 	esac
 }
+
+# A failed or malformed generator must stop migration before any UCI write.
+for failure in error short nonhex; do
+	(
+		hexdump() {
+			case "$failure" in
+				error) printf '%064d' 0; return 1 ;;
+				short) printf 'abc' ;;
+				nonhex) printf '%063dx' 0 ;;
+			esac
+		}
+		if ensure_credentials; then exit 1; fi
+		[ "$UCI_SET_COUNT" -eq 0 ]
+	)
+done
 
 generate_secret() {
 	local count

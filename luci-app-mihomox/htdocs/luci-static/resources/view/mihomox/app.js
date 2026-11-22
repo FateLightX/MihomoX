@@ -497,6 +497,7 @@ return view.extend({
         o.rmempty = false;
 
         o = s.taboption('environment_variable', form.Flag, 'env_disable_quic_go_ecn', _('Disable ECN of quic-go'));
+        o.default = '1';
         o.rmempty = false;
 
         o = s.taboption('environment_variable', form.Flag, 'env_skip_system_ipv6_check', _('Skip System IPv6 Check'));

@@ -24,7 +24,7 @@ grep -q "option 'password' ''" "$CONFIG"
 grep -q "option 'api_secret' ''" "$CONFIG"
 grep -q "option 'start_delay' '10'" "$CONFIG"
 grep -q "option 'dns_cache_algorithm' 'arc'" "$CONFIG"
-grep -q "option 'fake_ip_filter' '1'" "$CONFIG"
+grep -q "option 'fake_ip_filter' 'auto'" "$CONFIG"
 grep -q "option 'fake_ip_filter_mode' 'blacklist'" "$CONFIG"
 grep -q "option 'fake_ip_cache' '0'" "$CONFIG"
 grep -q "option 'fake_ip6_range' 'fc00::/18'" "$CONFIG"
@@ -35,7 +35,11 @@ grep -q "list 'fake_ip_filters' '+.push.apple.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' 'dns.msftncsi.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' 'www.msftncsi.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' 'www.msftconnecttest.com'" "$CONFIG"
-grep -q "option 'hosts' '1'" "$CONFIG"
+grep -q "option 'hosts' '0'" "$CONFIG"
+if grep -q "option 'dns_direct_nameserver_follow_policy'" "$CONFIG"; then
+	echo "new installs must inherit the profile's direct DNS policy" >&2
+	exit 1
+fi
 grep -q "option 'sniffer' '1'" "$CONFIG"
 grep -q "option 'sniffer_sniff_dns_mapping' '1'" "$CONFIG"
 grep -q "option 'sniffer_ignore_domain_name' '1'" "$CONFIG"
@@ -45,7 +49,7 @@ grep -q "list 'sniffer_ignore_domain_names' 'Mijia Cloud'" "$CONFIG"
 grep -q "list 'sniffer_ignore_domain_names' '+.push.apple.com'" "$CONFIG"
 grep -q "option 'sniffer_sniff' '1'" "$CONFIG"
 grep -q "option 'geoip_format' 'mmdb'" "$CONFIG"
-grep -q "option 'geodata_loader' 'standard'" "$CONFIG"
+grep -q "option 'geodata_loader' 'memconservative'" "$CONFIG"
 grep -q "option 'geox_auto_update' '1'" "$CONFIG"
 grep -q "option 'geox_update_interval' '72'" "$CONFIG"
 grep -q "option 'bypass_china_mainland_ip' '1'" "$CONFIG"
@@ -110,7 +114,21 @@ END { if (in_sniff) finish_block(); exit !(http && tls && quic) }
 ' "$CONFIG"
 
 grep -q 'mihomox.mixin.fake_ip6_range=fc00::/18' "$MIGRATE"
-grep -q 'uci set mihomox.procd.env_disable_quic_go_ecn=1' "$MIGRATE"
+# Apply the actual ECN migration twice, including an explicit user choice.
+ecn_migration=$(sed -n '/^if .*env_disable_quic_go_ecn/,/^fi/p' "$MIGRATE")
+uci() {
+	case "$*" in
+		'-q get mihomox.procd.env_disable_quic_go_ecn') printf '%s\n' "$ecn" ;;
+		'set mihomox.procd.env_disable_quic_go_ecn=1') ecn=1 ;;
+		*) return 1 ;;
+	esac
+}
+ecn=
+eval "$ecn_migration"
+[ "$ecn" = 1 ]
+ecn=0
+eval "$ecn_migration"
+[ "$ecn" = 0 ]
 grep -q 'prune_missing_fake_ip_rule_sets' "$INIT_SCRIPT"
 grep -q 'TRIM_LOGS_SH="$SH_DIR/trim_logs.sh"' "$INCLUDE_SCRIPT"
 grep -q 'files/scripts/trim_logs.sh' "$ROOT_DIR/mihomox/Makefile"

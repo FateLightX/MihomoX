@@ -278,11 +278,8 @@ fi
 
 # since v1.26.2
 
-# QUIC_GO_DISABLE_ECN was never effective on its own: the core rewrites it from its
-# own default on every start, so ECN has always been off regardless of this option.
-# The mixin now emits experimental.quic-go-disable-ecn, so align the stored value
-# with the behaviour existing installations already have.
-if [ "$(uci -q get mihomox.procd.env_disable_quic_go_ecn)" != "1" ]; then
+# Supply the core default once for configurations missing this option.
+if [ -z "$(uci -q get mihomox.procd.env_disable_quic_go_ecn)" ]; then
 	uci set mihomox.procd.env_disable_quic_go_ecn=1
 fi
 

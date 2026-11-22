@@ -309,15 +309,18 @@ log() {
 }
 
 generate_secret() {
-	[ -r /dev/urandom ] || return 1
-	od -An -N32 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n'
+	local secret
+	secret=$(hexdump -v -n 32 -e '1/1 "%02x"' /dev/urandom) || return 1
+	[ "${#secret}" -eq 64 ] || return 1
+	case "$secret" in *[!0123456789abcdef]*) return 1 ;; esac
+	printf '%s\n' "$secret"
 }
 
 # Generate missing credentials and rotate the historical public default. A
 # disabled authentication section still gets a new value when it contains that
 # known password, so later enabling it cannot expose the shared default.
 ensure_credentials() {
-	local api_secret auth_section auth_enabled auth_password
+	local api_secret index auth_section auth_enabled auth_password
 
 	MIHOMOX_CREDENTIALS_CHANGED=0
 	api_secret=$(uci -q get mihomox.mixin.api_secret)
@@ -327,7 +330,10 @@ ensure_credentials() {
 		MIHOMOX_CREDENTIALS_CHANGED=1
 	fi
 
-	for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@authentication\[[0-9][0-9]*\]\)=authentication$/\1/p'); do
+	# UCI's type index addresses both named and anonymous sections.
+	index=0
+	while uci -q get "mihomox.@authentication[$index]" >/dev/null; do
+		auth_section="mihomox.@authentication[$index]"
 		auth_enabled=$(uci -q get "$auth_section.enabled")
 		auth_password=$(uci -q get "$auth_section.password")
 		if [ "$auth_password" = "2333" ] || \
@@ -336,6 +342,7 @@ ensure_credentials() {
 			uci set "$auth_section.password=$auth_password" || return 1
 			MIHOMOX_CREDENTIALS_CHANGED=1
 		fi
+		index=$((index + 1))
 	done
 }
 

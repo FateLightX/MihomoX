@@ -680,6 +680,9 @@ msgid "Overwrite Destination"
 msgstr "Переопределить назначение"
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:270
+msgid "Only when the profile has no filter settings"
+msgstr "Только если в профиле нет настроек фильтра"
+
 msgid "Overwrite Fake-IP Filter"
 msgstr "Переопределить фильтр Fake-IP"
 

@@ -508,12 +508,17 @@ return view.extend({
         o.datatype = 'uinteger';
         o.placeholder = _('Unmodified');
 
-        o = s.taboption('dns', form.Flag, 'fake_ip_filter', _('Overwrite Fake-IP Filter'));
+        o = s.taboption('dns', form.ListValue, 'fake_ip_filter', _('Overwrite Fake-IP Filter'));
         o.rmempty = false;
+        o.default = '0';
+        o.value('0', _('Unmodified'));
+        o.value('auto', _('Only when the profile has no filter settings'));
+        o.value('1', _('Enable'));
 
         o = s.taboption('dns', form.DynamicList, 'fake_ip_filters', _('Edit Fake-IP Filters'));
         o.retain = true;
         o.depends('fake_ip_filter', '1');
+        o.depends('fake_ip_filter', 'auto');
         o.validate = function (section_id, value) {
             const mode = String(fakeIpFilterModeOption?.formvalue(section_id) || 'blacklist');
             return mode === 'rule' ? validateFakeIPRule(value) : validateDomainPattern(value);
@@ -522,6 +527,9 @@ return view.extend({
         fakeIpFilterModeOption = s.taboption('dns', form.ListValue, 'fake_ip_filter_mode', _('Fake-IP Filter Mode'));
         o = fakeIpFilterModeOption;
         o.default = 'blacklist';
+        o.retain = true;
+        o.depends('fake_ip_filter', '1');
+        o.depends('fake_ip_filter', 'auto');
         o.value('blacklist', _('Block Mode'));
         o.value('whitelist', _('Allow Mode'));
         o.value('rule', _('Rule Mode'));
