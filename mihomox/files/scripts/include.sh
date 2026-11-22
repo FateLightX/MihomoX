@@ -129,6 +129,77 @@ trim_runtime_logs() {
 		log "Log" "Unable to trim core log to the hard size limit."
 }
 
+# Normalise a downloaded China-IP list into "$output" and record rejected
+# lines in "$bad_log" (first hit is enough for the operator log). nft rejects
+# octets with leading zeroes (010.1.2.0/24) and prefixes above 32, so both are
+# rejected here instead of failing later at nft apply time.
+normalise_china_ip_list() {
+	local family="$1"
+	local input="$2"
+	local output="$3"
+	local bad_log="$4"
+
+	: > "$bad_log"
+	tr -d '\r' < "$input" | sed -e '/^[[:space:]]*$/d' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' > "$output.raw"
+	case "$family" in
+		ipv4)
+			if ! awk -v bad_log="$bad_log" '
+				function reject(line) {
+					print NR ": " line > bad_log
+					invalid = 1
+				}
+				function octet(value) {
+					return value ~ /^[0-9]+$/ && value !~ /^0[0-9]/ && length(value) <= 3 && value + 0 <= 255
+				}
+				{
+					if (split($0, parts, "/") != 2 || parts[2] !~ /^[0-9]+$/ || parts[2] ~ /^0[0-9]/ || parts[2] + 0 > 32)
+						reject($0)
+					else if (split(parts[1], octets, ".") != 4)
+						reject($0)
+					else if (!octet(octets[1]) || !octet(octets[2]) || !octet(octets[3]) || !octet(octets[4]))
+						reject($0)
+					else {
+						print $0
+						count++
+					}
+				}
+				END { exit (invalid || count == 0) }
+			' "$output.raw" > "$output.valid"; then
+				return 1
+			fi
+			sort -u "$output.valid" > "$output"
+			;;
+		ipv6)
+			if ! awk -v bad_log="$bad_log" '
+				{
+					if ($0 !~ /^[0-9A-Fa-f:][0-9A-Fa-f:]*\/[0-9][0-9]*$/) {
+						print NR ": " $0 > bad_log
+						invalid = 1
+						next
+					}
+					split($0, parts, "/")
+					if (parts[2] + 0 > 128) {
+						print NR ": " $0 > bad_log
+						invalid = 1
+						next
+					}
+					print $0
+					count++
+				}
+				END { exit (invalid || count == 0) }
+			' "$output.raw" > "$output.valid"; then
+				return 1
+			fi
+			sort -u "$output.valid" > "$output"
+			;;
+		*)
+			return 1
+			;;
+	esac
+
+	[ "$(wc -l < "$output")" -gt 100 ]
+}
+
 prune_missing_fake_ip_rule_sets() {
 	local profile="$1"
 	local providers_file entries_file entry name
@@ -240,6 +311,49 @@ log() {
 generate_secret() {
 	[ -r /dev/urandom ] || return 1
 	od -An -N32 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n'
+}
+
+# Generate missing credentials and rotate the historical public default. A
+# disabled authentication section still gets a new value when it contains that
+# known password, so later enabling it cannot expose the shared default.
+ensure_credentials() {
+	local api_secret auth_section auth_enabled auth_password
+
+	MIHOMOX_CREDENTIALS_CHANGED=0
+	api_secret=$(uci -q get mihomox.mixin.api_secret)
+	if [ -z "$api_secret" ] || [ "$api_secret" = "2333" ]; then
+		api_secret=$(generate_secret) || return 1
+		uci set mihomox.mixin.api_secret="$api_secret" || return 1
+		MIHOMOX_CREDENTIALS_CHANGED=1
+	fi
+
+	for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@authentication\[[0-9][0-9]*\]\)=authentication$/\1/p'); do
+		auth_enabled=$(uci -q get "$auth_section.enabled")
+		auth_password=$(uci -q get "$auth_section.password")
+		if [ "$auth_password" = "2333" ] || \
+			{ [ "$auth_enabled" = "1" ] && [ -z "$auth_password" ]; }; then
+			auth_password=$(generate_secret) || return 1
+			uci set "$auth_section.password=$auth_password" || return 1
+			MIHOMOX_CREDENTIALS_CHANGED=1
+		fi
+	done
+}
+
+ensure_windows_ncsi_fake_ip_filters() {
+	local domains domain
+
+	[ "$(uci -q get mihomox.mixin.fake_ip_filter)" = "1" ] || return 0
+	[ "$(uci -q get mihomox.mixin.fake_ip_filter_mode)" = "blacklist" ] || return 0
+	domains=$(uci -q get mihomox.mixin.fake_ip_filters)
+	for domain in dns.msftncsi.com www.msftncsi.com www.msftconnecttest.com; do
+		case " $domains " in
+			*" $domain "*) ;;
+			*)
+				uci add_list mihomox.mixin.fake_ip_filters="$domain" || return 1
+				domains="$domains $domain"
+				;;
+		esac
+	done
 }
 
 is_valid_cron() {

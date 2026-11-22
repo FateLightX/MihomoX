@@ -16,6 +16,7 @@ for (const option of [
     'dns_cache_max_size',
     'dns_ipv6_timeout',
     'dns_fallback_lazy_query',
+    'fake_ip_disable_mapping',
     'sniffer_skip_src_addresses',
     'sniffer_skip_dst_addresses'
 ]) {
@@ -53,6 +54,16 @@ assert.ok(source.includes('function validateTLSBundle'), 'TLS bundle validation 
 assert.ok(source.includes('function validatePolicyMatcher'), 'DNS policy matcher validation is missing');
 assert.ok(source.includes("UI Name must be a local relative path."), 'UI name path validation is missing');
 assert.ok(source.includes("Relative UI Path must stay within Mihomo home."), 'UI path validation is missing');
+assert.ok(source.includes("UI Path must stay within Mihomo home or Safe Paths."), 'absolute UI path validation is missing');
+assert.ok(
+    /'ui_path'[\s\S]{0,300}parseSafePaths[\s\S]{0,100}env_safe_paths[\s\S]{0,160}validateUIPath\(value, safePaths\)/.test(source),
+    'UI path validation must include configured Safe Paths'
+);
+assert.ok(
+    /'fake_ip_disable_mapping'[\s\S]{0,260}depends\('dns_mode', 'fake-ip'\)/.test(source),
+    'Fake-IP mapping option must only appear for Fake-IP mode'
+);
+assert.ok(source.includes("Prevents filtered real-IP responses from being mapped back to their domain names."), 'Fake-IP mapping description is missing');
 assert.ok(source.includes("API TLS requires listen address, certificate and private key together."), 'TLS pair validation is missing');
 assert.ok(source.includes("mode === 'rule' ? validateFakeIPRule(value) : validateDomainPattern(value)"), 'Fake-IP mode-aware validation is missing');
 assert.ok(source.includes('so.validate = validatePolicyMatcher;'), 'DNS policy matcher validation is missing');

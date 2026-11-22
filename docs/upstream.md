@@ -9,9 +9,9 @@ MihomoX 不直接合并参考仓库，也不把参考源码复制进本仓库。
 
 | 参考源 | 本地目录 | 定位 | 当前审计版本 |
 | --- | --- | --- | --- |
-| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `69c16319b12d10ec1ed05eefca3a482357f5ffbb` |
+| [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) | 按需使用系统临时目录 | 配置、API、内核资产权威源 | Alpha `100ff73ae769c15562d6e174e88bf0da401ec4e2` |
 | [Zephyruso/zashboard](https://github.com/Zephyruso/zashboard) | 不保留克隆 | 面板资产权威源 | `v3.30.0` |
-| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `78e1a75` |
+| [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki) | `../OpenWrt-nikki` | 主要功能基础 | `aaf46bf` |
 
 ## 同步流程
 
@@ -25,6 +25,37 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
 
 同步后检查 `旧版本..新版本` 的提交、文件和实际行为。只有符合
 [移植边界](../PORTING.md#2-参考来源) 的变化才进入 MihomoX；禁止整目录覆盖。
+
+## 2026-11-22：参考源同步与大陆 IP 白名单更新加固
+
+- MihomoX 自身：`448cc3d..b0fed35`，只有一次 CI 发版提交，代码无变化。
+- 官方 Mihomo Alpha 头：`100ff73ae769c15562d6e174e88bf0da401ec4e2`（
+  `git ls-remote refs/heads/Alpha` 实测），构建期资产与之对应。
+- OpenWrt-nikki：`78e1a75..aaf46bf`，2 个提交，只改 `mihomo-alpha/Makefile` 和
+  `mihomo-meta/Makefile` 的内核版本（alpha `0455d0d`、meta `v1.19.34`）与镜像摘要。
+  MihomoX 构建期通过 `mihomox/scripts/fetch_mihomo.sh` 独立解析 Prerelease-Alpha 资产，
+  实测当前解析结果为 `mihomo-linux-amd64-v1-alpha-100ff73.gz`；无需固定上游提交。
+- openwrt-clashoo：`2d264af..3ec462e`，24 个提交。聚合 Feed 重写、文档站、依赖升级和
+  规则数据刷新都属于 clashoo 自己的发布链，不适用。移植下面这一条。
+- 移植 `7c8892a`（大陆 IP 白名单更新的失败可诊断性）。原实现把 `awk`/`nft` 的报错
+  重定向到 `/dev/null`，失败只留一句 `nft set update failed`；`$TEMP_DIR` 又会被
+  `trap` 清空，事后无法定位坏行。
+  - 校验逻辑收敛到 `include.sh` 的 `normalise_china_ip_list()`：逐行记录被拒行到
+    `<family>.bad`，由 `update_china_ip.sh` 把首个命中写进 `ChinaIP` 日志。
+  - 新增 IPv4 前导零和前缀检查：`010.1.2.0/24` 这类写法 nft 会直接拒绝，原正则放行；
+    同时对前缀 >32 与每段 >255 做显式拦截。IPv6 补充前缀 >128 检查。
+  - `nft -c` / `nft -f` 的 stderr 落到 `<family>.nft-error`，失败时记首行、条目数和
+    `nft --version`。
+  - 失败现场复制到 `/tmp/mihomox_china_ip_failed_<family>.txt`（可用
+    `MIHOMOX_KEEP_FAILED_DIR` / `MIHOMOX_KEEP_FAILED_PREFIX` 覆盖），不随 `trap` 消失。
+  - curl 失败也记录首行错误，不再静默跳到下一个源。
+  - 测试：新增 `tests/test_china_ip_failure_log.sh` 并加入 `tests/run.sh`，覆盖前导零、
+    前缀越界、IPv6 前缀越界、`nft` 拒绝候选文件与在线 set 两条分支、成功后正常安装；
+    断言失败时目标 nft 文件保持不变、日志含行号与 nft 原始报错。
+- 不移植：`6a64b45` 的 fake-ip-filter 剪枝（MihomoX 在 `448cc3d` 已自带
+  `prune_missing_fake_ip_rule_sets` 并有测试）、`69828fb` 的 Mips 栈与 eBPF 识别
+  （MihomoX 的 `tun_stack` 早已含 `mips`，不支持 eBPF 核心）、`eed0cee` 的 BTF
+  同系列回退（MihomoX 无 BTF 安装逻辑）。
 
 ## 2026-11-05：Mihomo Alpha、Zashboard 与必要防护
 
@@ -74,6 +105,10 @@ git -C ../OpenWrt-nikki merge --ff-only origin/main
   `PKG_RELEASE` 重置为 1，生成 tag `v2026.10.16`。
 - 同批修正：`tests/test_default_settings.sh` 的断言随新默认值同步（首次触发 `38826502071` 因
   `validate` 的 `test` 步骤失败而中断，`sync`/`release`/`feed` 全部 skipped）。
+
+> 2026-11-22 后续：公开固定凭据已撤销，新安装和升级时若仍为历史默认值 `2333`，会生成
+> 随机 API Secret 与认证密码。Fake-IP 默认列表同时补入 Windows NCSI 域名，并接入
+> `dns.fake-ip-disable-mapping`；绝对 UI Path 校验与 Alpha 的 home/`SAFE_PATHS` 语义一致。
 
 ## 2026-10-15：Mihomo Alpha、Nikki 与 Zashboard
 

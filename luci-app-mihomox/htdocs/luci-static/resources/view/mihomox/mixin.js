@@ -44,15 +44,46 @@ function validateUIName(value) {
     return true;
 }
 
-function validateUIPath(value) {
+function normalizeAbsolutePath(value) {
+    const parts = [];
+    for (const part of String(value || '').replace(/\\/g, '/').split('/')) {
+        if (!part || part === '.')
+            continue;
+        if (part === '..') {
+            if (!parts.length)
+                return null;
+            parts.pop();
+        }
+        else
+            parts.push(part);
+    }
+    return '/' + parts.join('/');
+}
+
+function parseSafePaths(value) {
+    const paths = Array.isArray(value) ? value : String(value || '').split(':');
+    return paths.map((path) => String(path || '').trim()).filter(Boolean);
+}
+
+function validateUIPath(value, safePaths) {
     value = String(value || '').trim();
     if (!value)
         return true;
     if (value.includes('\0'))
         return _('Relative UI Path must stay within Mihomo home.');
-    if (value.startsWith('/'))
-        return true;
     const normalized = value.replace(/\\/g, '/').replace(/\/+/g, '/');
+    if (normalized.startsWith('/')) {
+        const absolute = normalizeAbsolutePath(normalized);
+        if (!absolute)
+            return _('UI Path must stay within Mihomo home or Safe Paths.');
+        const allowed = [mihomox.homeDir].concat(Array.isArray(safePaths) ? safePaths : []);
+        for (const base of allowed) {
+            const root = normalizeAbsolutePath(base);
+            if (root && (absolute === root || absolute.startsWith(root + '/')))
+                return true;
+        }
+        return _('UI Path must stay within Mihomo home or Safe Paths.');
+    }
     if (relativePathEscapes(normalized))
         return _('Relative UI Path must stay within Mihomo home.');
     return true;
@@ -234,7 +265,8 @@ return view.extend({
         o.placeholder = _('Unmodified');
         o.datatype = 'directory';
         o.validate = function (_, value) {
-            return validateUIPath(value);
+            const safePaths = parseSafePaths(uci.get('mihomox', 'procd', 'env_safe_paths'));
+            return validateUIPath(value, safePaths);
         };
 
         o = s.taboption('external_control', form.Value, 'ui_name', _('UI Name'));
@@ -493,6 +525,14 @@ return view.extend({
         o.value('blacklist', _('Block Mode'));
         o.value('whitelist', _('Allow Mode'));
         o.value('rule', _('Rule Mode'));
+
+        o = s.taboption('dns', form.ListValue, 'fake_ip_disable_mapping', _('Disable Fake-IP Mapping'));
+        o.optional = true;
+        o.placeholder = _('Unmodified');
+        o.depends('dns_mode', 'fake-ip');
+        o.value('0', _('Disable'));
+        o.value('1', _('Enable'));
+        o.description = _('Prevents filtered real-IP responses from being mapped back to their domain names.');
 
         o = s.taboption('dns', form.ListValue, 'fake_ip_cache', _('Fake-IP Cache'));
         o.optional = true;

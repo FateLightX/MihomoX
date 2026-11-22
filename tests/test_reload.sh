@@ -10,6 +10,11 @@ export TEST_DIR
 # Load the actual init functions, replacing only device paths and dependencies.
 sed '/^\. /d; s|/etc/crontabs/root|'"$TEST_DIR"'/crontab|g' \
 	"$ROOT_DIR/mihomox/files/mihomox.init" > "$TEST_DIR/init"
+awk '/^generate_secret\(\)/ { capture = 1 }
+capture { print }
+capture && /^}/ { exit }' \
+	"$ROOT_DIR/mihomox/files/scripts/include.sh" > "$TEST_DIR/generate-secret"
+. "$TEST_DIR/generate-secret"
 CORE_PATH="$TEST_DIR/core"
 extra_command() { :; }
 . "$TEST_DIR/init"
@@ -49,6 +54,7 @@ uci() {
 		'-q get mihomox.fixture') echo subscription ;;
 	esac
 }
+ensure_credentials() { MIHOMOX_CREDENTIALS_CHANGED=0; }
 config_load() { :; }
 config_get() {
 	local value="${4:-}"

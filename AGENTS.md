@@ -52,10 +52,10 @@ git rev-list --left-right --count HEAD...@{upstream}
 ```text
 proxy.enabled=1
 proxy.tcp_mode=tproxy
-proxy.udp_mode=tproxy
+proxy.udp_mode=tun
 proxy.router_proxy=1
 proxy.lan_proxy=1
-mixin.tun_enabled=0
+mixin.tun_enabled=1
 ```
 
 这是包源码默认值，不是运行中路由器的最终状态。修改默认值只影响新安装；迁移脚本不得

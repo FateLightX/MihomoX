@@ -46,8 +46,8 @@ MihomoX 是单 Mihomo 内核的 OpenWrt 透明代理服务：
 默认值以 `mihomox/files/mihomox.conf` 为准。LuCI 默认显示、UCI 默认值和生成后的
 Mihomo YAML 必须保持一致；修改字段时应沿完整链路验证。
 
-新安装默认启用透明代理，TCP 和 UDP 均使用 TPROXY，TUN 默认关闭；路由器自身与 LAN
-设备代理默认启用。该文件只定义新安装默认值，升级不得覆盖已有 UCI 选择。
+新安装默认启用透明代理，TCP 使用 TPROXY、UDP 使用 TUN；路由器自身与 LAN 设备代理
+默认启用。该文件只定义新安装默认值，升级不得覆盖已有 UCI 选择。
 
 ## 4. 编译期交付
 

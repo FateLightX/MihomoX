@@ -13,6 +13,10 @@ CHINA_IP6_JSDELIVR_URL="https://fastly.jsdelivr.net/gh/gaoyifan/china-operator-i
 
 LOCK_DIR="$TEMP_DIR/china-ip-update.lock"
 LOCK_HELD=0
+# The temporary directory is removed on exit, so a failed run has to leave its
+# evidence somewhere that survives: fixed path, one file per address family.
+KEEP_FAILED_DIR="${MIHOMOX_KEEP_FAILED_DIR:-/tmp}"
+KEEP_FAILED_PREFIX="${MIHOMOX_KEEP_FAILED_PREFIX:-mihomox_china_ip_failed}"
 
 log_update() {
 	log "ChinaIP" "$1"
@@ -20,7 +24,9 @@ log_update() {
 
 cleanup_update() {
 	[ "$LOCK_HELD" -eq 1 ] && rm -rf "$LOCK_DIR"
-	rm -f "$TEMP_DIR/china-ip-"*.tmp "$TEMP_DIR/china-ip-"*.raw "$TEMP_DIR/china-ip-"*.valid "$TEMP_DIR/china-ip-"*.list "$TEMP_DIR/china-ip-"*.nft "$TEMP_DIR/china-ip-"*.apply
+	rm -f "$TEMP_DIR/china-ip-"*.tmp "$TEMP_DIR/china-ip-"*.raw "$TEMP_DIR/china-ip-"*.valid \
+		"$TEMP_DIR/china-ip-"*.list "$TEMP_DIR/china-ip-"*.nft "$TEMP_DIR/china-ip-"*.apply \
+		"$TEMP_DIR/china-ip-"*.error "$TEMP_DIR/china-ip-"*.bad
 }
 
 prepare_files
@@ -41,6 +47,46 @@ LOCK_HELD=1
 printf '%s\n' "$$" > "$LOCK_DIR/pid"
 trap cleanup_update EXIT INT TERM
 
+first_line() {
+	head -n 1 "$1" 2>/dev/null | tr -d '\r'
+}
+
+nft_version() {
+	nft --version 2>/dev/null | head -n 1 || true
+}
+
+# Keep the input that failed validation so a later inspection can reproduce the
+# error; the working copy under $TEMP_DIR is gone once the trap runs.
+keep_failed_source() {
+	local family="$1"
+	local source_file="$2"
+	local keep="$KEEP_FAILED_DIR/${KEEP_FAILED_PREFIX}_$family.txt"
+
+	[ -d "$KEEP_FAILED_DIR" ] || mkdir -p "$KEEP_FAILED_DIR" 2>/dev/null || return 1
+	cp -f "$source_file" "$keep" 2>/dev/null || return 1
+	chmod 644 "$keep" >/dev/null 2>&1 || true
+	printf '%s\n' "$keep"
+}
+
+report_failure() {
+	local label="$1"
+	local family="$2"
+	local source_file="$3"
+	local kind="$4"
+	local detail="$5"
+	local lines keep
+
+	lines=$(grep -c '[^[:space:]]' "$source_file" 2>/dev/null || true)
+	[ -n "${lines:-}" ] || lines="?"
+	[ -n "$detail" ] || detail="no error output"
+	if keep=$(keep_failed_source "$family" "$source_file"); then
+		log_update "$label failed ($kind), ${lines} entries, $(nft_version); source kept at $keep"
+	else
+		log_update "$label failed ($kind), ${lines} entries, $(nft_version); unable to keep the source file"
+	fi
+	log_update "$label error: $detail"
+}
+
 download_list() {
 	local family="$1"
 	local output="$2"
@@ -48,17 +94,20 @@ download_list() {
 	local primary="$4"
 	local proxy="$5"
 	local jsdelivr="$6"
+	local curl_log="$TEMP_DIR/china-ip-$family.curl-error"
 	local url
 
 	for url in "$primary" "$proxy" "$jsdelivr"; do
 		log_update "Download $family list: $url"
-		if curl -fL --connect-timeout 15 --max-time 120 --silent --show-error "$url" -o "$output"; then
-			if [ -s "$output" ] && normalise_list "$family" "$output" "$list"; then
-				printf '%s\n' "$url"
-				return 0
-			fi
-			log_update "$family list from $url failed validation; try the next source."
+		if ! curl -fL --connect-timeout 15 --max-time 120 --silent --show-error "$url" -o "$output" 2>"$curl_log"; then
+			log_update "$family download failed from $url: $(first_line "$curl_log")"
+			continue
 		fi
+		if [ -s "$output" ] && normalise_list "$family" "$output" "$list"; then
+			printf '%s\n' "$url"
+			return 0
+		fi
+		log_update "$family list from $url failed validation; try the next source."
 	done
 
 	return 1
@@ -68,35 +117,16 @@ normalise_list() {
 	local family="$1"
 	local input="$2"
 	local output="$3"
+	local bad_log="$TEMP_DIR/china-ip-$family.bad"
+	local detail
 
-	tr -d '\r' < "$input" | sed -e '/^[[:space:]]*$/d' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' > "$output.raw"
-	case "$family" in
-		ipv4)
-			if ! awk '
-				/^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\/[0-9][0-9]*$/ { print; count++; next }
-			{ invalid = 1 }
-			END { exit (invalid || count == 0) }
-			' "$output.raw" > "$output.valid"; then
-				return 1
-			fi
-			sort -u "$output.valid" > "$output"
-			;;
-		ipv6)
-			if ! awk '
-				/^[0-9A-Fa-f:][0-9A-Fa-f:]*\/[0-9][0-9]*$/ { print; count++; next }
-			{ invalid = 1 }
-			END { exit (invalid || count == 0) }
-			' "$output.raw" > "$output.valid"; then
-				return 1
-			fi
-			sort -u "$output.valid" > "$output"
-			;;
-		*)
-			return 1
-			;;
-	esac
-
-	[ "$(wc -l < "$output")" -gt 100 ]
+	if normalise_china_ip_list "$family" "$input" "$output" "$bad_log"; then
+		return 0
+	fi
+	detail=$(first_line "$bad_log")
+	[ -n "$detail" ] || detail="no valid entries"
+	log_update "$family format check rejected line $detail"
+	return 1
 }
 
 write_nft_file() {
@@ -144,10 +174,15 @@ update_family() {
 	local list="$TEMP_DIR/china-ip-$family.list"
 	local candidate="$TEMP_DIR/china-ip-$family.nft"
 	local apply="$TEMP_DIR/china-ip-$family.apply"
+	local nft_log="$TEMP_DIR/china-ip-$family.nft-error"
 	local source
 
 	if ! source=$(download_list "$family" "$raw" "$list" "$primary" "$proxy" "$jsdelivr"); then
 		log_update "$family list download failed; keep the current list."
+		if [ -s "$raw" ]; then
+			report_failure "$family list validation" "$family" "$raw" "every source failed" \
+				"$(first_line "$TEMP_DIR/china-ip-$family.bad")"
+		fi
 		return 1
 	fi
 	write_nft_file "$set_name" "$list" "$candidate"
@@ -156,15 +191,18 @@ update_family() {
 		return 0
 	fi
 
+	: > "$nft_log"
 	if nft list set inet mihomox "$set_name" >/dev/null 2>&1; then
 		write_apply_file "$set_name" "$list" "$apply"
-		if ! nft -c -f "$apply" >/dev/null 2>&1 || ! nft -f "$apply" >/dev/null 2>&1; then
-			log_update "$family nft set update failed; keep the current list."
+		if nft -c -f "$apply" >/dev/null 2>"$nft_log" && nft -f "$apply" >/dev/null 2>>"$nft_log"; then
+			:
+		else
+			report_failure "$family nft set update" "$family" "$list" "nft rejected the update" "$(first_line "$nft_log")"
 			return 1
 		fi
 	else
-		if ! nft -c -f "$candidate" >/dev/null 2>&1; then
-			log_update "$family nft file validation failed; keep the current list."
+		if ! nft -c -f "$candidate" >/dev/null 2>"$nft_log"; then
+			report_failure "$family nft file validation" "$family" "$list" "nft rejected the candidate file" "$(first_line "$nft_log")"
 			return 1
 		fi
 	fi

@@ -995,6 +995,10 @@ msgstr ""
 msgid "UI Path"
 msgstr ""
 
+#: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
+msgid "Disable Fake-IP Mapping"
+msgstr ""
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:103
 msgid "UI Url"
 msgstr ""
@@ -1416,6 +1420,12 @@ msgstr ""
 
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "Relative UI Path must stay within Mihomo home."
+msgstr ""
+
+msgid "UI Path must stay within Mihomo home or Safe Paths."
+msgstr ""
+
+msgid "Prevents filtered real-IP responses from being mapped back to their domain names."
 msgstr ""
 
 msgid "Read failed"

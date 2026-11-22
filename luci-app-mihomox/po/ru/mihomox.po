@@ -1002,6 +1002,9 @@ msgstr "Имя интерфейса"
 msgid "UI Path"
 msgstr "Путь к интерфейсу"
 
+msgid "Disable Fake-IP Mapping"
+msgstr "Отключить сопоставление Fake-IP"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:103
 msgid "UI Url"
 msgstr "URL интерфейса"
@@ -1370,6 +1373,12 @@ msgstr "Имя UI должно быть локальным относитель�
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "Relative UI Path must stay within Mihomo home."
 msgstr "Относительный путь UI должен находиться в домашнем каталоге Mihomo."
+
+msgid "UI Path must stay within Mihomo home or Safe Paths."
+msgstr "Путь UI должен находиться в домашнем каталоге Mihomo или в разрешённых путях."
+
+msgid "Prevents filtered real-IP responses from being mapped back to their domain names."
+msgstr "Не сопоставлять реальные IP-адреса, возвращённые после фильтрации, с доменными именами."
 
 msgid "Read failed"
 msgstr "Ошибка чтения"

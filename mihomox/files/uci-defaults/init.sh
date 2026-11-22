@@ -5,21 +5,8 @@
 # check mihomox.config.init
 init=$(uci -q get mihomox.config.init); [ -z "$init" ] && return
 
-# keep the packaged API secret; only generate one when it is missing
-if [ -z "$(uci -q get mihomox.mixin.api_secret)" ]; then
-	api_secret=$(generate_secret) || exit 1
-	uci set mihomox.mixin.api_secret="$api_secret"
-fi
-
-# generate a password only when the packaged one is missing
-for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@authentication\[[0-9][0-9]*\]\)=authentication$/\1/p'); do
-	auth_enabled=$(uci -q get "$auth_section.enabled")
-	auth_password=$(uci -q get "$auth_section.password")
-	if [ "$auth_enabled" = 1 ] && [ -z "$auth_password" ]; then
-		auth_password=$(generate_secret) || exit 1
-		uci set "$auth_section.password=$auth_password"
-	fi
-done
+# rotate the historical public default and generate missing credentials
+ensure_credentials || exit 1
 
 # initialize custom core checksum field for older configurations
 [ -z "$(uci -q get mihomox.core.download_sha256)" ] && uci set mihomox.core.download_sha256=

@@ -18,6 +18,8 @@ const expectedMappings = [
     "config['dns']['cache-max-size'] = uci_int(uci.get('mihomox', 'mixin', 'dns_cache_max_size'));",
     "config['dns']['ipv6-timeout'] = uci_int(uci.get('mihomox', 'mixin', 'dns_ipv6_timeout'));",
     "config['dns']['fallback-lazy-query'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_fallback_lazy_query'));",
+    "const fake_ip_disable_mapping = uci.get('mihomox', 'mixin', 'fake_ip_disable_mapping');",
+    "config['dns']['fake-ip-disable-mapping'] = fake_ip_disable_mapping == '1';",
     "config['tun']['dns-mode'] = tun_dns_mode;",
     "config['sniffer']['skip-src-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_src_addresses'));",
     "config['sniffer']['skip-dst-address'] = uci_array(uci.get('mihomox', 'mixin', 'sniffer_skip_dst_addresses'));",
@@ -32,6 +34,14 @@ for (const mapping of expectedMappings) {
 
 assert.ok(!source.includes("['port'] = uci_array(section.port)"), 'sniffer must not emit the obsolete port key');
 assert.ok(!/\bsize_limit\s*:/.test(source), 'rule providers must not emit size_limit');
+assert.ok(
+    source.indexOf("const fake_ip_disable_mapping =") < source.indexOf("config['dns']['fake-ip-disable-mapping']"),
+    'Fake-IP mapping boolean must be guarded by the UCI value'
+);
+assert.ok(
+    source.includes("if (fake_ip_disable_mapping == '0' || fake_ip_disable_mapping == '1')"),
+    'an unset Fake-IP mapping option must not override the profile'
+);
 
 const sniffStart = source.indexOf("if (uci_bool(uci.get('mihomox', 'mixin', 'sniffer_sniff'))) {");
 const sniffEnd = source.indexOf("\n\nconfig['profile'] = {};", sniffStart);

@@ -261,18 +261,7 @@ fi
 [ -z "$(uci -q get mihomox.mixin.fake_ip6_range)" ] && uci set mihomox.mixin.fake_ip6_range=fc00::/18
 
 # replace missing legacy credentials before the service is started
-if [ -z "$(uci -q get mihomox.mixin.api_secret)" ]; then
-	api_secret=$(generate_secret) || exit 1
-	uci set mihomox.mixin.api_secret="$api_secret"
-fi
-for auth_section in $(uci show mihomox 2>/dev/null | sed -n 's/^\(mihomox\.@authentication\[[0-9][0-9]*\]\)=authentication$/\1/p'); do
-	auth_enabled=$(uci -q get "$auth_section.enabled")
-	auth_password=$(uci -q get "$auth_section.password")
-	if [ "$auth_enabled" = 1 ] && [ -z "$auth_password" ]; then
-		auth_password=$(generate_secret) || exit 1
-		uci set "$auth_section.password=$auth_password"
-	fi
-done
+ensure_credentials || exit 1
 
 # since v1.26.1
 
@@ -296,6 +285,15 @@ fi
 if [ "$(uci -q get mihomox.procd.env_disable_quic_go_ecn)" != "1" ]; then
 	uci set mihomox.procd.env_disable_quic_go_ecn=1
 fi
+
+# since v1.26.3
+
+# Windows NCSI probes must bypass Fake-IP. Only update configurations that
+# overwrite the subscription filter; leaving it unset preserves that list.
+ensure_windows_ncsi_fake_ip_filters || exit 1
+
+# Leave fake_ip_disable_mapping unset. An explicit value overrides subscriptions;
+# an absent value lets the core retain the subscription or its false default.
 
 # commit
 uci commit mihomox

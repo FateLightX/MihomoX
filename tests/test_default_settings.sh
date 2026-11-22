@@ -20,8 +20,8 @@ grep -q "option 'tun_stack' 'mips'" "$CONFIG"
 grep -q "option 'tun_dns_mode' ''" "$CONFIG"
 grep -q "option 'tcp_mode' 'tproxy'" "$CONFIG"
 grep -q "option 'udp_mode' 'tun'" "$CONFIG"
-grep -q "option 'password' '2333'" "$CONFIG"
-grep -q "option 'api_secret' '2333'" "$CONFIG"
+grep -q "option 'password' ''" "$CONFIG"
+grep -q "option 'api_secret' ''" "$CONFIG"
 grep -q "option 'start_delay' '10'" "$CONFIG"
 grep -q "option 'dns_cache_algorithm' 'arc'" "$CONFIG"
 grep -q "option 'fake_ip_filter' '1'" "$CONFIG"
@@ -32,6 +32,9 @@ grep -q "list 'fake_ip_filters' '+.gstatic.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.miwifi.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.market.xiaomi.com'" "$CONFIG"
 grep -q "list 'fake_ip_filters' '+.push.apple.com'" "$CONFIG"
+grep -q "list 'fake_ip_filters' 'dns.msftncsi.com'" "$CONFIG"
+grep -q "list 'fake_ip_filters' 'www.msftncsi.com'" "$CONFIG"
+grep -q "list 'fake_ip_filters' 'www.msftconnecttest.com'" "$CONFIG"
 grep -q "option 'hosts' '1'" "$CONFIG"
 grep -q "option 'sniffer' '1'" "$CONFIG"
 grep -q "option 'sniffer_sniff_dns_mapping' '1'" "$CONFIG"
@@ -106,12 +109,15 @@ in_sniff { block = block $0 "\n" }
 END { if (in_sniff) finish_block(); exit !(http && tls && quic) }
 ' "$CONFIG"
 
-grep -q 'auth_password=$(generate_secret)' "$MIGRATE"
-grep -q 'auth_password=$(generate_secret)' "$INIT_DEFAULTS"
 grep -q 'mihomox.mixin.fake_ip6_range=fc00::/18' "$MIGRATE"
 grep -q 'uci set mihomox.procd.env_disable_quic_go_ecn=1' "$MIGRATE"
 grep -q 'prune_missing_fake_ip_rule_sets' "$INIT_SCRIPT"
 grep -q 'TRIM_LOGS_SH="$SH_DIR/trim_logs.sh"' "$INCLUDE_SCRIPT"
 grep -q 'files/scripts/trim_logs.sh' "$ROOT_DIR/mihomox/Makefile"
+
+for credential_script in "$INIT_DEFAULTS" "$MIGRATE" "$INIT_SCRIPT"; do
+	grep -q 'ensure_credentials' "$credential_script"
+done
+grep -q 'ensure_windows_ncsi_fake_ip_filters' "$MIGRATE"
 
 echo "default settings tests passed"

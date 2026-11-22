@@ -88,6 +88,10 @@ if (uci_bool(uci.get('mihomox', 'mixin', 'fake_ip_filter'))) {
 	config['dns']['fake-ip-filter'] = uci_array(uci.get('mihomox', 'mixin', 'fake_ip_filters'));
 }
 config['dns']['fake-ip-filter-mode'] = uci.get('mihomox', 'mixin', 'fake_ip_filter_mode');
+const fake_ip_disable_mapping = uci.get('mihomox', 'mixin', 'fake_ip_disable_mapping');
+if (fake_ip_disable_mapping == '0' || fake_ip_disable_mapping == '1') {
+	config['dns']['fake-ip-disable-mapping'] = fake_ip_disable_mapping == '1';
+}
 
 config['dns']['respect-rules'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_respect_rules'));
 config['dns']['prefer-h3'] = uci_bool(uci.get('mihomox', 'mixin', 'dns_doh_prefer_http3'));

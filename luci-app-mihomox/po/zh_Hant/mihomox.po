@@ -1002,6 +1002,9 @@ msgstr "UI 名稱"
 msgid "UI Path"
 msgstr "UI 路徑"
 
+msgid "Disable Fake-IP Mapping"
+msgstr "停用 Fake-IP 對應"
+
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js:103
 msgid "UI Url"
 msgstr "UI 下載網址"
@@ -1424,6 +1427,12 @@ msgstr "UI 名稱必須是本機相對路徑。"
 #: applications/luci-app-mihomox/htdocs/luci-static/resources/view/mihomox/mixin.js
 msgid "Relative UI Path must stay within Mihomo home."
 msgstr "相對 UI 路徑必須位於 Mihomo 主目錄內。"
+
+msgid "UI Path must stay within Mihomo home or Safe Paths."
+msgstr "UI 路徑必須位於 Mihomo 主目錄或安全路徑內。"
+
+msgid "Prevents filtered real-IP responses from being mapped back to their domain names."
+msgstr "過濾後傳回真實 IP 時，不將其反向對應為網域名稱。"
 
 msgid "Read failed"
 msgstr "讀取失敗"
