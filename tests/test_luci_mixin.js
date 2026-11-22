@@ -34,6 +34,13 @@ assert.ok(source.includes("value === 'mrs'"), 'MRS format validation is missing'
 assert.ok(source.includes("behaviorOption.formvalue(section_id) === 'classical'"), 'MRS/Classical guard is missing');
 assert.ok(source.includes("description = _('Bytes; 0 means unlimited.')"), 'size limit unit is missing');
 assert.ok(source.includes('mihomox.inlineDescriptions'), 'tips must render inline beside their fields');
+assert.ok(source.includes('ensureAuthenticationTableLayout'), 'authentication table layout repair is missing');
+assert.ok(
+    source.includes('#cbi-mihomox-authentication .cbi-section-table td[data-name="password"] .control-group'),
+    'authentication password control layout is not scoped to the authentication table'
+);
+assert.ok(source.includes('flex-wrap: nowrap;'), 'authentication password controls may still wrap');
+assert.ok(source.includes('width: 40%;'), 'authentication username and password columns must stay balanced');
 for (const option of ['ui_url', 'geosite_url', 'geoip_mmdb_url', 'geoip_dat_url', 'geoip_asn_url']) {
     assert.ok(
         new RegExp(`'${option}'[\\s\\S]{0,240}validateURL\\(value\\)`).test(source),

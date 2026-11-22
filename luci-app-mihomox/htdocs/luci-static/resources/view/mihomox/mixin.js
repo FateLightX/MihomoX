@@ -34,6 +34,41 @@ const FAKE_IP_RULE_TYPES = new Set([
     'DOMAIN-WILDCARD', 'GEOSITE', 'RULE-SET', 'MATCH'
 ]);
 
+const AUTHENTICATION_TABLE_STYLE_ID = 'mihomox-authentication-table-style';
+const AUTHENTICATION_TABLE_STYLE = `
+#cbi-mihomox-authentication .cbi-section-table td[data-name="password"] .control-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+}
+#cbi-mihomox-authentication .cbi-section-table td[data-name="password"] .control-group > input {
+    flex: 1 1 auto;
+    width: auto !important;
+    min-width: 0 !important;
+}
+#cbi-mihomox-authentication .cbi-section-table td[data-name="password"] .control-group > button {
+    flex: 0 0 auto;
+}
+@media (min-width: 761px) {
+    #cbi-mihomox-authentication .cbi-section-table td[data-name="username"],
+    #cbi-mihomox-authentication .cbi-section-table td[data-name="password"] {
+        width: 40%;
+    }
+}
+`;
+
+function ensureAuthenticationTableLayout(node) {
+    if (!document.getElementById(AUTHENTICATION_TABLE_STYLE_ID)) {
+        const style = document.createElement('style');
+        style.id = AUTHENTICATION_TABLE_STYLE_ID;
+        style.textContent = AUTHENTICATION_TABLE_STYLE;
+        document.head.appendChild(style);
+    }
+    return node;
+}
+
 function validateUIName(value) {
     value = String(value || '').trim();
     if (!value)
@@ -938,6 +973,8 @@ return view.extend({
         o = s.taboption('mixin_file_content', form.Flag, 'mixin_file_content', _('Enable'), _('Please go to the editor tab to edit the file for mixin'));
         o.rmempty = false;
 
-        return Promise.resolve(m.render()).then(mihomox.inlineDescriptions);
+        return Promise.resolve(m.render())
+            .then(mihomox.inlineDescriptions)
+            .then(ensureAuthenticationTableLayout);
     }
 });
